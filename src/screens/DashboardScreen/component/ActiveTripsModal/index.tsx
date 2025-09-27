@@ -66,7 +66,7 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
     refetch: refetchActiveTrips,
     isLoading,
   } = useGetActiveTripsQuery({ CustomerID });
-
+  console.log({ activeTrips });
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -90,21 +90,22 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
   };
 
   const handleTripPress = (item: ActiveTrip) => {
+    console.log({ item });
     dispatch(addOrUpdateDriver([]));
     dispatch(setCustomerMap('Active'));
-    dispatch(setPostId(item?.Customer_LoadPostID));
+    dispatch(setPostId(item?.LoadPostID));
     dispatch(
       setOrigin({
-        latitude: item?.Customer_Origin_Lat,
-        longitude: item?.Customer_Origin_Lng,
+        latitude: item?.Origin_Lat,
+        longitude: item?.Origin_Lng,
       }),
     );
-    dispatch(setOriginAddress(item?.Customer_Origin));
-    dispatch(setDestinationAddress(item?.Customer_Destination));
+    dispatch(setOriginAddress(item?.Origin));
+    dispatch(setDestinationAddress(item?.Destination));
     dispatch(
       selectDriver({
-        latitude: item?.Driver_Lat,
-        longitude: item?.Driver_Lng,
+        latitude: item?.DriverLat,
+        longitude: item?.DriverLng,
         available: true,
         driver: item?.DriverID,
         id: item?.DriverID,
@@ -115,8 +116,8 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
     );
     dispatch(
       setDestination({
-        latitude: item?.Customer_Destination_Lat,
-        longitude: item?.Customer_Destination_Lng,
+        latitude: item?.Destination_Lat,
+        longitude: item?.Destination_Lng,
       }),
     );
     handleModalClose();
@@ -153,11 +154,11 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
         <View style={activeTripStyles.routeDetails}>
           <View style={activeTripStyles.locationRow}>
             <Text style={activeTripStyles.originText} numberOfLines={1}>
-              {item.Customer_Origin}
+              {item.Origin}
             </Text>
             <Icon source="arrow-right" size={16} color="#999" />
             <Text style={activeTripStyles.destinationText} numberOfLines={1}>
-              {item.Customer_Destination}
+              {item.Destination}
             </Text>
           </View>
         </View>
@@ -246,7 +247,7 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
         <FlatList
           data={activeTrips?.data || []}
           renderItem={renderTripCard}
-          keyExtractor={item => item.ActiveTripID}
+          keyExtractor={item => item?.LoadPostID}
           contentContainerStyle={activeTripStyles.listContent}
           showsVerticalScrollIndicator={true}
           refreshControl={

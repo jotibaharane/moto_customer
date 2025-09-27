@@ -25,11 +25,11 @@ const FirstStep: React.FC = () => {
     useFormikContext<ShipmentData>();
 
   const { data: truckTypesData } = useGetTruckTypeQuery();
-  const { data: ApproximateWeight } = useGetAproximateWeightQuery(
+  const { data: ApproximateWeight, refetch } = useGetAproximateWeightQuery(
     { vehicleType: values?.VehicleType },
     { skip: !values?.VehicleType },
   );
-
+  console.log({ ApproximateWeight, values });
   // truck type
   const truckTypes =
     truckTypesData?.data?.map((truck: any) => ({

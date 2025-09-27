@@ -3,6 +3,7 @@ import Icon from '@react-native-vector-icons/material-design-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import Dashboard from '@screens/DashboardScreen';
+import LoadPostForm from '@screens/LoadPostScreen';
 import colors from '@utils/colors';
 import { routeName } from '@utils/navigationHelpers';
 import { hp, wp } from '@utils/responsive';
@@ -107,18 +108,7 @@ const TabNavigator = () => {
     <>
       <Tab.Navigator screenOptions={screenOptions}>
         <Tab.Screen name={routeName.HOME} component={Dashboard} />
-        <Tab.Screen
-          name="MyPost"
-          component={() => <></>}
-          listeners={{
-            tabPress: e => {
-              // Prevent default action
-              e.preventDefault();
-              // Navigate to LOAD_POST screen
-              navigation.navigate(routeName.LOAD_POST);
-            },
-          }}
-        />
+        <Tab.Screen name="MyPost" component={LoadPostForm} />
         <Tab.Screen name="History" component={HistoryScreen} />
         <Tab.Screen name="Profile" component={ProfileScreen} />
       </Tab.Navigator>
