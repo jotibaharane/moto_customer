@@ -1,0 +1,534 @@
+import tw from '@utils/tw';
+import React from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { IconButton } from 'react-native-paper';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+
+type SelectItem = {
+  [key: string]: any;
+  disabled?: boolean;
+};
+
+interface SelectListProps {
+  setSelected: (selected: any) => void;
+  value?: any;
+  placeholder?: string;
+  label?: string;
+  iconLeft?: React.ReactNode;
+  iconLeftStyle?: any;
+  boxStyles?: any;
+  inputStyles?: any;
+  dropdownStyles?: any;
+  dropdownItemStyles?: any;
+  dropdownTextStyles?: any;
+  maxHeight?: number;
+  data: SelectItem[];
+  displayKey?: string;
+  matchKey?: string;
+  defaultOption?: SelectItem;
+  defaultValue?: any;
+  defaultKey?: any;
+  searchicon?: React.ReactNode;
+  arrowicon?: React.ReactNode;
+  closeicon?: React.ReactNode;
+  search?: boolean;
+  searchPlaceholder?: string;
+  notFoundText?: string;
+  disabledItemStyles?: any;
+  disabledTextStyles?: any;
+  onSelect?: (selectedItem: any) => void;
+  save?: 'key' | 'value' | 'object' | string;
+  dropdownShown?: boolean;
+  fontFamily?: string;
+  onSearchChange?: (text: string) => void;
+  searchValue?: string;
+  isLoading?: boolean;
+  onClear?: () => void;
+  disabled?: boolean; // New disabled prop
+}
+
+const SelectList: React.FC<SelectListProps> = ({
+  setSelected,
+  value,
+  placeholder = 'Select an option',
+  label,
+  iconLeft,
+  iconLeftStyle,
+  boxStyles,
+  inputStyles,
+  dropdownStyles,
+  dropdownItemStyles,
+  dropdownTextStyles,
+  maxHeight = 200,
+  data,
+  displayKey = 'value',
+  matchKey,
+  defaultOption,
+  defaultValue,
+  defaultKey,
+  searchicon = false,
+  arrowicon = false,
+  closeicon = false,
+  search = true,
+  searchPlaceholder = 'Search',
+  notFoundText = 'No data found',
+  disabledItemStyles,
+  disabledTextStyles,
+  onSelect = () => {},
+  onClear = () => {},
+  save = 'key',
+  dropdownShown = false,
+  fontFamily,
+  onSearchChange,
+  searchValue,
+  isLoading = false,
+  disabled = false, // Default to false
+}) => {
+  const [_firstRender, _setFirstRender] = React.useState<boolean>(true);
+  const [dropdown, setDropdown] = React.useState<boolean>(dropdownShown);
+  const [selectedItem, setSelectedItem] = React.useState<SelectItem | null>(
+    null,
+  );
+  const [height, setHeight] = React.useState<number>(maxHeight);
+  const [internalSearchValue, setInternalSearchValue] =
+    React.useState<string>('');
+  const animatedvalue = React.useRef(new Animated.Value(0)).current;
+  const [filtereddata, setFilteredData] = React.useState<SelectItem[]>(data);
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  const actualSearchValue =
+    searchValue !== undefined ? searchValue : internalSearchValue;
+  const setSearchValue =
+    searchValue !== undefined
+      ? onSearchChange || (() => {})
+      : setInternalSearchValue;
+
+  const actualMatchKey =
+    matchKey ||
+    (save === 'key'
+      ? 'key'
+      : save === 'value'
+      ? 'value'
+      : typeof save === 'string'
+      ? save
+      : 'key');
+
+  const normalizeString = (str: any) => {
+    if (str === null || str === undefined) return '';
+    return String(str).trim().toLowerCase();
+  };
+
+  const findItem = React.useCallback(
+    (val: any) => {
+      if (val === undefined || val === null) return undefined;
+
+      if (save === 'object' && typeof val === 'object') {
+        return data.find(item => JSON.stringify(item) === JSON.stringify(val));
+      }
+
+      return data.find(item => {
+        const itemValue = actualMatchKey
+          .split('.')
+          .reduce((obj, key) => obj?.[key], item);
+        return normalizeString(itemValue) === normalizeString(val);
+      });
+    },
+    [data, save, actualMatchKey],
+  );
+
+  React.useEffect(() => {
+    if (value === undefined) return;
+    const matchedItem = findItem(value);
+    if (matchedItem) {
+      setSelectedItem(matchedItem);
+    } else {
+      setSelectedItem(
+        value && typeof value === 'object' ? value : { [displayKey]: value },
+      );
+    }
+  }, [value, findItem, displayKey]);
+
+  React.useEffect(() => {
+    setHeight(maxHeight);
+  }, [maxHeight]);
+
+  React.useEffect(() => {
+    setFilteredData(data);
+  }, [data]);
+
+  React.useEffect(() => {
+    if (_firstRender && data.length > 0) {
+      let defaultItem: SelectItem | undefined;
+
+      if (defaultOption) {
+        defaultItem = defaultOption;
+      } else if (defaultKey !== undefined) {
+        defaultItem = findItem(defaultKey);
+      } else if (defaultValue !== undefined) {
+        defaultItem = findItem(defaultValue);
+      }
+
+      if (defaultItem && value === undefined) {
+        setSelectedItem(defaultItem);
+        if (save === 'object') {
+          setSelected(defaultItem);
+        } else {
+          const selectedValue =
+            typeof save === 'string'
+              ? defaultItem[save]
+              : defaultItem[actualMatchKey];
+          setSelected(selectedValue);
+        }
+      }
+
+      _setFirstRender(false);
+    }
+  }, [
+    _firstRender,
+    data,
+    defaultOption,
+    defaultKey,
+    defaultValue,
+    save,
+    findItem,
+    actualMatchKey,
+    value,
+  ]);
+
+  const slidedown = () => {
+    if (disabled) return; // Don't open dropdown if disabled
+    setDropdown(true);
+    setIsFocused(true);
+    Animated.timing(animatedvalue, {
+      toValue: height,
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const slideup = () => {
+    setIsFocused(false);
+    Animated.timing(animatedvalue, {
+      toValue: 0,
+      duration: 500,
+      useNativeDriver: false,
+    }).start(() => setDropdown(false));
+  };
+
+  const getDisplayValue = (item: SelectItem | null): string => {
+    if (!item) return placeholder || 'Select an option';
+    if (typeof item !== 'object') return String(item);
+
+    const displayValue = displayKey
+      .split('.')
+      .reduce((obj, key) => obj?.[key], item);
+    return displayValue
+      ? String(displayValue)
+      : placeholder || 'Select an option';
+  };
+
+  const handleItemPress = (item: SelectItem) => {
+    if (item.disabled) return;
+
+    setSelectedItem(item);
+
+    if (save === 'object') {
+      setSelected(item);
+    } else {
+      const selectedValue =
+        typeof save === 'string' ? item[save] : item[actualMatchKey];
+      setSelected(selectedValue);
+    }
+
+    onSelect(item);
+    slideup();
+    setTimeout(() => setFilteredData(data), 800);
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchValue(val);
+    const result = data.filter(item => {
+      const searchStr = normalizeString(val);
+      const displayValue = normalizeString(getDisplayValue(item));
+      return displayValue.includes(searchStr);
+    });
+    setFilteredData(result);
+  };
+
+  const handleClearSearch = () => {
+    setSearchValue('');
+    setFilteredData(data);
+    slideup();
+  };
+
+  const hasValue = selectedItem !== null && selectedItem !== undefined;
+
+  return (
+    <View>
+      {dropdown && search ? (
+        <View style={[styles.wrapper, boxStyles]}>
+          <View style={styles.searchContainer}>
+            {!searchicon ? (
+              <Icon name="search" size={20} style={styles.searchIcon} />
+            ) : (
+              searchicon
+            )}
+
+            <TextInput
+              placeholder={searchPlaceholder}
+              onChangeText={handleSearchChange}
+              value={actualSearchValue}
+              style={[styles.searchInput, { fontFamily }, inputStyles]}
+            />
+
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#666" />
+            ) : (
+              <TouchableOpacity onPress={handleClearSearch}>
+                {!closeicon ? (
+                  <Icon name="close" size={17} style={styles.closeIcon} />
+                ) : (
+                  closeicon
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View style={tw`relative`}>
+          {label && (
+            <Text
+              style={[
+                styles.label,
+                {
+                  top: isFocused || hasValue ? -8 : 18,
+                  fontSize: isFocused || hasValue ? 12 : 16,
+                  color: isFocused ? '#1976D2' : '#666',
+                  left: iconLeft ? 10 : 20,
+                },
+                inputStyles,
+                tw`text-primary font-semibold`,
+                disabled && { color: '#c4c5c6' }, // Disabled label color
+              ]}
+            >
+              {label}
+            </Text>
+          )}
+          <TouchableOpacity
+            style={[
+              styles.wrapper,
+              boxStyles,
+              label && { paddingTop: 18, paddingBottom: 8 },
+              disabled && {
+                backgroundColor: '#f5f5f5',
+                borderColor: '#e0e0e0',
+              }, // Disabled styles
+            ]}
+            onPress={() => {
+              if (disabled) return; // Don't respond to presses if disabled
+              if (!dropdown) {
+                Keyboard.dismiss();
+                slidedown();
+              } else {
+                slideup();
+              }
+            }}
+            activeOpacity={disabled ? 1 : 0.7} // No opacity change when disabled
+            disabled={disabled}
+          >
+            {iconLeft && (
+              <View style={[styles.iconLeftContainer, iconLeftStyle]}>
+                {iconLeft}
+              </View>
+            )}
+            <Text
+              numberOfLines={2}
+              style={[
+                { fontFamily },
+                inputStyles,
+                iconLeft && { marginLeft: 10, flex: 1 },
+                disabled && { color: '#c4c5c6' }, // Disabled text color
+              ]}
+            >
+              {getDisplayValue(selectedItem)}
+            </Text>
+
+            {!arrowicon && !onClear ? (
+              <Icon
+                name="keyboard-arrow-down"
+                size={20}
+                style={[styles.arrowIcon, disabled && { color: '#c4c5c6' }]} // Disabled arrow color
+              />
+            ) : (
+              arrowicon
+            )}
+          </TouchableOpacity>
+          {value !== '' &&
+            !disabled && ( // Don't show clear button when disabled
+              <IconButton
+                icon="close"
+                style={tw`absolute right-0 top-0`}
+                onPress={onClear}
+              />
+            )}
+        </View>
+      )}
+
+      {dropdown && (
+        <Animated.View
+          style={[
+            styles.dropdown,
+            { maxHeight: animatedvalue },
+            dropdownStyles,
+          ]}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            nestedScrollEnabled={true}
+          >
+            {filtereddata.length >= 1 ? (
+              filtereddata.map((item, index) => {
+                const disabled = item.disabled ?? false;
+                const displayValue = getDisplayValue(item);
+                const isSelected =
+                  selectedItem &&
+                  findItem(
+                    save === 'object'
+                      ? selectedItem
+                      : typeof save === 'string'
+                      ? selectedItem[save]
+                      : selectedItem[actualMatchKey],
+                  ) === item;
+
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.option,
+                      dropdownItemStyles,
+                      isSelected && { backgroundColor: '#f0f0f0' },
+                      disabled && [styles.disabledoption, disabledItemStyles],
+                    ]}
+                    key={index}
+                    onPress={() => !disabled && handleItemPress(item)}
+                    disabled={disabled}
+                  >
+                    <Text
+                      style={[
+                        { fontFamily },
+                        dropdownTextStyles,
+                        disabled && [styles.disabledText, disabledTextStyles],
+                      ]}
+                    >
+                      {displayValue}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              <View>
+                <TouchableOpacity
+                  style={[styles.option, dropdownItemStyles]}
+                  onPress={() => {
+                    const newItem = { [displayKey]: actualSearchValue };
+                    setSelectedItem(newItem);
+                    setSelected(actualSearchValue);
+                    slideup();
+                  }}
+                >
+                  <Text style={[{ fontFamily }, dropdownTextStyles]}>
+                    {notFoundText} min 3 word - Use "{actualSearchValue}"
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  wrapper: {
+    borderWidth: 1,
+    borderRadius: 10,
+    borderColor: 'gray',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  dropdown: {
+    borderWidth: 1,
+    borderRadius: 10,
+    borderColor: 'gray',
+    marginTop: 10,
+    overflow: 'hidden',
+  },
+  option: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    overflow: 'hidden',
+  },
+  disabledoption: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'whitesmoke',
+    opacity: 0.9,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  searchIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 7,
+  },
+  searchInput: {
+    padding: 0,
+    height: 20,
+    flex: 1,
+  },
+  closeIcon: {
+    width: 17,
+    height: 17,
+  },
+  arrowIcon: {
+    width: 20,
+    height: 20,
+  },
+  scrollContent: {
+    paddingVertical: 10,
+    overflow: 'hidden',
+  },
+  disabledText: {
+    color: '#c4c5c6',
+  },
+  label: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    paddingHorizontal: 4,
+    zIndex: 1,
+  },
+  iconLeftContainer: {
+    marginRight: 10,
+  },
+});
+
+export default SelectList;

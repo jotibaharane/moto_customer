@@ -1,0 +1,62 @@
+import { Dimensions } from 'react-native';
+
+export const colors = {
+  primary: '#6366F1',
+  primaryLight: '#818CF8',
+  surface: '#FFFFFF',
+  backgroundDarker: '#1F2937',
+  textSecondary: '#6B7280',
+  success: '#10B981',
+  warning: '#F59E0B',
+  info: '#3B82F6',
+  error: '#EF4444',
+};
+
+export const hp = (percentage: number) =>
+  Dimensions.get('window').height * (percentage / 100);
+export const wp = (percentage: number) =>
+  Dimensions.get('window').width * (percentage / 100);
+export type FloatingButtonTab =
+  | 'load-posts'
+  | 'process-trips'
+  | 'active-trips'
+  | 'completed-trips';
+
+export interface DashboardButton {
+  id: FloatingButtonTab;
+  icon: string;
+  label: string;
+  color: string;
+  routeName: string;
+}
+
+export const DASHBOARD_BUTTONS: DashboardButton[] = [
+  {
+    id: 'load-posts',
+    icon: 'map-marker-path',
+    label: 'Load Posts',
+    color: colors.primary,
+    routeName: 'BID_CUSTOMER_LIST',
+  },
+  {
+    id: 'process-trips',
+    icon: 'calculator',
+    label: 'Process Trips',
+    color: colors.success,
+    routeName: 'ACTIVE_TRIPS',
+  },
+  {
+    id: 'active-trips',
+    icon: 'file-document',
+    label: 'Active Trips',
+    color: colors.success,
+    routeName: 'DRIVER_OPERATIONS',
+  },
+  {
+    id: 'completed-trips',
+    icon: 'headset',
+    label: 'Completed Trips',
+    color: colors.warning,
+    routeName: 'ACTIVE_TRIPS',
+  },
+];

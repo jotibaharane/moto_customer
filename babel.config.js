@@ -1,3 +1,41 @@
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
+  plugins: [
+    [
+      'module-resolver',
+      {
+        root: ['./src'],
+        extensions: [
+          '.ios.ts',
+          '.android.ts',
+          '.ts',
+          '.ios.tsx',
+          '.android.tsx',
+          '.tsx',
+          '.jsx',
+          '.js',
+          '.json',
+        ],
+        alias: {
+          '@components': './src/components',
+          '@screens': './src/screens',
+          '@utils': './src/utils',
+          '@navigation': './src/navigation',
+          '@assets': './src/assets',
+          '@redux': './src/redux',
+          '@hooks': './src/hooks',
+          '@store': './src/store',
+          '@theme': './src/theme',
+          '@types': './src/types',
+          '@config': './src/config',
+          '@services': './src/services',
+          '@constants': './src/constants',
+          '@api': './src/api',
+          '@modal': './src/modal',
+        },
+      },
+    ],
+    'react-native-paper/babel',
+    'react-native-worklets/plugin',
+  ],
 };
