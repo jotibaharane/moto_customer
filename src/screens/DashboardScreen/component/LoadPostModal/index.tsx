@@ -1,6 +1,6 @@
 // components/LoadPostModal.tsx
 import { CustomerLoadPost } from '@api/api.type';
-import { useGetCustomerPostsQuery } from '@api/hooks_api';
+import { useGetCustomerPostsMutation } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import { RootState } from '@store/index';
 import {
@@ -11,7 +11,7 @@ import {
   setOriginAddress,
   setPostId,
 } from '@store/slices/mapSlice';
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -30,20 +30,21 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
   const dispatch = useDispatch();
-  const {
-    data: customerPosts,
-    refetch: refetchPosts,
-    isLoading,
-  } = useGetCustomerPostsQuery({ CustomerID });
+  const [fetchCustomerPost, { data: customerPosts, isLoading }] =
+    useGetCustomerPostsMutation();
 
   const [refreshing, setRefreshing] = useState(false);
 
   // Handle refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetchPosts();
+    await fetchCustomerPost({ CustomerID });
     setRefreshing(false);
   };
+
+  useLayoutEffect(() => {
+    handleRefresh();
+  }, [ref]);
 
   const handlePostPress = (item: CustomerLoadPost) => {
     dispatch(addOrUpdateDriver([]));
@@ -53,21 +54,18 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
     );
     dispatch(setOriginAddress(item?.Origin_City));
     dispatch(setDestinationAddress(item?.Destination_City));
-    dispatch(
-      setDestination({
-        latitude: item?.Destination_Lat,
-        longitude: item?.Destination_Lng,
-      }),
-    );
+    dispatch(setDestination(null));
     if (ref && typeof ref !== 'function' && ref.current) {
       ref.current.close();
     }
   };
+
   const handleModalClose = () => {
     if (ref && typeof ref !== 'function' && ref.current) {
       ref.current.close();
     }
   };
+
   // Render list item - ENHANCED CARD DESIGN
   const renderPostItem = ({ item }: { item: CustomerLoadPost }) => (
     <TouchableOpacity
@@ -92,7 +90,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
         </View>
       </View>
 
-      {/* Route Information */}
+      {/* Route Information - VERTICAL STACK */}
       <View style={styles.routeContainer}>
         <View style={styles.routeIndicator}>
           <View style={styles.originDot} />
@@ -101,51 +99,82 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
         </View>
 
         <View style={styles.routeDetails}>
-          <View style={styles.locationRow}>
-            <Text style={styles.originText} numberOfLines={1}>
+          {/* Origin Address - Top */}
+          <View style={styles.locationSection}>
+            <View style={styles.locationHeader}>
+              <Icon source="map-marker" size={14} color="#5e6bff" />
+              <Text style={styles.locationLabel}>From</Text>
+            </View>
+            <Text style={styles.locationText} numberOfLines={2}>
               {item.Origin_City}
             </Text>
-            <Icon source="arrow-right" size={16} color="#999" />
-            <Text style={styles.destinationText} numberOfLines={1}>
+            <Text style={styles.locationSubtext}>
+              {item.Origin_State} • {item.Origin_Pincode}
+            </Text>
+          </View>
+
+          {/* Destination Address - Bottom */}
+          <View style={styles.locationSection}>
+            <View style={styles.locationHeader}>
+              <Icon source="map-marker-check" size={14} color="#FF6B6B" />
+              <Text style={styles.locationLabel}>To</Text>
+            </View>
+            <Text style={styles.locationText} numberOfLines={2}>
               {item.Destination_City}
             </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Load Details */}
-      <View style={styles.detailsContainer}>
-        <View style={styles.detailItem}>
-          <Icon source="truck" size={16} color="#5e6bff" />
-          <Text style={styles.detailText}>{item.VehicleType}</Text>
-        </View>
-
-        <View style={styles.detailItem}>
-          <Icon source="weight" size={16} color="#5e6bff" />
-          <Text style={styles.detailText}>{item.Weight}</Text>
-        </View>
-
-        <View style={styles.detailItem}>
-          <Icon source="calendar" size={16} color="#5e6bff" />
-          <Text style={styles.detailText}>
-            {formatDate(item?.PostInsertDate || '')}
-          </Text>
-        </View>
-      </View>
-
-      {/* Verification Code Section */}
-      {item.verify_flag === 'N' && (
-        <View style={styles.verificationCodeContainer}>
-          <View style={styles.verificationHeader}>
-            <Icon source="shield-alert" size={16} color="#FF9800" />
-            <Text style={styles.verificationTitle}>Verification Required</Text>
-          </View>
-          <View style={styles.codeContainer}>
-            <Text style={styles.codeLabel}>Use this code when contacted:</Text>
-            <Text style={styles.verificationCode}>
-              {item.verification_code}
+            <Text style={styles.locationSubtext}>
+              {item.Destination_State} • {item.Destination_Pincode}
             </Text>
           </View>
+        </View>
+      </View>
+
+      {/* Load Details Grid */}
+      <View style={styles.detailsGrid}>
+        <View style={styles.detailColumn}>
+          <View style={styles.detailItem}>
+            <Icon source="truck" size={16} color="#5e6bff" />
+            <Text style={styles.detailText}>{item.VehicleType}</Text>
+          </View>
+
+          <View style={styles.detailItem}>
+            <Icon source="package-variant" size={16} color="#5e6bff" />
+            <Text style={styles.detailText}>{item.BodyType}</Text>
+          </View>
+        </View>
+
+        <View style={styles.detailColumn}>
+          <View style={styles.detailItem}>
+            <Icon source="weight" size={16} color="#5e6bff" />
+            <Text style={styles.detailText}>{item.Weight}</Text>
+          </View>
+
+          <View style={styles.detailItem}>
+            <Icon source="calendar" size={16} color="#5e6bff" />
+            <Text style={styles.detailText}>
+              {formatDate(item?.PostInsertDate || '')}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Cargo Information */}
+      <View style={styles.cargoContainer}>
+        <View style={styles.cargoItem}>
+          <Icon source="cube-outline" size={14} color="#666" />
+          <Text style={styles.cargoText}>{item.CargoContent}</Text>
+        </View>
+        <View style={styles.cargoItem}>
+          <Icon source="palette" size={14} color="#666" />
+          <Text style={styles.cargoText}>{item.CargoPackageType}</Text>
+        </View>
+      </View>
+
+      {/* Pending Status Indicator */}
+      {item.trip_status === 'Pending' && (
+        <View style={styles.pendingContainer}>
+          <Icon source="clock-outline" size={14} color="#FF9800" />
+          <Text style={styles.pendingText}>Awaiting driver assignment</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -155,7 +184,15 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
   const renderListView = () => (
     <View style={styles.listContainer}>
       <View style={styles.listHeader}>
-        <Text style={styles.listTitle}>My Load Posts</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.listTitle}>My Load Posts</Text>
+          {customerPosts?.data && customerPosts.data.length > 0 && (
+            <Text style={styles.postCount}>
+              {customerPosts.data.length} post
+              {customerPosts.data.length !== 1 ? 's' : ''}
+            </Text>
+          )}
+        </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
             onPress={handleRefresh}
@@ -165,10 +202,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleModalClose}
-            style={{
-              padding: 4,
-              marginLeft: 16,
-            }}
+            style={styles.closeButton}
           >
             <Icon source="close" size={24} color="#666" />
           </TouchableOpacity>
@@ -235,22 +269,36 @@ const styles = StyleSheet.create({
   listHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
     backgroundColor: '#FFF',
   },
+  titleContainer: {
+    flex: 1,
+  },
   listTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  postCount: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
   },
   headerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   refreshButton: {
     padding: 8,
+  },
+  closeButton: {
+    padding: 4,
+    marginLeft: 12,
   },
   loadingContainer: {
     flex: 1,
@@ -294,14 +342,14 @@ const styles = StyleSheet.create({
   cardContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
+    padding: 18,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#F0F0F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 4,
   },
   cardHeader: {
@@ -321,8 +369,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 12,
   },
   statusText: {
@@ -347,7 +395,7 @@ const styles = StyleSheet.create({
   },
   routeLine: {
     width: 2,
-    height: 30,
+    height: 50,
     backgroundColor: '#E0E0E0',
     marginVertical: 4,
   },
@@ -360,114 +408,86 @@ const styles = StyleSheet.create({
   routeDetails: {
     flex: 1,
   },
-  locationRow: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
+  locationSection: {
+    marginBottom: 16,
   },
-  originText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#5e6bff',
-    flex: 1,
-  },
-  destinationText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF6B6B',
-    flex: 1,
-  },
-  distanceContainer: {
+  locationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    marginBottom: 4,
   },
-  distanceText: {
+  locationLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+    textTransform: 'uppercase',
+  },
+  locationText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 2,
+  },
+  locationSubtext: {
     fontSize: 12,
     color: '#888',
+    fontWeight: '400',
   },
-  detailsContainer: {
+  detailsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 16,
     paddingHorizontal: 4,
   },
+  detailColumn: {
+    flex: 1,
+    gap: 10,
+  },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   detailText: {
     fontSize: 13,
     color: '#555',
     fontWeight: '500',
   },
-
-  // Verification Code Styles
-  verificationCodeContainer: {
-    backgroundColor: '#FFF9E6',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#FFEAA7',
-  },
-  verificationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  verificationTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#856404',
-  },
-  codeContainer: {
-    marginTop: 4,
-  },
-  codeLabel: {
-    fontSize: 12,
-    color: '#856404',
-    marginBottom: 6,
-  },
-  verificationCode: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#856404',
-    textAlign: 'center',
-    letterSpacing: 2,
-    backgroundColor: '#FFEAA7',
-    padding: 8,
-    borderRadius: 8,
-  },
-
-  // Card Footer
-  cardFooter: {
+  cargoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#F5F5F5',
-    paddingTop: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
   },
-  verificationBadge: {
+  cargoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    flex: 1,
   },
-  pendingBadge: {
-    backgroundColor: '#FFF9E6',
-  },
-  verifiedBadge: {
-    backgroundColor: '#E8F5E9',
-  },
-  verificationText: {
+  cargoText: {
     fontSize: 12,
+    color: '#666',
+    fontWeight: '400',
+    flexShrink: 1,
+  },
+  pendingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF9E6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9800',
+  },
+  pendingText: {
+    fontSize: 12,
+    color: '#856404',
     fontWeight: '500',
   },
 });

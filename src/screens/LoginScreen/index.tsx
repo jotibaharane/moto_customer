@@ -42,7 +42,7 @@ const OtpLoginScreen = () => {
   const otpInputRef = useRef<TextInput>(null);
 
   const handleSendOtp = async () => {
-    if (!phoneNumber || phoneNumber.length < 10) {
+    if (!phoneNumber || phoneNumber?.length < 10) {
       setError('Please enter a valid 10-digit phone number');
       return;
     }
@@ -54,20 +54,26 @@ const OtpLoginScreen = () => {
     try {
       const response = await sendOTP({
         mobile_number: phoneNumber,
-      }).unwrap();
-      if (response?.status === '00') {
+      });
+
+      if (response?.data?.status === '00') {
         setIsLoading(false);
         setIsOtpSent(true);
         setSuccessMessage('OTP sent successfully!');
+      } else {
+        setIsLoading(false);
+        setError(
+          response?.data?.message || 'Failed to send OTP. Please try again.',
+        );
       }
 
       // Focus on OTP input after a short delay
       setTimeout(() => {
-        otpInputRef.current?.focus();
+        otpInputRef?.current?.focus();
       }, 100);
     } catch (err: any) {
       setIsLoading(false);
-      setError(err.data?.message || 'Failed to send OTP. Please try again.');
+      setError(err?.data?.message || 'Failed to send OTP. Please try again.');
     }
   };
 
@@ -86,25 +92,28 @@ const OtpLoginScreen = () => {
       const response = await validateOTP({
         mobile_number: phoneNumber,
         otp: otp,
-      }).unwrap();
+      });
       console.log({ response });
-      if (response?.status === '00') {
+      if (response?.data?.status === '00') {
         dispatch(setMobileNumber(phoneNumber));
 
-        if (!response?.Customer_Details) {
+        if (!response?.data?.Customer_Details) {
           setIsLoading(false);
           setSuccessMessage('OTP verified successfully!');
           navigation.replace(routeName.REGISTRATION);
         }
-        if (response?.Customer_Details) {
-          dispatch(setCustomerDetails(response.Customer_Details));
-          if (response?.Customer_Details?.MPIN_Flag !== 'Y') {
+        if (response?.data?.Customer_Details) {
+          dispatch(setCustomerDetails(response?.data?.Customer_Details));
+          if (response?.data?.Customer_Details?.MPIN_Flag !== 'Y') {
             navigation.replace(routeName.SET_MPIN);
           } else {
             dispatch(setToken('true'));
             navigation.replace(routeName.DASHBOARD);
           }
         }
+      } else {
+        setIsLoading(false);
+        setError(response?.data?.message || 'Invalid OTP. Please try again.');
       }
     } catch (err: any) {
       setIsLoading(false);
@@ -122,12 +131,17 @@ const OtpLoginScreen = () => {
         mobile_number: phoneNumber,
       };
       console.log({ payload });
-      const response = await sendOTP(payload).unwrap();
+      const response = await sendOTP(payload);
       console.log({ response });
-      if (response?.status === '00') {
+      if (response?.data?.status === '00') {
         setIsLoading(false);
         setOtp('');
         setSuccessMessage('New OTP sent successfully!');
+      } else {
+        setIsLoading(false);
+        setError(
+          response?.data?.message || 'Failed to resend OTP. Please try again.',
+        );
       }
 
       // Focus on OTP input

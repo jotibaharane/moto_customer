@@ -14,6 +14,7 @@ export const useAuthStatus = () => {
 };
 
 export enum routeName {
+  SPLASH = 'Splash',
   LOGIN = 'login',
   REGISTRATION = 'registration',
   SET_MPIN = 'set-mpin',
@@ -81,4 +82,5 @@ export type RootStackParamList = {
   [routeName.DASHBOARD]: undefined;
   [routeName.MPIN_LOGIN]: undefined;
   [routeName.LOAD_POST]: undefined;
+  ['Splash']: undefined;
 };

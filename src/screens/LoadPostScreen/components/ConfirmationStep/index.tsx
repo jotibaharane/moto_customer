@@ -97,7 +97,7 @@ const ConfirmationStep: React.FC = () => {
             >
               <Ionicons name="location" size={12} color="white" />
             </View>
-            <View style={tw`w-1 bg-blue-200 h-16 my-1`} />
+            <View style={tw`w-1 bg-blue-200 h-32 my-1`} />
             <View
               style={tw`w-6 h-6 bg-red-500 rounded-full items-center justify-center`}
             >
@@ -105,22 +105,66 @@ const ConfirmationStep: React.FC = () => {
             </View>
           </View>
 
-          {/* Addresses */}
+          {/* Addresses with Full Details */}
           <View style={tw`flex-1`}>
-            <View style={tw`mb-4`}>
-              <Text style={tw`text-blue-700 font-semibold text-sm mb-1`}>
+            {/* Pickup Location */}
+            <View style={tw`mb-8`}>
+              <Text style={tw`text-blue-700 font-semibold text-sm mb-2`}>
                 Pickup Location
               </Text>
-              <Text style={tw`text-gray-800`}>{values.origin.address}</Text>
+              <Text style={tw`text-gray-800 font-medium text-base mb-1`}>
+                {values.origin.address}
+              </Text>
+
+              {/* Pickup Address Details */}
+              {(values.Origin_1 || values.Origin_2) && (
+                <View style={tw`bg-blue-50 p-3 rounded-lg mt-2`}>
+                  <Text style={tw`text-blue-700 text-sm`}>
+                    {values.Origin_1}
+                    {values.Origin_2 && `, ${values.Origin_2}`}
+                  </Text>
+                </View>
+              )}
+
+              {/* Contact Info for Pickup */}
             </View>
 
+            {/* Delivery Location */}
             <View>
-              <Text style={tw`text-red-600 font-semibold text-sm mb-1`}>
+              <Text style={tw`text-red-600 font-semibold text-sm mb-2`}>
                 Delivery Location
               </Text>
-              <Text style={tw`text-gray-800`}>
+              <Text style={tw`text-gray-800 font-medium text-base mb-1`}>
                 {values.destination.address}
               </Text>
+
+              {/* Delivery Address Details */}
+              {(values.Destination_1 ||
+                values.Destination_2 ||
+                values.District ||
+                values.Taluka ||
+                values.state ||
+                values.Pincode) && (
+                <View style={tw`bg-red-50 p-3 rounded-lg mt-2`}>
+                  {(values.Destination_1 || values.Destination_2) && (
+                    <Text style={tw`text-red-700 text-sm mb-1`}>
+                      {values.Destination_1}
+                      {values.Destination_2 && `, ${values.Destination_2}`}
+                    </Text>
+                  )}
+                  {(values.District ||
+                    values.Taluka ||
+                    values.state ||
+                    values.Pincode) && (
+                    <Text style={tw`text-red-700 text-sm`}>
+                      {[values.District, values.Taluka, values.state]
+                        .filter(Boolean)
+                        .join(', ')}
+                      {values.Pincode && ` - ${values.Pincode}`}
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -160,68 +204,34 @@ const ConfirmationStep: React.FC = () => {
       </View>
 
       {/* Contact Information Card */}
-      <View style={[tw`bg-white rounded-2xl p-6 mb-5`, styles.card]}>
-        <View style={tw`flex-row items-center mb-4`}>
-          <View style={tw`bg-purple-100 p-2 rounded-full mr-3`}>
-            <Ionicons name="person" size={20} color="#8b5cf6" />
-          </View>
-          <Text style={tw`text-xl font-bold text-gray-800`}>
-            Contact Details
-          </Text>
-        </View>
-
-        <View style={tw`flex-row justify-between`}>
-          <View style={tw`flex-1`}>
-            <Text style={tw`text-gray-500 text-sm mb-1`}>Contact Person</Text>
-            <Text style={tw`text-gray-800 font-medium`}>
-              {values.ContactPerson}
+      {values?.ContactPerson && values.ContactNumber && (
+        <View style={[tw`bg-white rounded-2xl p-6 mb-5`, styles.card]}>
+          <View style={tw`flex-row items-center mb-4`}>
+            <View style={tw`bg-purple-100 p-2 rounded-full mr-3`}>
+              <Ionicons name="person" size={20} color="#8b5cf6" />
+            </View>
+            <Text style={tw`text-xl font-bold text-gray-800`}>
+              Contact Details
             </Text>
           </View>
 
-          <View style={tw`flex-1`}>
-            <Text style={tw`text-gray-500 text-sm mb-1`}>Contact Number</Text>
-            <Text style={tw`text-gray-800 font-medium`}>
-              {values.ContactNumber}
-            </Text>
-          </View>
-        </View>
-      </View>
+          <View style={tw`flex-row justify-between`}>
+            <View style={tw`flex-1`}>
+              <Text style={tw`text-gray-500 text-sm mb-1`}>Contact Person</Text>
+              <Text style={tw`text-gray-800 font-medium`}>
+                {values.ContactPerson}
+              </Text>
+            </View>
 
-      {/* Address Details Card */}
-      <View style={[tw`bg-white rounded-2xl p-6 mb-5`, styles.card]}>
-        <View style={tw`flex-row items-center mb-4`}>
-          <View style={tw`bg-green-100 p-2 rounded-full mr-3`}>
-            <Ionicons name="business" size={20} color="#10b981" />
-          </View>
-          <Text style={tw`text-xl font-bold text-gray-800`}>
-            Address Details
-          </Text>
-        </View>
-
-        <View style={tw`mb-4`}>
-          <Text style={tw`text-gray-800 font-medium mb-2`}>Origin Address</Text>
-          <View style={tw`bg-gray-50 p-3 rounded-lg`}>
-            <Text style={tw`text-gray-600 text-sm`}>
-              {values.Origin_1}, {values.Origin_2}
-            </Text>
+            <View style={tw`flex-1`}>
+              <Text style={tw`text-gray-500 text-sm mb-1`}>Contact Number</Text>
+              <Text style={tw`text-gray-800 font-medium`}>
+                {values.ContactNumber}
+              </Text>
+            </View>
           </View>
         </View>
-
-        <View>
-          <Text style={tw`text-gray-800 font-medium mb-2`}>
-            Destination Address
-          </Text>
-          <View style={tw`bg-gray-50 p-3 rounded-lg`}>
-            <Text style={tw`text-gray-600 text-sm`}>
-              {values.Destination_1}, {values.Destination_2}
-            </Text>
-            <Text style={tw`text-gray-600 text-sm`}>
-              {values.District}, {values.Taluka || ''}, {values.state} -{' '}
-              {values.Pincode}
-            </Text>
-          </View>
-        </View>
-      </View>
+      )}
 
       {/* Vehicle Information Card */}
       <View style={[tw`bg-white rounded-2xl p-6 mb-5`, styles.card]}>

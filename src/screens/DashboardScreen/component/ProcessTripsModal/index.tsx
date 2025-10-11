@@ -1,4 +1,4 @@
-import { useGetProcessTripsQuery } from '@api/hooks_api';
+import { useGetProcessTripsMutation } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import { RootState } from '@store/index';
 import {
@@ -11,7 +11,13 @@ import {
   setOriginAddress,
   setPostId,
 } from '@store/slices/mapSlice';
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   FlatList,
   RefreshControl,
@@ -65,6 +71,9 @@ interface CustomerProcess {
   DriverLng: number | null;
   dllDriverID: string | null;
   MobileNo: string;
+  verify_flag: string;
+  verification_code: string;
+  trip_status: string;
 }
 
 interface ProcessTripsModalRef {
@@ -77,12 +86,9 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
   const dispatch = useDispatch();
-  const {
-    data: processTrips,
-    refetch: refetchProcessTrips,
-    isLoading,
-  } = useGetProcessTripsQuery({ CustomerID });
-
+  const [getProcesTrips, { data: processTrips, isLoading }] =
+    useGetProcessTripsMutation();
+  console.log({ processTrips });
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -93,17 +99,20 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetchProcessTrips();
+    await getProcesTrips({ CustomerID });
     setRefreshing(false);
   };
 
+  useLayoutEffect(() => {
+    handleRefresh();
+  }, [ref]);
   const handleModalClose = () => {
     bottomModalRef.current?.close();
   };
 
   const handleTripPress = (item: CustomerProcess) => {
     dispatch(addOrUpdateDriver([]));
-    dispatch(setCustomerMap('Active'));
+    dispatch(setCustomerMap('Process'));
     dispatch(setPostId(item?.LoadPostID));
     dispatch(
       setOrigin({
@@ -141,6 +150,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
       style={processTripStyles.cardContainer}
       onPress={() => handleTripPress(item)}
     >
+      {/* Card Header with ID and Status */}
       <View style={processTripStyles.cardHeader}>
         <View style={processTripStyles.idContainer}>
           <Icon source="identifier" size={14} color="#666" />
@@ -158,88 +168,122 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
         </View>
       </View>
 
+      {/* Route Information - Vertical Stack */}
       <View style={processTripStyles.routeContainer}>
         <View style={processTripStyles.routeIndicator}>
           <View style={processTripStyles.originDot} />
           <View style={processTripStyles.routeLine} />
           <View style={processTripStyles.destinationDot} />
         </View>
+
         <View style={processTripStyles.routeDetails}>
-          <View style={processTripStyles.locationRow}>
-            <Text style={processTripStyles.originText} numberOfLines={1}>
+          {/* Origin Address */}
+          <View style={processTripStyles.locationSection}>
+            <View style={processTripStyles.locationHeader}>
+              <Icon source="map-marker" size={14} color="#5e6bff" />
+              <Text style={processTripStyles.locationLabel}>From</Text>
+            </View>
+            <Text style={processTripStyles.locationText} numberOfLines={2}>
               {item.Origin_City}
             </Text>
-            <Icon source="arrow-right" size={16} color="#999" />
-            <Text style={processTripStyles.destinationText} numberOfLines={1}>
+            <Text style={processTripStyles.locationSubtext}>
+              {item.Origin_State} • {item.Origin_Pincode}
+            </Text>
+          </View>
+
+          {/* Destination Address */}
+          <View style={processTripStyles.locationSection}>
+            <View style={processTripStyles.locationHeader}>
+              <Icon source="map-marker-check" size={14} color="#FF6B6B" />
+              <Text style={processTripStyles.locationLabel}>To</Text>
+            </View>
+            <Text style={processTripStyles.locationText} numberOfLines={2}>
               {item.Destination_City}
+            </Text>
+            <Text style={processTripStyles.locationSubtext}>
+              {item.Destination_State} • {item.Destination_Pincode}
             </Text>
           </View>
         </View>
       </View>
 
-      <View style={processTripStyles.detailsContainer}>
-        <View style={processTripStyles.detailItem}>
-          <Icon source="truck" size={16} color="#5e6bff" />
-          <Text style={processTripStyles.detailText}>{item.VehicleType}</Text>
+      {/* Load Details Grid */}
+      <View style={processTripStyles.detailsGrid}>
+        <View style={processTripStyles.detailColumn}>
+          <View style={processTripStyles.detailItem}>
+            <Icon source="truck" size={16} color="#5e6bff" />
+            <Text style={processTripStyles.detailText}>{item.VehicleType}</Text>
+          </View>
+
+          <View style={processTripStyles.detailItem}>
+            <Icon source="package-variant" size={16} color="#5e6bff" />
+            <Text style={processTripStyles.detailText}>{item.BodyType}</Text>
+          </View>
         </View>
-        <View style={processTripStyles.detailItem}>
-          <Icon source="weight" size={16} color="#5e6bff" />
-          <Text style={processTripStyles.detailText}>{item.Weight}</Text>
+
+        <View style={processTripStyles.detailColumn}>
+          <View style={processTripStyles.detailItem}>
+            <Icon source="weight" size={16} color="#5e6bff" />
+            <Text style={processTripStyles.detailText}>{item.Weight}</Text>
+          </View>
+
+          <View style={processTripStyles.detailItem}>
+            <Icon source="calendar" size={16} color="#5e6bff" />
+            <Text style={processTripStyles.detailText}>
+              {formatDate(item.PostInsertDate)}
+            </Text>
+          </View>
         </View>
-        <View style={processTripStyles.detailItem}>
-          <Icon source="calendar" size={16} color="#5e6bff" />
-          <Text style={processTripStyles.detailText}>
-            {formatDate(item.PostInsertDate)}
+      </View>
+
+      {/* Cargo Information */}
+      <View style={processTripStyles.cargoContainer}>
+        <View style={processTripStyles.cargoItem}>
+          <Icon source="cube-outline" size={14} color="#666" />
+          <Text style={processTripStyles.cargoText}>{item.CargoContent}</Text>
+        </View>
+        <View style={processTripStyles.cargoItem}>
+          <Icon source="palette" size={14} color="#666" />
+          <Text style={processTripStyles.cargoText}>
+            {item.CargoPackageType}
           </Text>
         </View>
       </View>
 
-      {item.DriverID && (
-        <View style={processTripStyles.driverContainer}>
-          <View style={processTripStyles.driverInfo}>
-            <Icon source="account" size={14} color="#666" />
-            <Text style={processTripStyles.driverText}>Driver Assigned</Text>
+      {/* Verification Code Section */}
+      {item.verify_flag === 'N' && item.verification_code && (
+        <View style={processTripStyles.verificationContainer}>
+          <View style={processTripStyles.verificationHeader}>
+            <Icon source="shield-alert" size={16} color="#FF9800" />
+            <Text style={processTripStyles.verificationTitle}>
+              Verification Required
+            </Text>
           </View>
-        </View>
-      )}
-
-      <View style={processTripStyles.cardFooter}>
-        <View style={processTripStyles.statusContainer}>
-          <Text style={processTripStyles.statusLabel}>Customer: </Text>
-          <View
-            style={[
-              processTripStyles.statusPill,
-              { backgroundColor: getStatusColor(item.CustomerStatus) },
-            ]}
-          >
-            <Text style={processTripStyles.statusPillText}>
-              {item.CustomerStatus || 'N/A'}
+          <View style={processTripStyles.codeContainer}>
+            <Text style={processTripStyles.codeLabel}>
+              Share this code with driver:
+            </Text>
+            <Text style={processTripStyles.verificationCode}>
+              {item.verification_code}
             </Text>
           </View>
         </View>
-        {item.VendorStatus && (
-          <View style={processTripStyles.statusContainer}>
-            <Text style={processTripStyles.statusLabel}>Vendor: </Text>
-            <View
-              style={[
-                processTripStyles.statusPill,
-                { backgroundColor: getStatusColor(item.VendorStatus) },
-              ]}
-            >
-              <Text style={processTripStyles.statusPillText}>
-                {item.VendorStatus}
-              </Text>
-            </View>
-          </View>
-        )}
-      </View>
+      )}
     </TouchableOpacity>
   );
 
   const renderListView = () => (
     <View style={processTripStyles.listContainer}>
       <View style={processTripStyles.listHeader}>
-        <Text style={processTripStyles.listTitle}>Process Trips</Text>
+        <View style={processTripStyles.titleContainer}>
+          <Text style={processTripStyles.listTitle}>Process Trips</Text>
+          {processTrips?.data && processTrips.data.length > 0 && (
+            <Text style={processTripStyles.tripCount}>
+              {processTrips.data.length} trip
+              {processTrips.data.length !== 1 ? 's' : ''}
+            </Text>
+          )}
+        </View>
         <View style={processTripStyles.headerActions}>
           <TouchableOpacity
             onPress={handleRefresh}
@@ -249,7 +293,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleModalClose}
-            style={{ padding: 4, marginLeft: 16 }}
+            style={processTripStyles.closeButton}
           >
             <Icon source="close" size={24} color="#666" />
           </TouchableOpacity>
@@ -266,10 +310,10 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
           <View style={processTripStyles.emptyContent}>
             <Icon source="truck" size={64} color="#E0E0E0" />
             <Text style={processTripStyles.emptyText}>
-              No process trips found
+              No active trips found
             </Text>
             <Text style={processTripStyles.emptySubText}>
-              Your active trips will appear here
+              Your ongoing trips will appear here
             </Text>
           </View>
         </View>
@@ -310,27 +354,57 @@ const processTripStyles = StyleSheet.create({
     borderTopRightRadius: 20,
     overflow: 'hidden',
   },
-  listContainer: { flex: 1 },
+  listContainer: {
+    flex: 1,
+  },
   listHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
     backgroundColor: '#FFF',
   },
-  listTitle: { fontSize: 22, fontWeight: 'bold', color: '#333' },
-  headerActions: { flexDirection: 'row' },
-  refreshButton: { padding: 8 },
+  titleContainer: {
+    flex: 1,
+  },
+  listTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  tripCount: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  refreshButton: {
+    padding: 8,
+  },
+  closeButton: {
+    padding: 4,
+    marginLeft: 12,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 25,
   },
-  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
-  emptyContainer: { flexGrow: 1 },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    flexGrow: 1,
+  },
   emptyContent: {
     flex: 1,
     justifyContent: 'center',
@@ -345,19 +419,28 @@ const processTripStyles = StyleSheet.create({
     marginBottom: 4,
     fontWeight: '600',
   },
-  emptySubText: { fontSize: 14, color: '#999', textAlign: 'center' },
-  listContent: { padding: 16, paddingBottom: 100 },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+
+  // Enhanced Card Styles
   cardContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
+    padding: 18,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#F0F0F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 4,
   },
   cardHeader: {
@@ -366,12 +449,37 @@ const processTripStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  idContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cardId: { fontSize: 12, color: '#666', fontWeight: '500' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-  statusText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-  routeContainer: { flexDirection: 'row', marginBottom: 16 },
-  routeIndicator: { alignItems: 'center', marginRight: 16, width: 20 },
+  idContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardId: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+
+  // Route Styles
+  routeContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  routeIndicator: {
+    alignItems: 'center',
+    marginRight: 16,
+    width: 20,
+  },
   originDot: {
     width: 10,
     height: 10,
@@ -380,7 +488,7 @@ const processTripStyles = StyleSheet.create({
   },
   routeLine: {
     width: 2,
-    height: 30,
+    height: 50,
     backgroundColor: '#E0E0E0',
     marginVertical: 4,
   },
@@ -390,28 +498,120 @@ const processTripStyles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#FF6B6B',
   },
-  routeDetails: { flex: 1 },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  originText: { fontSize: 16, fontWeight: '600', color: '#5e6bff', flex: 1 },
-  destinationText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF6B6B',
+  routeDetails: {
     flex: 1,
   },
-  detailsContainer: {
+  locationSection: {
+    marginBottom: 16,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  locationLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+    textTransform: 'uppercase',
+  },
+  locationText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 2,
+  },
+  locationSubtext: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '400',
+  },
+
+  // Details Grid
+  detailsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 16,
     paddingHorizontal: 4,
   },
-  detailItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  detailText: { fontSize: 13, color: '#555', fontWeight: '500' },
+  detailColumn: {
+    flex: 1,
+    gap: 10,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailText: {
+    fontSize: 13,
+    color: '#555',
+    fontWeight: '500',
+  },
+
+  // Cargo Information
+  cargoContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  cargoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  cargoText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '400',
+    flexShrink: 1,
+  },
+
+  // Verification Code Styles
+  verificationContainer: {
+    backgroundColor: '#FFF9E6',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFEAA7',
+  },
+  verificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  verificationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#856404',
+  },
+  codeContainer: {
+    marginTop: 4,
+  },
+  codeLabel: {
+    fontSize: 12,
+    color: '#856404',
+    marginBottom: 6,
+  },
+  verificationCode: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#856404',
+    textAlign: 'center',
+    letterSpacing: 2,
+    backgroundColor: '#FFEAA7',
+    padding: 8,
+    borderRadius: 8,
+  },
+
+  // Driver Information
   driverContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -423,8 +623,35 @@ const processTripStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F5F5F5',
   },
-  driverInfo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  driverText: { fontSize: 14, color: '#28A745', fontWeight: '500' },
+  driverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  driverDetails: {
+    flexDirection: 'column',
+  },
+  driverText: {
+    fontSize: 14,
+    color: '#28A745',
+    fontWeight: '500',
+  },
+  driverId: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
+  },
+  contactContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  contactText: {
+    fontSize: 12,
+    color: '#666',
+  },
+
+  // Status Footer
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -432,10 +659,25 @@ const processTripStyles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  statusContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statusLabel: { fontSize: 12, color: '#666' },
-  statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  statusPillText: { color: '#FFFFFF', fontSize: 10, fontWeight: '500' },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusPillText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '500',
+  },
 });
 
 export default ProcessTripsModal;

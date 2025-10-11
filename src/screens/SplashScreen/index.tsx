@@ -1,10 +1,31 @@
-import React from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { routeName, useAuthStatus } from '@utils/navigationHelpers';
+import React, { useEffect } from 'react';
 import { Animated, Easing, Image, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { styles } from './styles';
 
 const SplashScreen = () => {
+  const { token } = useAuthStatus();
   const loadingProgress = React.useRef(new Animated.Value(0)).current;
+  const navigation = useNavigation<any>();
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      setTimeout(() => {
+        if (!token) {
+          navigation.replace(routeName.LOGIN);
+        } else {
+          navigation.replace(routeName.MPIN_LOGIN);
+        }
+      }, 2000);
+    } catch (error) {
+      navigation.replace(routeName.LOGIN);
+    }
+  };
 
   React.useEffect(() => {
     Animated.loop(

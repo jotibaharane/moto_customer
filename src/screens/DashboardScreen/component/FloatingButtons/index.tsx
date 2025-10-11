@@ -1,7 +1,7 @@
 import {
-  useGetActiveTripsQuery,
-  useGetCustomerPostsQuery,
-  useGetProcessTripsQuery,
+  useGetActiveTripsMutation,
+  useGetCustomerPostsMutation,
+  useGetProcessTripsMutation,
 } from '@api/hooks_api';
 import { RootState } from '@store/index';
 import {
@@ -14,7 +14,7 @@ import {
   setOriginAddress,
   setPostId,
 } from '@store/slices/mapSlice';
-import React, { useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { IconButton, Text } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
-import ActiveTripsModal, { ActiveTripsModalRef } from '../ActiveTripsModal';
+import ActiveTripsModal from '../ActiveTripsModal';
 import LoadPostModal from '../LoadPostModal';
 import ProcessTripsModal from '../ProcessTripsModal';
 import { ProcessTripsModalRef } from '../ProcessTripsModal/helper';
@@ -116,14 +116,13 @@ export const FloatingActionButton = () => {
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
 
-  const { data: activeTrips, refetch: refetchActiveTrips } =
-    useGetActiveTripsQuery({ CustomerID });
-  const { data: customerPosts, refetch: refetchPosts } =
-    useGetCustomerPostsQuery({ CustomerID });
-  const { data: processTrips, refetch: refetchProcessTrips } =
-    useGetProcessTripsQuery({ CustomerID });
-
-  const activeTripsModalRef = useRef<ActiveTripsModalRef>(null);
+  const [getActiveTrips, { data: activeTrips }] = useGetActiveTripsMutation();
+  const [getCustomerPosts, { data: customerPosts }] =
+    useGetCustomerPostsMutation();
+  const [getProcessTrips, { data: processTrips }] =
+    useGetProcessTripsMutation();
+  console.log({ customerPosts });
+  const activeTripsModalRef = useRef<ProcessTripsModalRef>(null);
   const processTripsModalRef = useRef<ProcessTripsModalRef>(null);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -143,24 +142,21 @@ export const FloatingActionButton = () => {
   const handleButtonPress = (button: DashboardButtonProp) => {
     toggleMenu();
     dispatch(resetMap());
+
+    console.log({ id: button?.id });
     if (button?.id === 'load-posts') {
       dispatch(setCustomerMap('Load'));
       dispatch(selectDriver(null));
-      dispatch(setPostId(customerPosts?.data?.[0]?.LoadPostID));
+      dispatch(setPostId(customerPosts?.data?.[0]?.LoadPostID || ''));
       dispatch(
         setOrigin({
-          latitude: customerPosts?.data?.[0]?.Origin_Lat,
-          longitude: customerPosts?.data?.[0]?.Origin_Lng,
+          latitude: customerPosts?.data?.[0]?.Origin_Lat || 0,
+          longitude: customerPosts?.data?.[0]?.Origin_Lng || 0,
         }),
       );
-      dispatch(setOriginAddress(customerPosts?.data?.[0]?.Origin));
-      dispatch(setDestinationAddress(customerPosts?.data?.[0]?.Destination));
-      dispatch(
-        setDestination({
-          latitude: customerPosts?.data?.[0]?.Destination_Lat,
-          longitude: customerPosts?.data?.[0]?.Destination_Lng,
-        }),
-      );
+      dispatch(setOriginAddress(customerPosts?.data?.[0]?.Origin || ''));
+      dispatch(setDestinationAddress(''));
+      dispatch(setDestination(null));
       modalRef.current?.open();
     } else if (button?.id === 'active-trips') {
       dispatch(setCustomerMap('Active'));
@@ -195,7 +191,7 @@ export const FloatingActionButton = () => {
       );
       activeTripsModalRef.current?.open();
     } else if (button?.id === 'process-trips') {
-      dispatch(setCustomerMap('Active'));
+      dispatch(setCustomerMap('Process'));
       dispatch(setPostId(processTrips?.data?.[0]?.LoadPostID));
       dispatch(
         setOrigin({
@@ -238,6 +234,12 @@ export const FloatingActionButton = () => {
     inputRange: [0, 1],
     outputRange: ['0deg', '135deg'],
   });
+
+  useLayoutEffect(() => {
+    getCustomerPosts({ CustomerID });
+    getActiveTrips({ CustomerID });
+    getProcessTrips({ CustomerID });
+  }, []);
 
   return (
     <>

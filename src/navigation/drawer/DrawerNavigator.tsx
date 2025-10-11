@@ -1,7 +1,6 @@
 // navigation/drawer/DrawerNavigator.tsx
 import TabNavigator from '@navigation/tabs/TabNavigator';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import SplashScreen from '@screens/SplashScreen';
 import { routeName } from '@utils/navigationHelpers';
 import React from 'react';
 import CustomDrawer from './CustomDrawer';
@@ -44,7 +43,7 @@ const DrawerNavigator = () => (
 
     <Drawer.Screen
       name={routeName.LOAD_POST}
-      component={SplashScreen}
+      component={() => <></>}
       options={{
         title: 'Load Post',
       }}
@@ -52,7 +51,7 @@ const DrawerNavigator = () => (
 
     <Drawer.Screen
       name="MY_LOADS"
-      component={SplashScreen}
+      component={() => <></>}
       options={{
         title: 'My Loads',
       }}
@@ -60,7 +59,7 @@ const DrawerNavigator = () => (
 
     <Drawer.Screen
       name="TRIP_MANAGEMENT"
-      component={SplashScreen}
+      component={() => <></>}
       options={{
         title: 'Trip Management',
       }}
@@ -68,7 +67,7 @@ const DrawerNavigator = () => (
 
     <Drawer.Screen
       name="DRIVER_MANAGEMENT"
-      component={SplashScreen}
+      component={() => <></>}
       options={{
         title: 'Driver Management',
       }}
@@ -76,7 +75,7 @@ const DrawerNavigator = () => (
 
     <Drawer.Screen
       name="VEHICLE_MANAGEMENT"
-      component={SplashScreen}
+      component={() => <></>}
       options={{
         title: 'Vehicle Management',
       }}
@@ -84,7 +83,7 @@ const DrawerNavigator = () => (
 
     <Drawer.Screen
       name="PROFILE"
-      component={SplashScreen}
+      component={() => <></>}
       options={{
         title: 'Profile',
       }}
@@ -92,7 +91,7 @@ const DrawerNavigator = () => (
 
     <Drawer.Screen
       name={routeName.SET_MPIN}
-      component={SplashScreen}
+      component={() => <></>}
       options={{
         title: 'MPIN Settings',
       }}
@@ -100,7 +99,7 @@ const DrawerNavigator = () => (
 
     <Drawer.Screen
       name="Settings"
-      component={SplashScreen}
+      component={() => <></>}
       options={{
         title: 'Settings',
       }}

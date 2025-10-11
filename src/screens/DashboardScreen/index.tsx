@@ -1,5 +1,5 @@
 // Dashboard.tsx
-import { useGetCustomerPostsQuery } from '@api/hooks_api';
+import { useGetCustomerPostsMutation } from '@api/hooks_api';
 import { useNavigation } from '@react-navigation/native';
 import { RootState } from '@store/index';
 import {
@@ -11,7 +11,7 @@ import {
   setOriginAddress,
   setPostId,
 } from '@store/slices/mapSlice';
-import React, { useEffect } from 'react';
+import React, { useEffect, useLayoutEffect } from 'react';
 import {
   Image,
   SafeAreaView,
@@ -36,12 +36,15 @@ const Dashboard: React.FC = () => {
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
 
-  const { data: customerPosts, refetch: refetchPosts } =
-    useGetCustomerPostsQuery({ CustomerID });
+  const [getCustomerPosts, { data: customerPosts }] =
+    useGetCustomerPostsMutation();
   const { originAddress, destinationAddress } = useSelector(
     (state: RootState) => state.map,
   );
 
+  useLayoutEffect(() => {
+    getCustomerPosts({ CustomerID });
+  }, []);
   // Toggle drawer
   const toggleDrawer = () => {
     navigation.openDrawer();

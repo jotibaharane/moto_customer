@@ -32,16 +32,16 @@ const SelectionCard: React.FC<SelectionCardProps> = ({
   testID,
 }) => (
   <View
-    style={tw`mb-6 bg-white p-6 rounded-2xl shadow-sm border ${
+    style={tw`mb-4 bg-white p-4 rounded-xl border ${
       error && touched ? 'border-red-300' : 'border-gray-100'
-    }`}
+    } shadow-xs`}
     testID={testID}
   >
-    <View style={tw`flex-row items-center mb-4`}>
+    <View style={tw`flex-row items-center mb-3`}>
       <View
-        style={[tw`w-2 h-6 mr-3 rounded-full`, { backgroundColor: color }]}
+        style={[tw`w-2 h-4 mr-2 rounded-full`, { backgroundColor: color }]}
       />
-      <Text style={tw`text-lg font-bold text-gray-800`}>{title}</Text>
+      <Text style={tw`text-base font-bold text-gray-800`}>{title}</Text>
     </View>
     {children}
     {error && touched && (
@@ -78,18 +78,23 @@ const SelectionButton: React.FC<SelectionButtonProps> = ({
         : hasError
         ? 'border-red-200 bg-red-50'
         : 'border-gray-300 bg-gray-50'
-    } p-4 rounded-xl`}
+    } p-3 rounded-lg`}
     onPress={onPress}
     testID={testID}
   >
     {value ? (
       renderSelected()
     ) : (
-      <View style={tw`items-center flex-row justify-center gap-5 py-4`}>
-        <View style={tw`bg-gray-200 p-4 rounded-full`}>
-          <Icon name={iconName} size={24} color="#6B7280" />
+      <View style={tw`flex-row items-center gap-3`}>
+        <View style={tw`bg-gray-200 p-2 rounded-full`}>
+          <Icon name={iconName} size={16} color="#6B7280" />
         </View>
-        <Text style={tw`text-gray-500 font-medium`}>{placeholder}</Text>
+        <Text style={tw`text-gray-500 text-sm flex-1`}>{placeholder}</Text>
+        <Icon
+          name="keyboard-arrow-down"
+          size={20}
+          color={tw.color('gray-500')}
+        />
       </View>
     )}
   </TouchableOpacity>
@@ -98,7 +103,9 @@ const SelectionButton: React.FC<SelectionButtonProps> = ({
 const SecondStep: React.FC = () => {
   const { values, errors, touched, setFieldValue } =
     useFormikContext<ShipmentData>();
+
   console.log({ values });
+
   const { data: BodyTypeData } = useGetBodyTypeQuery(
     {
       vehicleType: values.VehicleType,
@@ -106,10 +113,12 @@ const SecondStep: React.FC = () => {
     },
     { skip: !values.VehicleType || !values.Weight },
   );
+
   const { data: packageTypeData } = useGetPackageTypeQuery(
     { cargotype: values?.CargoContent },
     { skip: !values?.CargoContent },
   );
+
   const { data: cargoContentData } = useGetCargoContentQuery();
 
   const bodyTypeRef = useRef<SelectionModalRef>(null);
@@ -117,8 +126,6 @@ const SecondStep: React.FC = () => {
   const packageTypeRef = useRef<SelectionModalRef>(null);
 
   // Format options for modals
-
-  //   body type
   const bodyTypeOptions =
     BodyTypeData?.data?.map(item => ({
       id: item?.BodyType,
@@ -131,13 +138,13 @@ const SecondStep: React.FC = () => {
     [BodyTypeData, values.BodyType],
   );
 
-  //   cargo content
   const cargoContentOptions =
     cargoContentData?.data?.map(item => ({
       id: item?.cargo_type,
       label: item?.cargo_type,
       image: { uri: item?.img },
     })) || [];
+
   const selectedCargoContentType = useMemo(
     () =>
       cargoContentData?.data.find(
@@ -146,7 +153,6 @@ const SecondStep: React.FC = () => {
     [cargoContentData, values.CargoContent],
   );
 
-  // package type
   const packageTypeOptions =
     packageTypeData?.data?.map(item => ({
       id: item?.packaging_type,
@@ -163,10 +169,7 @@ const SecondStep: React.FC = () => {
   );
 
   return (
-    <View style={styles.container} testID="address-info-step">
-      <Text style={styles.title}>Load Information</Text>
-      <Text style={styles.subtitle}>Please provide your Load details</Text>
-
+    <View style={styles.compactContainer} testID="address-info-step">
       {/* Dhala Length Selection */}
       {(values?.VehicleType === 'Medium' ||
         values?.VehicleType === 'Multi Axle') && (
@@ -178,7 +181,7 @@ const SecondStep: React.FC = () => {
           testID="dhala-length-card"
         >
           <View
-            style={tw`border-2 border-dashed border-gray-300 bg-gray-50 p-4 rounded-xl`}
+            style={tw`border-2 border-dashed border-gray-300 bg-gray-50 p-3 rounded-lg`}
           >
             <CustomRadioButton
               options={DhalaLengthOptions}
@@ -188,7 +191,7 @@ const SecondStep: React.FC = () => {
                 setFieldValue('isVolumetric', true);
               }}
               selectedColor="#3B82F6"
-              containerStyle={tw`p-3`}
+              containerStyle={tw`p-2`}
             />
           </View>
         </SelectionCard>
@@ -211,22 +214,29 @@ const SecondStep: React.FC = () => {
             hasError={!!errors.BodyType && !!touched.BodyType}
             testID="body-type-button"
             renderSelected={() => (
-              <View style={tw`items-center flex-row justify-center gap-5`}>
+              <View style={tw`flex-row items-center gap-3`}>
                 <Image
                   source={
                     selectedBodyType?.img
                       ? { uri: selectedBodyType?.img }
                       : undefined
                   }
-                  style={tw`w-20 h-20 mb-3 flex-1`}
+                  style={tw`w-12 h-12`}
                   resizeMode="contain"
                 />
-                <View style={tw`items-center flex-1`}>
-                  <Text style={tw`text-lg font-bold text-gray-800`}>
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-sm font-bold text-gray-800`}>
                     {selectedBodyType?.BodyType}
                   </Text>
-                  <Text style={tw`text-gray-600 mt-1`}>Selected body type</Text>
+                  <Text style={tw`text-xs text-gray-600 mt-1`}>
+                    Selected body type
+                  </Text>
                 </View>
+                <Icon
+                  name="keyboard-arrow-down"
+                  size={20}
+                  color={tw.color('gray-500')}
+                />
               </View>
             )}
           />
@@ -259,22 +269,29 @@ const SecondStep: React.FC = () => {
           hasError={!!errors.CargoContent && !!touched.CargoContent}
           testID="cargo-content-button"
           renderSelected={() => (
-            <View style={tw`items-center flex-row justify-center gap-5`}>
+            <View style={tw`flex-row items-center gap-3`}>
               <Image
                 source={
                   selectedCargoContentType?.img
                     ? { uri: selectedCargoContentType?.img }
                     : undefined
                 }
-                style={tw`w-20 h-20 mb-3 flex-1`}
+                style={tw`w-12 h-12`}
                 resizeMode="contain"
               />
-              <View style={tw`items-center flex-1`}>
-                <Text style={tw`text-lg font-bold text-gray-800`}>
+              <View style={tw`flex-1`}>
+                <Text style={tw`text-sm font-bold text-gray-800`}>
                   {selectedCargoContentType?.cargo_type}
                 </Text>
-                <Text style={tw`text-gray-600 mt-1`}>Selected cargo type</Text>
+                <Text style={tw`text-xs text-gray-600 mt-1`}>
+                  Selected cargo type
+                </Text>
               </View>
+              <Icon
+                name="keyboard-arrow-down"
+                size={20}
+                color={tw.color('gray-500')}
+              />
             </View>
           )}
         />
@@ -289,33 +306,6 @@ const SecondStep: React.FC = () => {
           }}
           numColumns={2}
         />
-        {/* {values.CargoContent=== 'other' && (
-          <View style={tw`mt-4`}>
-            <Text style={tw`text-base font-medium text-gray-800 mb-2`}>
-              Specify Cargo Type
-            </Text>
-            <TextInput
-              style={tw`border ${
-                errors.customCargoType && touched.customCargoType
-                  ? 'border-red-500'
-                  : 'border-gray-300'
-              } rounded-lg p-3 text-base text-gray-800 bg-white`}
-              value={values.customCargoType}
-              onChangeText={text => setFieldValue('customCargoType', text)}
-              onBlur={() =>
-                setFieldValue('customCargoType', values.customCargoType?.trim())
-              }
-              placeholder="Enter custom cargo type"
-              placeholderTextColor={tw.color('gray-400')}
-              testID="custom-cargo-input"
-            />
-            {errors.customCargoType && touched.customCargoType && (
-              <Text style={styles.errorText}>
-                {errors.customCargoType as string}
-              </Text>
-            )}
-          </View>
-        )} */}
       </SelectionCard>
 
       {/* Package Type Selection */}
@@ -335,24 +325,29 @@ const SecondStep: React.FC = () => {
             hasError={!!errors.CargoPackageType && !!touched.CargoPackageType}
             testID="package-type-button"
             renderSelected={() => (
-              <View style={tw`items-center flex-row justify-center gap-5`}>
+              <View style={tw`flex-row items-center gap-3`}>
                 <Image
                   source={
                     selectedPackageType?.img
                       ? { uri: selectedPackageType?.img }
                       : undefined
                   }
-                  style={tw`w-20 h-20 mb-3 flex-1`}
+                  style={tw`w-12 h-12`}
                   resizeMode="contain"
                 />
-                <View style={tw`items-center flex-1`}>
-                  <Text style={tw`text-lg font-bold text-gray-800`}>
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-sm font-bold text-gray-800`}>
                     {selectedPackageType?.packaging_type}
                   </Text>
-                  <Text style={tw`text-gray-600 mt-1`}>
+                  <Text style={tw`text-xs text-gray-600 mt-1`}>
                     Selected package type
                   </Text>
                 </View>
+                <Icon
+                  name="keyboard-arrow-down"
+                  size={20}
+                  color={tw.color('gray-500')}
+                />
               </View>
             )}
           />
@@ -369,48 +364,16 @@ const SecondStep: React.FC = () => {
         </SelectionCard>
       )}
 
-      {/* Custom Package Type Input for 'other' cargo content */}
-      {/* {values.CargoContent === 'other' && (
-        <SelectionCard
-          title="Package Type"
-          color="#8B5CF6"
-          error={errors.CargoPackageType as string}
-          touched={touched.CargoPackageType as boolean}
-          testID="package-type-card"
-        >
-          <View style={tw`mt-4`}>
-            <Text style={tw`text-base font-medium text-gray-800 mb-2`}>
-              Specify Package Type
-            </Text>
-            <TextInput
-              style={tw`border ${
-                errors.CargoPackageType && touched.CargoPackageType
-                  ? 'border-red-500'
-                  : 'border-gray-300'
-              } rounded-lg p-3 text-base text-gray-800 bg-white`}
-              value={values.CargoPackageType}
-              onChangeText={text => setFieldValue('CargoPackageType', text)}
-              onBlur={() =>
-                setFieldValue(
-                  'CargoPackageType',
-                  values.CargoPackageType?.trim(),
-                )
-              }
-              placeholder="Enter custom package type"
-              placeholderTextColor={tw.color('gray-400')}
-              testID="custom-package-input"
-            />
-            {errors.CargoPackageType && touched.CargoPackageType && (
-              <Text style={styles.errorText}>
-                {errors.CargoPackageType as string}
-              </Text>
-            )}
-          </View>
-        </SelectionCard>
-      )} */}
-
       {/* Time Picker */}
-      <View style={styles.inputGroup} testID="time-picker-group">
+      <View
+        style={tw`mb-4 bg-white p-4 rounded-xl border border-gray-100 shadow-xs`}
+      >
+        <View style={tw`flex-row items-center mb-3`}>
+          <View style={tw`w-2 h-4 bg-indigo-500 mr-2 rounded-full`} />
+          <Text style={tw`text-base font-bold text-gray-800`}>
+            Expected Available Time
+          </Text>
+        </View>
         <TimePicker
           value={values?.ExpectedAvailableTime}
           onChange={time => setFieldValue('ExpectedAvailableTime', time)}
@@ -426,8 +389,10 @@ const SecondStep: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  compactContainer: {
+    flex: 1,
     padding: 16,
+    backgroundColor: '#f8fafc',
   },
   title: {
     fontSize: 24,
@@ -440,12 +405,11 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 24,
   },
-  inputGroup: {
-    marginBottom: 20,
-  },
   errorText: {
-    color: '#dc3545',
-    fontSize: 14,
+    color: '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   },
 });
 

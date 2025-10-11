@@ -7,7 +7,9 @@ import React, {
   useState,
 } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
   KeyboardAvoidingView,
   Modal,
@@ -18,10 +20,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, {
+  LatLng,
+  Marker,
+  Polyline,
+  PROVIDER_GOOGLE,
+  Region,
+} from 'react-native-maps';
 import { RadioButton, TextInput } from 'react-native-paper';
+import Toast from 'react-native-toast-message';
 import Entypo from 'react-native-vector-icons/Entypo';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import { ShipmentData } from '@api/api.type';
@@ -31,6 +41,7 @@ import ActionButton from '@components/common/ActionButton';
 import { SelectList } from '@components/common/Select';
 import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
 import {
+  calculateRoute,
   geocodeCoordinates,
   getCurrentLocationWithFallback,
   INDIA_DEFAULT_REGION,
@@ -52,6 +63,15 @@ interface LocationSuggestion {
   value: string;
 }
 
+interface RouteData {
+  coordinates: Array<{
+    latitude: number;
+    longitude: number;
+  }>;
+  distance: number;
+  duration: number;
+}
+
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
@@ -64,14 +84,55 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const [mapRegion, setMapRegion] = useState<Region>(INDIA_DEFAULT_REGION);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+  const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [userLocation, setUserLocation] = useState<any>(null);
+  const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
+  const [showRouteInfo, setShowRouteInfo] = useState(false);
+  const [isMapDragging, setIsMapDragging] = useState(false);
+  const [centerPinCoordinate, setCenterPinCoordinate] = useState<LatLng | null>(
+    null,
+  );
+
   const scrollViewRef = useRef<ScrollView>(null);
   const mapRef = useRef<MapView>(null);
+  const pinAnimation = useRef(new Animated.Value(0)).current;
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { values, setFieldValue } = useFormikContext<ShipmentData>();
   const { currentData } = useGetCurrentAddressQuery<any>();
   const originPlaces = useGooglePlacesSelect();
 
   const isOtherPickupType = useMemo(() => pickupType === 'other', [pickupType]);
+
+  // Custom debounce function without lodash
+  const debounce = useCallback(
+    (func: (...args: any[]) => void, wait: number) => {
+      return (...args: any[]) => {
+        if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+        }
+        debounceTimeoutRef.current = setTimeout(() => {
+          func(...args);
+        }, wait);
+      };
+    },
+    [],
+  );
+
+  // Animate the center pin
+  const animatePin = useCallback(
+    (toValue: number) => {
+      Animated.spring(pinAnimation, {
+        toValue,
+        useNativeDriver: true,
+        tension: 120,
+        friction: 8,
+        overshootClamping: false,
+      }).start();
+    },
+    [pinAnimation],
+  );
 
   const handleConfirm = useCallback(() => {
     if (!values.origin?.address) {
@@ -99,13 +160,18 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         const location = await originPlaces.getPlaceDetails(selected.key);
         if (location) {
           setFieldValue('origin', location);
-          // Center map on selected location
-          setMapRegion({
+          const newRegion = {
             latitude: location.coordinates.lat,
             longitude: location.coordinates.lng,
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
+          };
+          setMapRegion(newRegion);
+          setCenterPinCoordinate({
+            latitude: location.coordinates.lat,
+            longitude: location.coordinates.lng,
           });
+          setSelectedLocation(location);
         }
       } catch (error) {
         Alert.alert('Error', 'Failed to fetch location details');
@@ -122,7 +188,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       });
       setShowHistoryModal(false);
     },
-    [setFieldValue],
+    [setFieldValue, values.origin],
   );
 
   const handleCurrentLocationPress = useCallback(async () => {
@@ -135,54 +201,159 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
 
       if (address) {
         setFieldValue('origin', address);
-        // Update map region to current location
-        setMapRegion({
+        setUserLocation({ latitude, longitude });
+
+        const newRegion = {
           latitude,
           longitude,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
-        });
+        };
+        setMapRegion(newRegion);
+        setCenterPinCoordinate({ latitude, longitude });
+        setSelectedLocation(address);
+
+        if (selectedLocation) {
+          await calculateRouteBetweenPoints(
+            { latitude, longitude },
+            {
+              latitude: selectedLocation.coordinates.lat,
+              longitude: selectedLocation.coordinates.lng,
+            },
+          );
+        }
+      } else {
+        Alert.alert(
+          'Location Unavailable',
+          'Could not fetch address. Please select a location manually.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Select Manually', onPress: () => setShowMapModal(true) },
+          ],
+        );
       }
     } catch (error: any) {
       console.error('Location error:', error);
-
-      if (
+      Alert.alert(
+        'Location Error',
         error.message.includes('permission') ||
-        error.message.includes('disabled')
-      ) {
-        Alert.alert('Location Required', error.message, [
+          error.message.includes('disabled')
+          ? 'Location services are disabled. Please enable them or select a location manually.'
+          : 'Failed to fetch location. Please try again or select manually.',
+        [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: openLocationSettings },
-        ]);
-      } else {
-        Alert.alert('Location Error', error.message);
-      }
+          error.message.includes('permission') ||
+          error.message.includes('disabled')
+            ? { text: 'Open Settings', onPress: openLocationSettings }
+            : { text: 'Select Manually', onPress: () => setShowMapModal(true) },
+        ],
+      );
     } finally {
       setActiveOriginButton('');
       setIsLoadingLocation(false);
     }
-  }, [setFieldValue]);
+  }, [setFieldValue, selectedLocation]);
 
-  const handleMapLocationSelect = useCallback(async (region: Region) => {
-    try {
-      setIsLoadingLocation(true);
-      const address = await reverseGeocode(region.latitude, region.longitude);
+  const calculateRouteBetweenPoints = useCallback(
+    async (
+      origin: { latitude: number; longitude: number },
+      destination: { latitude: number; longitude: number },
+    ) => {
+      try {
+        setIsCalculatingRoute(true);
+        const route = await calculateRoute(origin, destination);
+        setRouteData(route);
+        setShowRouteInfo(true);
 
-      if (address) {
-        setSelectedLocation({
-          ...address,
-          coordinates: {
-            lat: region.latitude,
-            lng: region.longitude,
-          },
-        });
+        if (mapRef.current && route.coordinates.length > 0) {
+          mapRef.current.fitToCoordinates(route.coordinates, {
+            edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+            animated: true,
+          });
+        }
+      } catch (error) {
+        console.error('Route calculation error:', error);
+        Alert.alert('Error', 'Could not calculate route');
+      } finally {
+        setIsCalculatingRoute(false);
       }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to get address for selected location');
-    } finally {
-      setIsLoadingLocation(false);
-    }
-  }, []);
+    },
+    [],
+  );
+
+  const handleMapLocationSelect = useCallback(
+    async (coordinate: LatLng) => {
+      try {
+        setIsLoadingLocation(true);
+        const address = await reverseGeocode(
+          coordinate.latitude,
+          coordinate.longitude,
+        );
+
+        if (address) {
+          const newLocation = {
+            ...address,
+            coordinates: {
+              lat: coordinate.latitude,
+              lng: coordinate.longitude,
+            },
+          };
+          setSelectedLocation(newLocation);
+
+          if (userLocation) {
+            await calculateRouteBetweenPoints(userLocation, coordinate);
+          }
+        } else {
+          Alert.alert(
+            'Error',
+            'Could not fetch address. Please try another location.',
+            [
+              { text: 'OK', style: 'cancel' },
+              { text: 'Select Manually', onPress: () => setShowMapModal(true) },
+            ],
+          );
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to get address for selected location');
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    },
+    [userLocation, calculateRouteBetweenPoints],
+  );
+
+  const debouncedHandleMapLocationSelect = useCallback(
+    debounce(handleMapLocationSelect, 500),
+    [handleMapLocationSelect],
+  );
+
+  const handleMapRegionChangeComplete = useCallback(
+    async (region: Region) => {
+      setMapRegion(region);
+
+      const centerCoord = {
+        latitude: region.latitude,
+        longitude: region.longitude,
+      };
+
+      setCenterPinCoordinate(centerCoord);
+
+      if (isMapDragging) {
+        setIsMapDragging(false);
+        await debouncedHandleMapLocationSelect(centerCoord);
+      }
+    },
+    [isMapDragging, debouncedHandleMapLocationSelect],
+  );
+
+  const handleMapDragStart = useCallback(() => {
+    setIsMapDragging(true);
+    animatePin(-20);
+  }, [animatePin]);
+
+  const handleMapDragEnd = useCallback(() => {
+    animatePin(0);
+  }, [animatePin]);
 
   const handleConfirmMapLocation = useCallback(() => {
     if (selectedLocation) {
@@ -196,23 +367,42 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     setMapRegion(region);
   }, []);
 
-  const handleMapPress = useCallback(
-    (event: any) => {
-      const { coordinate } = event.nativeEvent;
-      handleMapLocationSelect({
-        ...coordinate,
-        latitudeDelta: mapRegion.latitudeDelta,
-        longitudeDelta: mapRegion.longitudeDelta,
+  const handleRecenterMap = useCallback(() => {
+    if (userLocation && mapRef.current) {
+      const newRegion = {
+        ...userLocation,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+      mapRef.current.animateToRegion(newRegion, 1000);
+      setCenterPinCoordinate(userLocation);
+    }
+  }, [userLocation]);
+
+  const handleToggleMapType = useCallback(() => {
+    setMapType(current => {
+      const newType = current === 'standard' ? 'satellite' : 'standard';
+      Toast.show({
+        type: 'info',
+        text1: `Switched to ${newType} view`,
+        visibilityTime: 2000,
       });
-    },
-    [mapRegion, handleMapLocationSelect],
-  );
+      return newType;
+    });
+  }, []);
 
   const handleModalClose = useCallback(() => {
     setActiveOriginButton('');
     setShowHistoryModal(false);
     setShowMapModal(false);
     setIsModalOpen(false);
+    setRouteData(null);
+    setShowRouteInfo(false);
+    setCenterPinCoordinate(null);
+    setIsMapDragging(false);
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
     bottomModalRef.current?.close();
   }, []);
 
@@ -235,6 +425,50 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     },
     close: handleModalClose,
   }));
+
+  const initializeCenterPin = useCallback(() => {
+    if (showMapModal && !centerPinCoordinate) {
+      setCenterPinCoordinate({
+        latitude: mapRegion.latitude,
+        longitude: mapRegion.longitude,
+      });
+
+      if (selectedLocation) {
+        setCenterPinCoordinate({
+          latitude: selectedLocation.coordinates.lat,
+          longitude: selectedLocation.coordinates.lng,
+        });
+      }
+    }
+  }, [showMapModal, centerPinCoordinate, mapRegion, selectedLocation]);
+
+  const CenterSelectionPin = useMemo(() => {
+    if (!centerPinCoordinate) return null;
+
+    return (
+      <View style={styles.centerPinContainer} pointerEvents="none">
+        <Animated.View
+          style={[
+            styles.centerPin,
+            {
+              transform: [
+                {
+                  translateY: pinAnimation.interpolate({
+                    inputRange: [-20, 0],
+                    outputRange: [-20, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="map-marker" size={40} color="#EF4444" />
+          <View style={styles.pinPulse} />
+        </Animated.View>
+        <View style={styles.centerPinBase} />
+      </View>
+    );
+  }, [centerPinCoordinate, pinAnimation]);
 
   const actionButtons = useMemo(
     () => [
@@ -273,6 +507,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         onPress: () => {
           setActiveOriginButton('map');
           setShowMapModal(true);
+          initializeCenterPin();
         },
         color:
           activeOriginButton === 'map' ? tw.color('purple-600') : 'transparent',
@@ -301,17 +536,30 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         borderColor: 'gray-600',
       },
     ],
-    [activeOriginButton, handleCurrentLocationPress, isLoadingLocation],
+    [
+      activeOriginButton,
+      handleCurrentLocationPress,
+      isLoadingLocation,
+      initializeCenterPin,
+    ],
   );
 
-  // Map Modal Component
   const MapSelectionModal = useMemo(
     () => (
       <Modal
         visible={showMapModal}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setShowMapModal(false)}
+        onRequestClose={() => {
+          setShowMapModal(false);
+          setIsLoadingLocation(false);
+          setIsCalculatingRoute(false);
+          setActiveOriginButton('');
+          if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+          }
+        }}
+        onShow={initializeCenterPin}
       >
         <View style={styles.mapContainer}>
           <View style={styles.mapHeader}>
@@ -319,33 +567,218 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
             <TouchableOpacity
               onPress={() => setShowMapModal(false)}
               style={styles.mapCloseButton}
+              accessibilityLabel="Close map modal"
+              accessibilityHint="Closes the map selection modal"
             >
               <Icon name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
 
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            provider={PROVIDER_GOOGLE}
-            region={mapRegion}
-            onRegionChangeComplete={handleMapRegionChange}
-            onPress={handleMapPress}
-            showsUserLocation={true}
-            showsMyLocationButton={true}
-            followsUserLocation={true}
-          >
-            {selectedLocation && (
-              <Marker
-                coordinate={{
-                  latitude: selectedLocation.coordinates.lat,
-                  longitude: selectedLocation.coordinates.lng,
-                }}
-                title="Selected Location"
-                description={selectedLocation.address}
-              />
+          <View style={styles.mapWrapper}>
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              provider={PROVIDER_GOOGLE}
+              region={mapRegion}
+              onRegionChange={handleMapRegionChange}
+              onRegionChangeComplete={handleMapRegionChangeComplete}
+              onPanDrag={handleMapDragStart}
+              onResponderRelease={handleMapDragEnd}
+              mapType={mapType}
+              showsUserLocation={true}
+              showsMyLocationButton={false}
+              showsCompass={true}
+              showsScale={true}
+              showsTraffic={false}
+              zoomControlEnabled={true}
+              scrollEnabled={true}
+              zoomEnabled={true}
+              rotateEnabled={true}
+              liteMode={Platform.OS === 'android' && !showMapModal}
+              accessible={true}
+              accessibilityLabel="Map for selecting pickup location"
+            >
+              {routeData && routeData.coordinates.length > 0 && (
+                <Polyline
+                  coordinates={routeData.coordinates}
+                  strokeWidth={4}
+                  strokeColor="#3B82F6"
+                  lineCap="round"
+                  lineJoin="round"
+                />
+              )}
+
+              {selectedLocation && (
+                <Marker
+                  coordinate={{
+                    latitude: selectedLocation.coordinates.lat,
+                    longitude: selectedLocation.coordinates.lng,
+                  }}
+                  title="Selected Location"
+                  description={selectedLocation.address}
+                >
+                  <View style={styles.selectedMarker}>
+                    <MaterialCommunityIcons
+                      name="map-marker-check"
+                      size={32}
+                      color="#10B981"
+                    />
+                  </View>
+                </Marker>
+              )}
+
+              {userLocation && (
+                <Marker
+                  coordinate={userLocation}
+                  title="Your Location"
+                  pinColor="#3B82F6"
+                />
+              )}
+            </MapView>
+
+            {CenterSelectionPin}
+
+            {(isLoadingLocation || isCalculatingRoute) && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color="#3B82F6" />
+                <Text style={styles.loadingText}>
+                  {isLoadingLocation
+                    ? 'Fetching location...'
+                    : 'Calculating route...'}
+                </Text>
+              </View>
             )}
-          </MapView>
+
+            <View style={styles.instructionsContainer}>
+              <Text style={styles.instructionsText}>
+                Drag map to move selection pin
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.mapControls}>
+            <TouchableOpacity
+              style={styles.mapControlButton}
+              onPress={handleRecenterMap}
+              accessibilityLabel="Recenter map to your location"
+              accessibilityHint="Moves the map view to your current location"
+            >
+              <Icon name="my-location" size={20} color="#374151" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.mapControlButton}
+              onPress={handleToggleMapType}
+              accessibilityLabel={`Switch to ${
+                mapType === 'standard' ? 'satellite' : 'standard'
+              } view`}
+              accessibilityHint="Toggles between standard and satellite map views"
+            >
+              <MaterialCommunityIcons
+                name={mapType === 'standard' ? 'satellite-variant' : 'map'}
+                size={20}
+                color="#374151"
+              />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.nudgeControls}>
+            <TouchableOpacity
+              style={styles.nudgeButton}
+              onPress={() => {
+                if (centerPinCoordinate) {
+                  const newCoord = {
+                    ...centerPinCoordinate,
+                    latitude: centerPinCoordinate.latitude + 0.0001,
+                  };
+                  setCenterPinCoordinate(newCoord);
+                  debouncedHandleMapLocationSelect(newCoord);
+                }
+              }}
+              accessibilityLabel="Move pin up"
+              accessibilityHint="Adjusts the pin location slightly upward"
+            >
+              <Icon name="arrow-upward" size={20} color="#374151" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.nudgeButton}
+              onPress={() => {
+                if (centerPinCoordinate) {
+                  const newCoord = {
+                    ...centerPinCoordinate,
+                    longitude: centerPinCoordinate.longitude - 0.0001,
+                  };
+                  setCenterPinCoordinate(newCoord);
+                  debouncedHandleMapLocationSelect(newCoord);
+                }
+              }}
+              accessibilityLabel="Move pin left"
+              accessibilityHint="Adjusts the pin location slightly to the left"
+            >
+              <Icon name="arrow-back" size={20} color="#374151" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.nudgeButton}
+              onPress={() => {
+                if (centerPinCoordinate) {
+                  const newCoord = {
+                    ...centerPinCoordinate,
+                    longitude: centerPinCoordinate.longitude + 0.0001,
+                  };
+                  setCenterPinCoordinate(newCoord);
+                  debouncedHandleMapLocationSelect(newCoord);
+                }
+              }}
+              accessibilityLabel="Move pin right"
+              accessibilityHint="Adjusts the pin location slightly to the right"
+            >
+              <Icon name="arrow-forward" size={20} color="#374151" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.nudgeButton}
+              onPress={() => {
+                if (centerPinCoordinate) {
+                  const newCoord = {
+                    ...centerPinCoordinate,
+                    latitude: centerPinCoordinate.latitude - 0.0001,
+                  };
+                  setCenterPinCoordinate(newCoord);
+                  debouncedHandleMapLocationSelect(newCoord);
+                }
+              }}
+              accessibilityLabel="Move pin down"
+              accessibilityHint="Adjusts the pin location slightly downward"
+            >
+              <Icon name="arrow-downward" size={20} color="#374151" />
+            </TouchableOpacity>
+          </View>
+
+          {showRouteInfo && routeData && (
+            <View style={styles.routeInfoContainer}>
+              <View style={styles.routeInfo}>
+                <View style={styles.routeInfoItem}>
+                  <MaterialCommunityIcons
+                    name="road-variant"
+                    size={16}
+                    color="#6B7280"
+                  />
+                  <Text style={styles.routeInfoText}>
+                    {routeData.distance} km
+                  </Text>
+                </View>
+                <View style={styles.routeInfoItem}>
+                  <MaterialCommunityIcons
+                    name="clock-outline"
+                    size={16}
+                    color="#6B7280"
+                  />
+                  <Text style={styles.routeInfoText}>
+                    {routeData.duration} min
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           <View style={styles.mapFooter}>
             <View style={styles.selectedLocationInfo}>
@@ -361,7 +794,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                 </>
               ) : (
                 <Text style={styles.noLocationText}>
-                  Tap on the map to select a location
+                  Drag the map to select a location
                 </Text>
               )}
             </View>
@@ -370,20 +803,33 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
               <TouchableOpacity
                 style={[styles.mapButton, styles.cancelMapButton]}
                 onPress={() => setShowMapModal(false)}
+                accessibilityLabel="Cancel map selection"
+                accessibilityHint="Closes the map without saving the selected location"
               >
                 <Text style={styles.cancelMapButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.mapButton,
-                  styles.confirmMapButton,
-                  !selectedLocation && styles.disabledButton,
-                ]}
-                onPress={handleConfirmMapLocation}
-                disabled={!selectedLocation}
-              >
-                <Text style={styles.confirmMapButtonText}>Select Location</Text>
-              </TouchableOpacity>
+              {!isMapDragging && (
+                <TouchableOpacity
+                  style={[
+                    styles.mapButton,
+                    styles.confirmMapButton,
+                    (!selectedLocation || isCalculatingRoute) &&
+                      styles.disabledButton,
+                  ]}
+                  onPress={handleConfirmMapLocation}
+                  disabled={!selectedLocation || isCalculatingRoute}
+                  accessibilityLabel="Confirm selected location"
+                  accessibilityHint="Saves the currently selected location and closes the map"
+                >
+                  {isCalculatingRoute ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.confirmMapButtonText}>
+                      Select Location
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -393,18 +839,30 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       showMapModal,
       mapRegion,
       selectedLocation,
+      userLocation,
+      mapType,
+      routeData,
+      showRouteInfo,
+      isCalculatingRoute,
+      isMapDragging,
       handleMapRegionChange,
-      handleMapPress,
+      handleMapRegionChangeComplete,
+      handleMapDragStart,
+      handleMapDragEnd,
+      handleRecenterMap,
+      handleToggleMapType,
       handleConfirmMapLocation,
+      CenterSelectionPin,
+      initializeCenterPin,
     ],
   );
-  console.log({ currentData });
+
   return (
     <BottomModal
       ref={bottomModalRef}
       customHeight="80%"
       backdropOpacity={0.8}
-      animationDuration={400}
+      animationDuration={500}
       swipeThreshold={50}
       onClose={handleBottomModalClose}
       disableSwipe
@@ -417,6 +875,8 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
           <TouchableOpacity
             onPress={handleModalClose}
             style={styles.closeButton}
+            accessibilityLabel="Close pickup modal"
+            accessibilityHint="Closes the pickup location selection modal"
           >
             <Icon name="close" size={24} color="#666" />
           </TouchableOpacity>
@@ -436,7 +896,6 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
             bounces={true}
             alwaysBounceVertical={false}
           >
-            {/* Pickup Type Selection */}
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
                 <View style={tw`w-2 h-6 bg-blue-500 mr-3 rounded-full`} />
@@ -470,7 +929,6 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
               </View>
             </View>
 
-            {/* Location Selection */}
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
                 <View style={tw`w-2 h-6 bg-blue-500 mr-3 rounded-full`} />
@@ -518,13 +976,11 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                       styles.actionButton,
                       tw`border border-${button.borderColor}`,
                     ]}
-                    loading={button.loading}
                   />
                 ))}
               </View>
             </View>
 
-            {/* Address Details */}
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
                 <View style={tw`w-2 h-6 bg-green-500 mr-3 rounded-full`} />
@@ -554,7 +1010,6 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
               </View>
             </View>
 
-            {/* Contact Details */}
             {isOtherPickupType && (
               <View style={styles.sectionContainer}>
                 <View style={styles.sectionHeader}>
@@ -589,6 +1044,8 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
             <TouchableOpacity
               style={[styles.cancelButton, tw`border border-gray-300`]}
               onPress={handleModalClose}
+              accessibilityLabel="Cancel pickup selection"
+              accessibilityHint="Closes the modal without saving changes"
             >
               <Text style={[styles.cancelButtonText, tw`text-gray-700`]}>
                 Cancel
@@ -597,6 +1054,8 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
             <TouchableOpacity
               style={[styles.confirmButton, tw`bg-blue-600`]}
               onPress={handleConfirm}
+              accessibilityLabel="Confirm pickup location"
+              accessibilityHint="Saves the selected pickup location and closes the modal"
             >
               <Text style={[styles.confirmButtonText, tw`text-white`]}>
                 Confirm Pickup
@@ -749,7 +1208,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: 'white',
   },
-  // Map Modal Styles
   mapContainer: {
     flex: 1,
     backgroundColor: 'white',
@@ -771,9 +1229,137 @@ const styles = StyleSheet.create({
   mapCloseButton: {
     padding: 4,
   },
+  mapWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
   map: {
     flex: 1,
     width: screenWidth,
+  },
+  centerPinContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -20,
+    marginTop: -40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  centerPin: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1001,
+  },
+  centerPinBase: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EF4444',
+    opacity: 0.2,
+    position: 'absolute',
+    top: 10,
+  },
+  pinPulse: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+    backgroundColor: '#EF4444',
+    opacity: 0.3,
+    transform: [{ scale: 1.5 }],
+  },
+  instructionsContainer: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  instructionsText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  mapControls: {
+    position: 'absolute',
+    top: 80,
+    right: 16,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  mapControlButton: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  nudgeControls: {
+    position: 'absolute',
+    top: 160,
+    right: 16,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    flexDirection: 'column',
+  },
+  nudgeButton: {
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  selectedMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  routeInfoContainer: {
+    position: 'absolute',
+    top: 80,
+    left: 16,
+    right: 80,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  routeInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  routeInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  routeInfoText: {
+    marginLeft: 4,
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
   },
   mapFooter: {
     padding: 16,
@@ -831,6 +1417,23 @@ const styles = StyleSheet.create({
   confirmMapButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1002,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
   },
 });
 

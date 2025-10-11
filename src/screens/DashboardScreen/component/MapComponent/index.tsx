@@ -1,26 +1,32 @@
 import { useGetNearbyDriversQuery } from '@api/hooks_api';
 import { RootState } from '@store/index';
 import { addOrUpdateDriver } from '@store/slices/mapSlice';
-import { Driver } from '@store/slices/mapSliceType';
+import colors from '@utils/colors';
 import { GOOGLE_MAPS_API_KEY } from '@utils/env';
-import React, { useEffect, useRef, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { View } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  DROP_MARKER_IMG,
-  FALLBACK_IMAGE,
-  HEAVY_TRUCK_IMG,
-  MAP_STYLE,
-  MEDIUM_TRUCK_IMG,
-  ORIGIN_MARKER_IMG,
-  SMALL_TRUCK_IMG,
-} from './helper';
+import DropMarker from '../icon/DropMarker';
+import OriginMarker from '../icon/OriginMarker';
+import Truck from '../icon/Truck';
+import { MAP_STYLE } from './helper';
 
 interface Coordinate {
   latitude: number;
   longitude: number;
+}
+
+interface Driver {
+  id: string;
+  latitude: number;
+  longitude: number;
+  rotation: number;
+  driver: string;
+  available: boolean;
+  licensePlate: string;
+  type: string;
 }
 
 const ICON_SIZES = {
@@ -29,18 +35,16 @@ const ICON_SIZES = {
   truck: { width: 45, height: 45 },
 };
 
-// Helper function to get appropriate truck image based on vehicle type
-const getTruckImage = (type?: string) => {
-  switch (type?.toLowerCase()) {
-    case 'small':
-      return SMALL_TRUCK_IMG;
-    case 'medium':
-      return MEDIUM_TRUCK_IMG;
-    case 'heavy':
-      return HEAVY_TRUCK_IMG;
-    default:
-      return MEDIUM_TRUCK_IMG;
-  }
+// Throttle function to limit function calls
+const throttle = (func: Function, limit: number) => {
+  let inThrottle: boolean;
+  return function (this: any, ...args: any[]) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
 };
 
 const MapComponent: React.FC = () => {
@@ -58,96 +62,132 @@ const MapComponent: React.FC = () => {
     postId,
   } = useSelector((state: RootState) => state.map);
 
+  const mapRef = useRef<MapView | null>(null);
+  const lastFitCoordinatesRef = useRef<Coordinate[]>([]);
+  const lastDriverUpdateRef = useRef<number>(0);
+
+  // Clear map when currentMap changes to prevent stale markers
+  useEffect(() => {
+    // Reset fit coordinates when map type changes
+    lastFitCoordinatesRef.current = [];
+
+    // Force map refresh by animating to current region
+    if (mapRef.current) {
+      mapRef.current.animateToRegion(region, 350);
+    }
+  }, [currentMap, region]);
+
+  // Optimized driver query with conditional polling
+  const shouldPoll = useMemo(
+    () => postId && currentMap === 'Load',
+    [postId, currentMap],
+  );
+
   const { data: driverLocations } = useGetNearbyDriversQuery(
     { CustomerID, LoadPostID: postId },
     {
-      pollingInterval: 1000,
-      skip: !postId && currentMap !== 'Load',
+      pollingInterval: shouldPoll ? 2000 : 0,
+      skip: !shouldPoll,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
     },
   );
 
-  const [iconsLoaded, setIconsLoaded] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
-  const mapRef = useRef<MapView | null>(null);
+  // Memoized coordinates calculation
+  const getMapCoordinates = useCallback((): Coordinate[] => {
+    const coords: Coordinate[] = [];
 
-  // Track rendered markers to prevent duplicates
-  const renderedDriverIds = useRef<Set<string>>(new Set());
+    if (origin?.latitude && origin.longitude) {
+      coords.push({ latitude: origin.latitude, longitude: origin.longitude });
+    }
 
-  // Debug logging
-  useEffect(() => {
-    console.log('=== MAP COMPONENT DEBUG INFO ===');
-    console.log('Marker images:', {
-      origin: ORIGIN_MARKER_IMG,
-      destination: DROP_MARKER_IMG,
-      small: SMALL_TRUCK_IMG,
-      medium: MEDIUM_TRUCK_IMG,
-      heavy: HEAVY_TRUCK_IMG,
-      fallback: FALLBACK_IMAGE,
-    });
-    console.log('Current map state:', {
-      currentMap,
-      hasOrigin: !!origin?.latitude,
-      hasDestination: !!destination?.latitude,
-      driversCount: drivers.length,
-      hasSelectedDriver: !!selectedDriver,
-      postId,
-    });
+    // Only include destination coordinates for Active map
+    if (
+      currentMap === 'Active' &&
+      destination?.latitude &&
+      destination.longitude
+    ) {
+      coords.push({
+        latitude: destination.latitude,
+        longitude: destination.longitude,
+      });
+    }
 
-    setIconsLoaded(true);
-  }, []);
+    // Only include drivers for Load map
+    if (currentMap === 'Load') {
+      drivers.forEach(driver => {
+        if (driver.latitude && driver.longitude) {
+          coords.push({
+            latitude: driver.latitude,
+            longitude: driver.longitude,
+          });
+        }
+      });
+    }
+    // Include selected driver for Active and Process maps
+    else if (
+      (currentMap === 'Active' || currentMap === 'Process') &&
+      selectedDriver?.latitude &&
+      selectedDriver.longitude
+    ) {
+      coords.push({
+        latitude: selectedDriver.latitude,
+        longitude: selectedDriver.longitude,
+      });
+    }
 
-  // Fit map to coordinates
-  useEffect(() => {
-    if (mapRef.current && mapReady) {
-      let coords: Coordinate[] = [];
+    return coords;
+  }, [currentMap, origin, destination, drivers, selectedDriver]);
 
-      // Add origin and destination
-      if (origin?.latitude) {
-        coords.push({ latitude: origin.latitude, longitude: origin.longitude });
-      }
-      if (destination?.latitude) {
-        coords.push({
-          latitude: destination.latitude,
-          longitude: destination.longitude,
+  // Throttled map fitting function
+  const fitMapToCoordinates = useCallback(
+    throttle((coordinates: Coordinate[]) => {
+      if (mapRef.current && coordinates.length > 0) {
+        // Check if coordinates have significantly changed
+        const hasSignificantChange = coordinates.some((coord, index) => {
+          const lastCoord = lastFitCoordinatesRef.current[index];
+          if (!lastCoord) return true;
+
+          const latDiff = Math.abs(coord.latitude - lastCoord.latitude);
+          const lngDiff = Math.abs(coord.longitude - lastCoord.longitude);
+          return latDiff > 0.0001 || lngDiff > 0.0001; // ~11 meters precision
         });
-      }
 
-      // Add drivers based on current map mode
-      if (currentMap === 'Load') {
-        drivers.forEach(driver => {
-          if (driver.latitude && driver.longitude) {
-            coords.push({
-              latitude: driver.latitude,
-              longitude: driver.longitude,
-            });
-          }
-        });
-      } else if (selectedDriver?.latitude) {
-        coords.push({
-          latitude: selectedDriver.latitude,
-          longitude: selectedDriver.longitude,
-        });
-      }
-
-      // Fit to coordinates if we have valid ones
-      if (coords.length > 0) {
-        console.log('Fitting map to coordinates:', coords.length);
-        mapRef.current.fitToCoordinates(coords, {
-          edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
-          animated: true,
-        });
-      } else {
+        if (
+          hasSignificantChange ||
+          coordinates.length !== lastFitCoordinatesRef.current.length
+        ) {
+          console.log('Fitting map to coordinates:', coordinates.length);
+          mapRef.current.fitToCoordinates(coordinates, {
+            edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+            animated: true,
+          });
+          lastFitCoordinatesRef.current = coordinates;
+        }
+      } else if (mapRef.current && coordinates.length === 0) {
         // Fallback to initial region
         mapRef.current.animateToRegion(region, 1000);
       }
-    }
-  }, [currentMap, origin, destination, drivers, selectedDriver, mapReady]);
+    }, 1000),
+    [region],
+  );
 
-  // Update drivers from API
+  // Optimized map fitting effect
+  useEffect(() => {
+    const coordinates = getMapCoordinates();
+    fitMapToCoordinates(coordinates);
+  }, [getMapCoordinates, fitMapToCoordinates]);
+
+  // Optimized driver updates with deduplication
   useEffect(() => {
     if (driverLocations?.data?.length) {
-      console.log('Updating drivers from API:', driverLocations.data.length);
-      const data: Driver[] = driverLocations.data
+      const now = Date.now();
+      // Throttle driver updates to prevent excessive re-renders
+      if (now - lastDriverUpdateRef.current < 1500) {
+        return;
+      }
+
+      const newDrivers: Driver[] = driverLocations.data
         .map(item => ({
           latitude: item?.Driver_Origin_Lat,
           longitude: item?.Driver_Origin_Lng,
@@ -158,93 +198,55 @@ const MapComponent: React.FC = () => {
           licensePlate: item?.VehicleNumber,
           type: item?.VehicleType || 'medium',
         }))
-        .filter(driver => driver.latitude && driver.longitude);
+        .filter(
+          (driver): driver is Driver => !!driver.latitude && !!driver.longitude,
+        );
 
-      dispatch(addOrUpdateDriver(data));
+      // Only dispatch if drivers have actually changed
+      if (newDrivers.length > 0) {
+        dispatch(addOrUpdateDriver(newDrivers as any));
+        lastDriverUpdateRef.current = now;
+      }
     }
   }, [driverLocations, dispatch]);
 
-  const forceMapRefresh = () => {
-    if (mapRef.current && mapReady) {
-      setTimeout(() => {
-        mapRef.current?.animateToRegion(region, 500);
-      }, 300);
-    }
-  };
+  // Memoized marker components with conditional rendering based on currentMap
+  const renderOriginMarker = useMemo(() => {
+    // Show origin marker for all map types
+    if (!origin?.latitude) return null;
 
-  // Filter out duplicate drivers and ensure selected driver is not duplicated
-  const getFilteredDrivers = () => {
-    const filteredDrivers: Driver[] = [];
-    const seenDriverIds = new Set<string>();
-
-    // Add selected driver first if applicable
-    if (selectedDriver && selectedDriver.id && currentMap === 'Load') {
-      seenDriverIds.add(selectedDriver.id);
-      filteredDrivers.push(selectedDriver);
-    }
-
-    // Add other drivers, avoiding duplicates
-    drivers.forEach(driver => {
-      if (driver.id && !seenDriverIds.has(driver.id)) {
-        seenDriverIds.add(driver.id);
-        filteredDrivers.push(driver);
-      }
-    });
-
-    return filteredDrivers;
-  };
-
-  if (!iconsLoaded) {
     return (
-      <View style={[styles.map, styles.loadingContainer]}>
-        <Text>Loading map...</Text>
-      </View>
+      <Marker
+        key={`origin-${origin.latitude}-${origin.longitude}-${currentMap}`}
+        coordinate={origin}
+        flat
+        anchor={{ x: 0.5, y: 0.5 }}
+        zIndex={700}
+        tracksViewChanges={false}
+      >
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <OriginMarker size={45} />
+        </View>
+      </Marker>
     );
-  }
+  }, [origin, currentMap]);
 
-  const filteredDrivers = getFilteredDrivers();
+  const renderDestinationMarker = useMemo(() => {
+    // Only show destination marker for Active map
+    if (currentMap !== 'Active' || !destination?.latitude) return null;
 
-  return (
-    <MapView
-      ref={mapRef}
-      style={styles.map}
-      customMapStyle={MAP_STYLE}
-      showsTraffic={false}
-      showsBuildings={true}
-      // showsUserLocation={true}
-      showsMyLocationButton={true}
-      initialRegion={{
-        latitude: 28.6139,
-        longitude: 77.209,
-        latitudeDelta: 0.5,
-        longitudeDelta: 0.5,
-      }}
-      followsUserLocation={false}
-      loadingEnabled={true}
-      loadingIndicatorColor="#666666"
-      loadingBackgroundColor="#eeeeee"
-      onMapReady={() => {
-        console.log('Map is ready');
-        setMapReady(true);
-        forceMapRefresh();
-      }}
-      onLayout={forceMapRefresh}
-    >
-      {/* Origin Marker */}
-      {origin?.latitude && (
-        <Marker
-          key="origin-marker"
-          coordinate={{
-            latitude: origin.latitude,
-            longitude: origin.longitude,
-          }}
-          title="Origin"
-          description="Pickup location"
-          anchor={{ x: 0.5, y: 0.5 }}
-          zIndex={1000}
-        >
-          <Image
-            source={ORIGIN_MARKER_IMG}
+    return (
+      <Marker
+        key={`destination-${destination.latitude}-${destination.longitude}-${currentMap}`}
+        coordinate={destination}
+        flat
+        anchor={{ x: 0.5, y: 0.5 }}
+        zIndex={800}
+        tracksViewChanges={false}
+      >
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <DropMarker
+            size={45}
             style={[
               ICON_SIZES.origin,
               {
@@ -254,183 +256,216 @@ const MapComponent: React.FC = () => {
                 shadowRadius: 3,
               },
             ]}
-            resizeMode="contain"
           />
-        </Marker>
-      )}
+        </View>
+      </Marker>
+    );
+  }, [destination, currentMap]);
 
-      {/* Destination Marker */}
-      {destination?.latitude && (
-        <Marker
-          key="destination-marker"
-          coordinate={{
-            latitude: destination.latitude,
-            longitude: destination.longitude,
-          }}
-          title="Destination"
-          description="Drop-off location"
-          anchor={{ x: 0.5, y: 0.5 }}
-          zIndex={1000}
-        >
-          <Image
-            source={DROP_MARKER_IMG}
-            style={[
-              ICON_SIZES.destination,
-              {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.3,
-                shadowRadius: 3,
-              },
-            ]}
-            resizeMode="contain"
-          />
-        </Marker>
-      )}
+  const renderSelectedDriverMarker = useMemo(() => {
+    // Show selected driver for Active and Process maps only
+    if (
+      !selectedDriver?.latitude ||
+      !(currentMap === 'Process' || currentMap === 'Active')
+    ) {
+      return null;
+    }
 
-      {/* Pickup Route - Driver to Origin */}
-      {currentMap === 'Process' &&
-        selectedDriver?.latitude &&
-        origin?.latitude && (
-          <MapViewDirections
-            key="pickup-route"
-            origin={{
-              latitude: selectedDriver.latitude,
-              longitude: selectedDriver.longitude,
-            }}
-            destination={{
-              latitude: origin.latitude,
-              longitude: origin.longitude,
-            }}
-            apikey={GOOGLE_MAPS_API_KEY}
-            strokeWidth={6}
-            strokeColor="#4a90e2"
-            strokeColors={['#4a90e2']}
-            lineCap="round"
-            lineJoin="round"
-          />
-        )}
+    return (
+      <Marker
+        key={`selected-driver-${selectedDriver.id}-${currentMap}`}
+        coordinate={{
+          latitude: selectedDriver.latitude,
+          longitude: selectedDriver.longitude,
+        }}
+        title={selectedDriver.driver}
+        description={`License: ${selectedDriver.licensePlate}`}
+        anchor={{ x: 0.5, y: 0.5 }}
+        zIndex={900}
+        tracksViewChanges={false}
+      >
+        <View style={{ transform: [{ rotate: `${180}deg` }] }}>
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <Truck height={100} width={100} />
+          </View>
+        </View>
+      </Marker>
+    );
+  }, [selectedDriver, currentMap]);
 
-      {/* Delivery Route - Origin to Destination */}
-      {currentMap === 'Active' && origin?.latitude && destination?.latitude && (
+  const renderNearbyDrivers = useMemo(() => {
+    // Only show nearby drivers for Load map
+    if (currentMap !== 'Load') return null;
+
+    return drivers.map(driver => (
+      <Marker
+        key={`driver-${driver.id}-${currentMap}`}
+        coordinate={{
+          latitude: driver.latitude,
+          longitude: driver.longitude,
+        }}
+        title={driver.driver}
+        description={`License: ${driver.licensePlate}`}
+        anchor={{ x: 0.5, y: 0.5 }}
+        zIndex={800}
+        tracksViewChanges={false}
+      >
+        <View style={{ transform: [{ rotate: `${180}deg` }] }}>
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <Truck height={100} width={100} />
+          </View>
+        </View>
+      </Marker>
+    ));
+  }, [drivers, currentMap]);
+
+  const renderRoutes = useMemo(() => {
+    // Show origin to destination route for Active map
+    if (currentMap === 'Active' && origin?.latitude && destination?.latitude) {
+      return (
         <MapViewDirections
-          key="delivery-route"
-          origin={{
-            latitude: origin.latitude,
-            longitude: origin.longitude,
-          }}
-          destination={{
-            latitude: destination.latitude,
-            longitude: destination.longitude,
-          }}
+          key={`delivery-route-${currentMap}-${origin.latitude}-${destination.latitude}`}
+          origin={origin}
+          destination={destination}
           apikey={GOOGLE_MAPS_API_KEY}
-          strokeWidth={6}
-          strokeColor="#2ecc71"
-          strokeColors={['#2ecc71']}
+          strokeWidth={8}
+          strokeColor={colors.primary}
+          strokeColors={[colors.primary]}
           lineCap="round"
           lineJoin="round"
+          precision="high"
+          onReady={() => {
+            // Force map refresh after route is drawn
+            setTimeout(() => {
+              const coordinates = getMapCoordinates();
+              if (coordinates.length > 0 && mapRef.current) {
+                mapRef.current.fitToCoordinates(coordinates, {
+                  edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+                  animated: true,
+                });
+              }
+            }, 100);
+          }}
         />
-      )}
+      );
+    }
 
-      {/* Driver to Destination Route */}
-      {currentMap === 'Active' &&
-        selectedDriver?.latitude &&
-        destination?.latitude &&
-        !origin?.latitude && (
-          <MapViewDirections
-            key="driver-destination-route"
-            origin={{
-              latitude: selectedDriver.latitude,
-              longitude: selectedDriver.longitude,
-            }}
-            destination={{
-              latitude: destination.latitude,
-              longitude: destination.longitude,
-            }}
-            apikey={GOOGLE_MAPS_API_KEY}
-            strokeWidth={6}
-            strokeColor="#e74c3c"
-            strokeColors={['#e74c3c']}
-            lineCap="round"
-            lineJoin="round"
-          />
-        )}
+    // Show selected driver to origin route for Process map
+    if (
+      currentMap === 'Process' &&
+      selectedDriver?.latitude &&
+      origin?.latitude
+    ) {
+      return (
+        <MapViewDirections
+          key={`pickup-route-${currentMap}-${selectedDriver.latitude}-${origin.latitude}`}
+          origin={selectedDriver}
+          destination={origin}
+          apikey={GOOGLE_MAPS_API_KEY}
+          strokeWidth={6}
+          strokeColor="#4a90e2"
+          strokeColors={['#4a90e2']}
+          lineCap="round"
+          lineJoin="round"
+          precision="high"
+          onReady={() => {
+            // Force map refresh after route is drawn
+            setTimeout(() => {
+              const coordinates = getMapCoordinates();
+              if (coordinates.length > 0 && mapRef.current) {
+                mapRef.current.fitToCoordinates(coordinates, {
+                  edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+                  animated: true,
+                });
+              }
+            }, 100);
+          }}
+        />
+      );
+    }
 
-      {/* Selected Driver Marker - Only show in Process and Active modes */}
-      {selectedDriver?.latitude &&
-        (currentMap === 'Process' || currentMap === 'Active') && (
-          <Marker
-            key={`selected-driver-${selectedDriver.id}`}
-            coordinate={{
-              latitude: selectedDriver.latitude,
-              longitude: selectedDriver.longitude,
-            }}
-            title={selectedDriver.driver}
-            description={`License: ${selectedDriver.licensePlate}`}
-            anchor={{ x: 0.5, y: 0.5 }}
-            zIndex={900}
-          >
-            <Image
-              source={MEDIUM_TRUCK_IMG}
-              style={[
-                ICON_SIZES.truck,
-                {
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 3,
-                  transform: [{ rotate: `${selectedDriver.rotation || 0}deg` }],
-                },
-              ]}
-              resizeMode="contain"
-            />
-          </Marker>
-        )}
+    return null;
+  }, [currentMap, origin, destination, selectedDriver, getMapCoordinates]);
 
-      {/* Nearby Drivers - Only show in Load mode and exclude selected driver */}
-      {currentMap === 'Load' &&
-        filteredDrivers.map((driver, index) => (
-          <Marker
-            key={`driver-${driver.id}-${index}`}
-            coordinate={{
-              latitude: driver.latitude,
-              longitude: driver.longitude,
-            }}
-            title={driver.driver}
-            description={`License: ${driver.licensePlate}`}
-            anchor={{ x: 0.5, y: 0.5 }}
-            zIndex={800} // Lower zIndex than selected driver
-          >
-            <Image
-              source={MEDIUM_TRUCK_IMG}
-              style={[
-                ICON_SIZES.truck,
-                {
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 3,
-                  transform: [{ rotate: `${driver.rotation || 0}deg` }],
-                },
-              ]}
-              resizeMode="contain"
-            />
-          </Marker>
-        ))}
+  // Main render function with proper conditional rendering
+  const renderMapContent = useMemo(() => {
+    switch (currentMap) {
+      case 'Load':
+        return (
+          <>
+            {renderOriginMarker}
+            {renderNearbyDrivers}
+          </>
+        );
+
+      case 'Active':
+        return (
+          <>
+            {renderOriginMarker}
+            {renderDestinationMarker}
+            {renderSelectedDriverMarker}
+            {renderRoutes}
+          </>
+        );
+
+      case 'Process':
+        return (
+          <>
+            {renderOriginMarker}
+            {renderSelectedDriverMarker}
+            {renderRoutes}
+          </>
+        );
+
+      default:
+        return null;
+    }
+  }, [
+    currentMap,
+    renderOriginMarker,
+    renderNearbyDrivers,
+    renderDestinationMarker,
+    renderSelectedDriverMarker,
+    renderRoutes,
+  ]);
+
+  return (
+    <MapView
+      ref={mapRef}
+      maxZoomLevel={18}
+      minZoomLevel={5}
+      pitchEnabled={false}
+      style={{ flex: 1 }}
+      provider={PROVIDER_GOOGLE}
+      showsMyLocationButton={false}
+      showsCompass={false}
+      showsIndoors={false}
+      showsIndoorLevelPicker={false}
+      showsTraffic={false}
+      showsScale={false}
+      showsBuildings={false}
+      showsPointsOfInterests={false}
+      customMapStyle={MAP_STYLE}
+      showsUserLocation={false}
+      initialRegion={region}
+      moveOnMarkerPress={false}
+      toolbarEnabled={false}
+      onMapReady={() => {
+        // Force initial map refresh
+        setTimeout(() => {
+          const coordinates = getMapCoordinates();
+          if (coordinates.length > 0 && mapRef.current) {
+            mapRef.current.fitToCoordinates(coordinates, {
+              edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+              animated: true,
+            });
+          }
+        }, 500);
+      }}
+    >
+      {renderMapContent}
     </MapView>
   );
 };
 
-const styles = StyleSheet.create({
-  map: {
-    width: '100%',
-    height: '100%',
-  },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-});
-
-export default MapComponent;
+export default React.memo(MapComponent);

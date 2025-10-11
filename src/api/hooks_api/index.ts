@@ -35,86 +35,88 @@ import {
   ValidateOtpResponse,
   WeightResponse,
 } from '@api/api.type';
-import { apiEndpoints } from '@api/endpoints';
 import baseApi from '../index';
 
 export const motoApi = baseApi.injectEndpoints({
   endpoints: builder => ({
     sendOtp: builder.mutation<OtpResponse, SendOtpRequest>({
       query: queryArg => ({
-        url: apiEndpoints.sendOtp,
+        url: '/Customer_SendOtp',
         method: 'POST',
         body: queryArg,
       }),
     }),
     validateOtp: builder.mutation<ValidateOtpResponse, ValidateOtpRequest>({
       query: queryArg => ({
-        url: apiEndpoints.validateOtp,
+        url: `/Customer_ValidateOtp`,
         method: 'POST',
         body: queryArg,
       }),
     }),
     getDistrict: builder.mutation<DistrictResponse, DistrictRequest>({
       query: queryArg => ({
-        url: apiEndpoints.stateRegionDistrict,
+        url: '/get_state_region_district',
         method: 'POST',
         body: queryArg,
       }),
     }),
     getPincodeData: builder.mutation<PincodeDataResponse, PincodeDataRequest>({
       query: queryArg => ({
-        url: apiEndpoints.pincode,
+        url: `/pincode`,
         method: 'POST',
         body: queryArg,
       }),
     }),
     insertCustomer: builder.mutation<RegisterResponse, RegisterRequest>({
       query: queryArg => ({
-        url: apiEndpoints.registerCustomer,
+        url: `/Insert_Customer`,
         method: 'POST',
         body: queryArg,
       }),
     }),
     getState: builder.query<StateResponse, void>({
       query: () => ({
-        url: apiEndpoints.stateRegionDistrict,
+        url: '/get_state_region_district',
         method: 'POST',
       }),
     }),
     setMpin: builder.mutation<MpinResponse, MpinRequest>({
       query: queryArg => ({
-        url: apiEndpoints.setMpin,
+        url: '/Customer_Set_Mpin',
         method: 'POST',
         body: queryArg,
       }),
     }),
     mpinLogin: builder.mutation<MpinLoginResponse, MpinLoginRequest>({
       query: queryArg => ({
-        url: apiEndpoints.mpinLogin,
+        url: '/Customer_Login_Mpin',
         method: 'POST',
         body: queryArg,
       }),
     }),
-    getCustomerPosts: builder.query<CustomerPostResponse, CustomerPostRequest>({
+    getCustomerPosts: builder.mutation<
+      CustomerPostResponse,
+      CustomerPostRequest
+    >({
       query: body => ({
-        url: apiEndpoints.customerpost,
+        url: '/get_customer_load_post',
         method: 'POST',
         body,
       }),
     }),
-    getProcessTrips: builder.query<
+    getProcessTrips: builder.mutation<
       CustomerProcessResponse,
       CustomerProcessRequest
     >({
       query: queryArg => ({
-        url: apiEndpoints.processTrips,
+        url: `/customer_process_Trip`,
         method: 'POST',
         body: queryArg,
       }),
     }),
-    getActiveTrips: builder.query<ActiveTripResponse, ActiveTripRequest>({
+    getActiveTrips: builder.mutation<ActiveTripResponse, ActiveTripRequest>({
       query: queryArg => ({
-        url: apiEndpoints.activeTrips,
+        url: `/customer_active_Trip`,
         method: 'POST',
         body: queryArg,
       }),
@@ -153,7 +155,7 @@ export const motoApi = baseApi.injectEndpoints({
         body: query,
       }),
     }),
-    getTruckType: builder.query<TruckResponse, void>({
+    getTruckType: builder.mutation<TruckResponse, void>({
       query: () => ({
         url: '/get_vehicle_Details',
         method: 'POST',
@@ -207,14 +209,14 @@ export const {
   useGetStateQuery,
   useSetMpinMutation,
   useMpinLoginMutation,
-  useGetCustomerPostsQuery,
-  useGetProcessTripsQuery,
-  useGetActiveTripsQuery,
+  useGetActiveTripsMutation,
+  useGetCustomerPostsMutation,
+  useGetProcessTripsMutation,
   usePostCustomerRequirementMutation,
   useGetBodyTypeQuery,
   useUpdateCustomerRequirementMutation,
   useGetCurrentAddressQuery,
-  useGetTruckTypeQuery,
+  useGetTruckTypeMutation,
   useGetAproximateWeightQuery,
   useGetPackageTypeQuery,
   useGetCargoContentQuery,

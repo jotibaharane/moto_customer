@@ -5,33 +5,25 @@ import LoadPostForm from '@screens/LoadPostScreen';
 import OtpLoginScreen from '@screens/LoginScreen';
 import RegistrationScreen from '@screens/RegistrationScreen';
 import SetMPINScreen from '@screens/SetMPINScreen';
-import {
-  RootStackParamList,
-  routeName,
-  useAuthStatus,
-} from '@utils/navigationHelpers';
+import SplashScreen from '@screens/SplashScreen';
+import { RootStackParamList, routeName } from '@utils/navigationHelpers';
 import DrawerNavigator from './drawer/DrawerNavigator';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator = () => {
-  const { token } = useAuthStatus();
-  console.log({ token });
   return (
     <NavigationContainer>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!token && (
-          <>
-            <RootStack.Screen
-              name={routeName.LOGIN}
-              component={OtpLoginScreen}
-            />
-            <RootStack.Screen
-              name={routeName.REGISTRATION}
-              component={RegistrationScreen}
-            />
-          </>
-        )}
+      <RootStack.Navigator
+        initialRouteName={routeName.SPLASH}
+        screenOptions={{ headerShown: false }}
+      >
+        <RootStack.Screen name={routeName.SPLASH} component={SplashScreen} />
+        <RootStack.Screen name={routeName.LOGIN} component={OtpLoginScreen} />
+        <RootStack.Screen
+          name={routeName.REGISTRATION}
+          component={RegistrationScreen}
+        />
         <RootStack.Screen
           name={routeName.MPIN_LOGIN}
           component={EnterMPINScreen}

@@ -3,6 +3,46 @@ import Geolocation from '@react-native-community/geolocation';
 import { Linking, PermissionsAndroid, Platform } from 'react-native';
 import { Region } from 'react-native-maps';
 import { GOOGLE_MAPS_API_KEY } from './env';
+export interface RouteData {
+  coordinates: Array<{
+    latitude: number;
+    longitude: number;
+  }>;
+  distance: number; // in kilometers
+  duration: number; // in minutes
+  bounds: {
+    northeast: { lat: number; lng: number };
+    southwest: { lat: number; lng: number };
+  };
+}
+
+export interface RouteStep {
+  distance: { text: string; value: number };
+  duration: { text: string; value: number };
+  start_location: { lat: number; lng: number };
+  end_location: { lat: number; lng: number };
+  polyline: { points: string };
+  html_instructions: string;
+  travel_mode: string;
+}
+
+export interface RouteLeg {
+  distance: { text: string; value: number };
+  duration: { text: string; value: number };
+  steps: RouteStep[];
+}
+
+export interface RouteResponse {
+  routes: Array<{
+    bounds: {
+      northeast: { lat: number; lng: number };
+      southwest: { lat: number; lng: number };
+    };
+    legs: RouteLeg[];
+    overview_polyline: { points: string };
+  }>;
+  status: string;
+}
 
 export const defaultRegion: Location = {
   address: '',
@@ -366,4 +406,161 @@ export const debounce = (func: (...args: any[]) => void, wait: number) => {
     if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
+};
+
+export const calculateRoute = async (
+  origin: { latitude: number; longitude: number },
+  destination: { latitude: number; longitude: number },
+  mode: 'driving' | 'walking' | 'bicycling' | 'transit' = 'driving',
+): Promise<RouteData> => {
+  try {
+    const originStr = `${origin.latitude},${origin.longitude}`;
+    const destinationStr = `${destination.latitude},${destination.longitude}`;
+
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${originStr}&destination=${destinationStr}&mode=${mode}&key=${GOOGLE_MAPS_API_KEY}&alternatives=false&units=metric`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `Directions API request failed with status ${response.status}`,
+      );
+    }
+
+    const data: RouteResponse = await response.json();
+
+    if (data.status === 'ZERO_RESULTS') {
+      throw new Error('No route found between the selected locations');
+    }
+
+    if (data.status !== 'OK') {
+      throw new Error(`Directions API failed: ${data.status}`);
+    }
+
+    if (!data.routes || data.routes.length === 0) {
+      throw new Error('No routes available');
+    }
+
+    const route = data.routes[0];
+    const leg = route.legs[0];
+
+    // Decode the overview polyline to get coordinates
+    const coordinates = decodePolyline(route.overview_polyline.points);
+
+    return {
+      coordinates,
+      distance: leg.distance.value / 1000, // Convert meters to kilometers
+      duration: Math.ceil(leg.duration.value / 60), // Convert seconds to minutes
+      bounds: route.bounds,
+    };
+  } catch (error) {
+    console.error('Route calculation error:', error);
+
+    // Fallback: create a straight line route with estimated distance/time
+    if (error instanceof Error && error.message.includes('No route found')) {
+      return getFallbackRoute(origin, destination, mode);
+    }
+
+    throw error;
+  }
+};
+
+const decodePolyline = (
+  encoded: string,
+): Array<{ latitude: number; longitude: number }> => {
+  let points: Array<{ latitude: number; longitude: number }> = [];
+  let index = 0;
+  const len = encoded.length;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < len) {
+    let b;
+    let shift = 0;
+    let result = 0;
+
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+
+    const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+
+    const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += dlng;
+
+    points.push({
+      latitude: lat * 1e-5,
+      longitude: lng * 1e-5,
+    });
+  }
+
+  return points;
+};
+
+const getFallbackRoute = (
+  origin: { latitude: number; longitude: number },
+  destination: { latitude: number; longitude: number },
+  mode: string = 'driving',
+): RouteData => {
+  const distance = calculateDistance(
+    origin.latitude,
+    origin.longitude,
+    destination.latitude,
+    destination.longitude,
+  );
+
+  // Estimate duration based on mode and distance
+  let averageSpeed = 40; // km/h for driving
+  if (mode === 'walking') averageSpeed = 5;
+  if (mode === 'bicycling') averageSpeed = 15;
+
+  const duration = Math.ceil((distance / averageSpeed) * 60); // Convert to minutes
+
+  // Create a simple straight line with a few intermediate points
+  const coordinates = createStraightLinePath(origin, destination, 10);
+
+  return {
+    coordinates,
+    distance,
+    duration,
+    bounds: {
+      northeast: {
+        lat: Math.max(origin.latitude, destination.latitude),
+        lng: Math.max(origin.longitude, destination.longitude),
+      },
+      southwest: {
+        lat: Math.min(origin.latitude, destination.latitude),
+        lng: Math.min(origin.longitude, destination.longitude),
+      },
+    },
+  };
+};
+const createStraightLinePath = (
+  start: { latitude: number; longitude: number },
+  end: { latitude: number; longitude: number },
+  numPoints: number = 10,
+): Array<{ latitude: number; longitude: number }> => {
+  const coordinates = [];
+
+  for (let i = 0; i <= numPoints; i++) {
+    const ratio = i / numPoints;
+    const lat = start.latitude + (end.latitude - start.latitude) * ratio;
+    const lng = start.longitude + (end.longitude - start.longitude) * ratio;
+
+    coordinates.push({ latitude: lat, longitude: lng });
+  }
+
+  return coordinates;
 };

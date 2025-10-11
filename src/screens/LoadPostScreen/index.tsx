@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { RootState } from '@store/index';
 import {
   addOrUpdateDriver,
+  setCustomerMap,
   setDestination,
   setDestinationAddress,
   setOrigin,
@@ -13,13 +14,8 @@ import {
 import { routeName } from '@utils/navigationHelpers';
 import { Formik } from 'formik';
 import React, { useState } from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ScrollView, StatusBar, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { useDispatch, useSelector } from 'react-redux';
 import ConfirmationStep from './components/ConfirmationStep';
@@ -34,12 +30,13 @@ const LoadPostForm: React.FC = ({ params }: any) => {
   const { CustomerID } = useSelector(
     (state: RootState) => state.auth.customerDetails,
   ) || { CustomerID: '' };
-
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const navigation = useNavigation<any>();
   const [postCustomerRequirement] = usePostCustomerRequirementMutation();
   const [currentStep, setCurrentStep] = useState<FormStep>('Location');
   const [completedSteps, setCompletedSteps] = useState<FormStep[]>([]);
+
   const handleNext = () => {
     const currentIndex = STEPS.indexOf(currentStep);
     if (currentIndex < STEPS.length - 1) {
@@ -71,7 +68,7 @@ const LoadPostForm: React.FC = ({ params }: any) => {
     }
   };
 
-  const handleSubmit = async (values: ShipmentData) => {
+  const handleSubmit = async (values: ShipmentData, { resetForm }: any) => {
     console.log('Form submitted:', values);
     try {
       let response = await postCustomerRequirement({
@@ -84,7 +81,7 @@ const LoadPostForm: React.FC = ({ params }: any) => {
           type: 'success',
           text1: response?.data?.message,
         });
-        console.log({ response: response?.data?.[0] });
+        dispatch(setCustomerMap('Load'));
         dispatch(addOrUpdateDriver([]));
         dispatch(setPostId(response?.data?.[0]?.LoadPostID));
         dispatch(
@@ -101,6 +98,12 @@ const LoadPostForm: React.FC = ({ params }: any) => {
             longitude: values?.destination?.coordinates?.lng,
           }),
         );
+
+        // Reset form after successful submission
+        setCurrentStep('Location');
+        resetForm();
+        setCompletedSteps([]);
+
         navigation.navigate(routeName.DASHBOARD, {
           screen: routeName.HOMESTACK,
           params: {
@@ -119,12 +122,21 @@ const LoadPostForm: React.FC = ({ params }: any) => {
         type: 'error',
         text1: error?.message,
       });
-    } finally {
-      // setSubmitting(false);
     }
   };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
       <StatusBar barStyle="dark-content" />
       <Formik
         initialValues={emptyShipmentData}
@@ -133,8 +145,16 @@ const LoadPostForm: React.FC = ({ params }: any) => {
         validateOnMount={false}
         validateOnChange={true}
         validateOnBlur={true}
+        enableReinitialize={true}
       >
-        {({ handleSubmit, values, errors, isValid, isSubmitting }) => (
+        {({
+          handleSubmit,
+          values,
+          errors,
+          isValid,
+          isSubmitting,
+          resetForm,
+        }) => (
           <View style={styles.container}>
             <FormProgress
               currentStep={currentStep}
@@ -160,7 +180,7 @@ const LoadPostForm: React.FC = ({ params }: any) => {
           </View>
         )}
       </Formik>
-    </SafeAreaView>
+    </View>
   );
 };
 

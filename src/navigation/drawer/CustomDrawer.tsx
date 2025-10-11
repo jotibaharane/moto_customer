@@ -3,6 +3,7 @@ import {
   DrawerContentComponentProps,
   DrawerContentScrollView,
 } from '@react-navigation/drawer';
+import { useNavigation } from '@react-navigation/native';
 import { RootState } from '@store/index';
 import { logout } from '@store/slices/authSlice';
 import { routeName } from '@utils/navigationHelpers';
@@ -30,8 +31,9 @@ interface DrawerItem {
 
 const CustomDrawer: React.FC<DrawerContentComponentProps> = props => {
   const dispatch = useDispatch();
+  const navigation = useNavigation<any>();
   const auth = useSelector((state: RootState) => state.auth);
-  const { navigation } = props;
+
   const { customerDetails } = auth;
   const [logoutVisible, setLogoutVisible] = useState(false);
 
@@ -43,10 +45,6 @@ const CustomDrawer: React.FC<DrawerContentComponentProps> = props => {
     setLogoutVisible(false);
     dispatch(logout());
     navigation.replace(routeName.LOGIN);
-    // navigation.reset({
-    //   index: 0,
-    //   routes: [{ name: routeName.LOGIN as never }],
-    // });
   };
 
   const cancelLogout = () => {
