@@ -11,8 +11,14 @@ import { useNavigation } from '@react-navigation/native';
 import { RootState } from '@store/index';
 import { setCustomerDetails } from '@store/slices/authSlice';
 import { routeName } from '@utils/navigationHelpers';
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  View,
+} from 'react-native';
 import {
   Button,
   Card,
@@ -25,6 +31,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { useDispatch, useSelector } from 'react-redux';
 import { styles } from './style';
+import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
+import { UseDispatch } from 'react-redux';
+import { setRegisteredAddress } from '@store/slices/authSlice';
+import AddressSearch from '@screens/LoadPostScreen/components/AddressSearch';
 
 const RegistrationScreen = () => {
   const navigation = useNavigation<any>();
@@ -52,16 +62,16 @@ const RegistrationScreen = () => {
     PancardNo: '',
     City: '',
   });
-  console.log({ stateData });
+
   const [errors, setErrors] = useState<Partial<RegisterRequest>>({});
   const [availableDistricts, setAvailableDistricts] = useState<any[]>([]);
+  const originPlaces = useGooglePlacesSelect();
 
   const handleChange = async (name: keyof RegisterRequest, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
 
     if (name === 'State') {
       const response = await getDistricts({ state: value }).unwrap();
-
       const districtsList = response?.data || [];
       setAvailableDistricts(districtsList);
       setFormData(prev => ({ ...prev, Destination: '' }));
@@ -69,7 +79,6 @@ const RegistrationScreen = () => {
 
     if (name === 'Pincode' && value.length === 6) {
       const response = await pincodeData({ pincode: value }).unwrap();
-
       const mapped = response?.data;
       if (mapped) {
         setFormData(prev => ({
@@ -79,11 +88,56 @@ const RegistrationScreen = () => {
           Destination: mapped?.District,
         }));
         const response = await getDistricts({ state: mapped?.State }).unwrap();
-
         setAvailableDistricts(response?.data ? response?.data : []);
       }
     }
   };
+
+  const handleOriginSelect = useCallback(
+    async (placeId: string, description: string) => {
+      try {
+        const location = await originPlaces.getPlaceDetails(placeId);
+
+        if (!location) return;
+
+        const { place, pincode, state, dist, tal } = location.components;
+
+        const registeredAddressObj = {
+          id: placeId,
+          fullAddress: location.address,
+          latitude: location.coordinates.lat,
+          longitude: location.coordinates.lng,
+          addressComponents: {
+            place: place || '',
+            dist: dist || '',
+            tal: tal || '',
+            state: state || '',
+            pincode: pincode || '',
+          },
+        };
+
+        // ---- UPDATE FORM DATA ----
+        setFormData(prev => ({
+          ...prev,
+
+          Pincode: pincode || prev.Pincode,
+          State: state || prev.State,
+          Destination: dist || prev.Destination,
+          City: tal || prev.City,
+
+          // ⭐ store FULL location object
+          RegisteredAddress: registeredAddressObj,
+        }));
+
+        // ---- SAVE TO REDUX ----zz
+        dispatch(setRegisteredAddress(registeredAddressObj));
+      } catch (error) {
+        console.log('Location Fetch Error:', error);
+        Alert.alert('Error', 'Failed to fetch location details');
+      }
+    },
+    [originPlaces, dispatch],
+  );
 
   const validateForm = (): boolean => {
     const newErrors: Partial<RegisterRequest> = {};
@@ -117,12 +171,11 @@ const RegistrationScreen = () => {
   const handleSubmit = async () => {
     try {
       if (validateForm()) {
-        console.log('Submitting:', formData);
         const response = await Registration({
           ...formData,
           ContactNo: mobilenumber || '',
         });
-        console.log({ response });
+        console.log('Registration Response:', response);
         if (response?.data?.status === '00') {
           dispatch(
             setCustomerDetails({
@@ -135,9 +188,11 @@ const RegistrationScreen = () => {
               MPIN_Flag: 'N',
             }),
           );
-          navigation.replace(routeName.SET_MPIN);
+          navigation.replace(routeName.ADD_EMPLOYEE);
+          // navigation.replace(routeName.SET_MPIN);
         } else {
-          Toast.show({ type: 'error', text1: response?.data?.message });
+          console.log(response?.data?.message);
+          Alert.alert(response?.data?.message);
         }
       }
     } catch (error) {
@@ -226,6 +281,19 @@ const RegistrationScreen = () => {
             <Card.Content>
               <Text style={styles.sectionTitle}>Address Details</Text>
 
+              {/* Google Places Search - Only sets Googleaddress */}
+              {/* <SelectList
+                data={originPlaces?.suggestions}
+                displayKey="value"
+                value={formData.Googleaddress} // Show selected Google address
+                save="object"
+                setSelected={handleOriginSelect}
+                placeholder="Search location with Google..."
+                search={true}
+                onSearchChange={originPlaces.handleInputChange}
+                searchValue={originPlaces.inputValue}
+              /> */}
+
               <TextInput
                 mode="outlined"
                 label="Building, Apartment, Plot Number *"
@@ -244,14 +312,14 @@ const RegistrationScreen = () => {
 
               <TextInput
                 mode="outlined"
-                label="Area, Street, Sector, Village *"
+                label="Area, Street, Sector, Village"
                 value={formData.Address2}
                 onChangeText={text => handleChange('Address2', text)}
                 style={styles.input}
                 theme={{ roundness: 8 }}
                 multiline
                 numberOfLines={2}
-                left={<TextInput.Icon icon="map-marker" />}
+                left={<TextInput.Icon icon="home" />}
               />
 
               <View style={styles.row}>
@@ -265,7 +333,6 @@ const RegistrationScreen = () => {
                     error={!!errors.Pincode}
                     style={styles.input}
                     theme={{ roundness: 8 }}
-                    left={<TextInput.Icon icon="pin" />}
                   />
                   <HelperText type="error" visible={!!errors.Pincode}>
                     {errors.Pincode}
@@ -279,12 +346,11 @@ const RegistrationScreen = () => {
                     onChangeText={text => handleChange('City', text)}
                     style={styles.input}
                     theme={{ roundness: 8 }}
-                    left={<TextInput.Icon icon="city" />}
                   />
                 </View>
               </View>
 
-              {/* ✅ State SelectList */}
+              {/* State SelectList */}
               <SelectList
                 label="State *"
                 data={stateData?.data || []}
@@ -299,7 +365,7 @@ const RegistrationScreen = () => {
                 {errors.State}
               </HelperText>
 
-              {/* ✅ District SelectList */}
+              {/* District SelectList */}
               <SelectList
                 label="District / City *"
                 data={availableDistricts}
@@ -314,6 +380,7 @@ const RegistrationScreen = () => {
               <HelperText type="error" visible={!!errors.Destination}>
                 {errors.Destination}
               </HelperText>
+              <AddressSearch onSelect={handleOriginSelect} />
             </Card.Content>
           </Card>
 

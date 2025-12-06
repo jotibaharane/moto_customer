@@ -1,6 +1,26 @@
 import { io } from 'socket.io-client';
 
-export const socket = io('http://neotechnet.com:9090', {
-  transports: ['websocket'], // force WebSocket
-  reconnection: true,
+export const socket = io('http://neotechnet.com:9000', {
+  transports: ['websocket'], // Force WebSocket transport
+  reconnection: true, // Auto-reconnect
+});
+
+// ✅ When connected
+socket.on('connect', () => {
+  console.log('✅ Socket connected successfully:', socket.id);
+});
+
+// ⚠️ When disconnected
+socket.on('disconnect', reason => {
+  console.log('⚠️ Socket disconnected:', reason);
+});
+
+// 🔁 When trying to reconnect
+socket.on('reconnect_attempt', attempt => {
+  console.log('🔁 Reconnecting... Attempt:', attempt);
+});
+
+// ❌ If connection fails
+socket.on('connect_error', error => {
+  console.log('❌ Connection error:', error.message);
 });

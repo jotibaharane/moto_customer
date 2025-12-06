@@ -388,7 +388,19 @@ const SelectList: React.FC<SelectListProps> = ({
         <Animated.View
           style={[
             styles.dropdown,
-            { maxHeight: animatedvalue },
+            {
+              maxHeight: animatedvalue,
+              position: 'absolute',
+              bottom: '100%',
+              marginBottom: 8,
+              zIndex: 9999,
+              backgroundColor: '#fff', // ✅ solid white background
+              elevation: 5, // ✅ shadow for Android
+              shadowColor: '#000', // ✅ shadow for iOS
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 4,
+            },
             dropdownStyles,
           ]}
         >

@@ -1,6 +1,6 @@
 // components/LoadPostModal.tsx
 import { CustomerLoadPost } from '@api/api.type';
-import { useGetCustomerPostsMutation } from '@api/hooks_api';
+import { useGetCustomerPostsQuery } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import { RootState } from '@store/index';
 import {
@@ -11,7 +11,7 @@ import {
   setOriginAddress,
   setPostId,
 } from '@store/slices/mapSlice';
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -24,27 +24,47 @@ import {
 import { Icon } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
+import { useRefreshOnFocus } from '@hooks/useRefreshOnFocus';
 
 const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
   const CustomerID = useSelector(
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
   const dispatch = useDispatch();
-  const [fetchCustomerPost, { data: customerPosts, isLoading }] =
-    useGetCustomerPostsMutation();
+
+  // Query hook (auto-fetches). refetch is used for manual refresh.
+  const {
+    data: customerPosts,
+    isLoading,
+    refetch,
+  } = useGetCustomerPostsQuery(
+    { CustomerID },
+    {
+      refetchOnMountOrArgChange: true,
+      keepUnusedDataFor: 0,
+    },
+  );
+
+  console.log(customerPosts, 'this is from loadpost');
 
   const [refreshing, setRefreshing] = useState(false);
-
+  useRefreshOnFocus(refetch);
   // Handle refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchCustomerPost({ CustomerID });
-    setRefreshing(false);
+    try {
+      // refetch returns a Promise-like object; awaiting ensures the UI waits
+      await refetch();
+    } catch (e) {
+      // optionally handle/log error
+      // console.warn('Failed to refresh customer posts', e);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
-  useLayoutEffect(() => {
-    handleRefresh();
-  }, [ref]);
+  // If you want to fetch when CustomerID changes, RTK Query already re-runs query,
+  // but if you need an immediate manual refetch when CustomerID becomes available:
 
   const handlePostPress = (item: CustomerLoadPost) => {
     dispatch(addOrUpdateDriver([]));
@@ -52,8 +72,8 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
     dispatch(
       setOrigin({ latitude: item?.Origin_Lat, longitude: item?.Origin_Lng }),
     );
-    dispatch(setOriginAddress(item?.Origin_City));
-    dispatch(setDestinationAddress(item?.Destination_City));
+    dispatch(setOriginAddress(item?.Origin));
+    dispatch(setDestinationAddress(item?.Destination));
     dispatch(setDestination(null));
     if (ref && typeof ref !== 'function' && ref.current) {
       ref.current.close();
@@ -66,7 +86,6 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
     }
   };
 
-  // Render list item - ENHANCED CARD DESIGN
   const renderPostItem = ({ item }: { item: CustomerLoadPost }) => (
     <TouchableOpacity
       style={styles.cardContainer}
@@ -77,6 +96,10 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
         <View style={styles.idContainer}>
           <Icon source="identifier" size={14} color="#666" />
           <Text style={styles.cardId}>ID: {item.LoadPostID}</Text>
+        </View>
+
+        <View>
+          <Text> {formatDate(item?.PostInsertDate || '')}</Text>
         </View>
         <View
           style={[
@@ -106,7 +129,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
               <Text style={styles.locationLabel}>From</Text>
             </View>
             <Text style={styles.locationText} numberOfLines={2}>
-              {item.Origin_City}
+              {item.Origin}
             </Text>
             <Text style={styles.locationSubtext}>
               {item.Origin_State} • {item.Origin_Pincode}
@@ -120,7 +143,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
               <Text style={styles.locationLabel}>To</Text>
             </View>
             <Text style={styles.locationText} numberOfLines={2}>
-              {item.Destination_City}
+              {item.Destination}
             </Text>
             <Text style={styles.locationSubtext}>
               {item.Destination_State} • {item.Destination_Pincode}
@@ -150,10 +173,8 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
           </View>
 
           <View style={styles.detailItem}>
-            <Icon source="calendar" size={16} color="#5e6bff" />
-            <Text style={styles.detailText}>
-              {formatDate(item?.PostInsertDate || '')}
-            </Text>
+            <Icon source="weight" size={16} color="#5e6bff" />
+            <Text style={styles.detailText}>{item?.Approximate_weight}</Text>
           </View>
         </View>
       </View>
@@ -180,7 +201,6 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
     </TouchableOpacity>
   );
 
-  // Render list view
   const renderListView = () => (
     <View style={styles.listContainer}>
       <View style={styles.listHeader}>
@@ -231,6 +251,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
           keyExtractor={item => item.LoadPostID}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={true}
+          // scrollEnabled={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
@@ -246,6 +267,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
       backdropOpacity={0.8}
       animationDuration={400}
       swipeThreshold={50}
+      onOpen={handleRefresh}
       disableSwipe
     >
       <View style={styles.container}>{renderListView()}</View>

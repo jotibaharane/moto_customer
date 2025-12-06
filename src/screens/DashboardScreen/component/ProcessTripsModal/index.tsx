@@ -1,4 +1,4 @@
-import { useGetProcessTripsMutation } from '@api/hooks_api';
+import { useGetProcessTripsQuery } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import { RootState } from '@store/index';
 import {
@@ -28,6 +28,7 @@ import {
 import { ActivityIndicator, Icon, Text } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
+import { useRefreshOnFocus } from '@hooks/onFocusevent';
 
 interface CustomerProcess {
   LoadPostID: string;
@@ -86,8 +87,14 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
   const dispatch = useDispatch();
-  const [getProcesTrips, { data: processTrips, isLoading }] =
-    useGetProcessTripsMutation();
+  const {
+    data: processTrips,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useGetProcessTripsQuery({ CustomerID });
+
+  // useRefreshOnFocus(() => getProcesTrips({ CustomerID }), true);
   console.log({ processTrips });
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,18 +106,17 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await getProcesTrips({ CustomerID });
+    await refetch(); // ⬅️ RTK Query refetch
     setRefreshing(false);
   };
 
-  useLayoutEffect(() => {
-    handleRefresh();
-  }, [ref]);
+  useRefreshOnFocus(refetch, true);
   const handleModalClose = () => {
     bottomModalRef.current?.close();
   };
 
   const handleTripPress = (item: CustomerProcess) => {
+    console.log('Rendering trip item:', item);
     dispatch(addOrUpdateDriver([]));
     dispatch(setCustomerMap('Process'));
     dispatch(setPostId(item?.LoadPostID));
@@ -120,8 +126,8 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
         longitude: item?.Origin_Lng,
       }),
     );
-    dispatch(setOriginAddress(item?.Origin_City));
-    dispatch(setDestinationAddress(item?.Destination_City));
+    dispatch(setOriginAddress(item?.Origin));
+    dispatch(setDestinationAddress(item?.Destination));
     if (item.DriverLat && item.DriverLng) {
       dispatch(
         selectDriver({
@@ -156,6 +162,9 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
           <Icon source="identifier" size={14} color="#666" />
           <Text style={processTripStyles.cardId}>ID: {item.LoadPostID}</Text>
         </View>
+        <View>
+          <Text> {formatDate(item?.PostInsertDate || '')}</Text>
+        </View>
         <View
           style={[
             processTripStyles.statusBadge,
@@ -184,7 +193,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
               <Text style={processTripStyles.locationLabel}>From</Text>
             </View>
             <Text style={processTripStyles.locationText} numberOfLines={2}>
-              {item.Origin_City}
+              {item.Origin}
             </Text>
             <Text style={processTripStyles.locationSubtext}>
               {item.Origin_State} • {item.Origin_Pincode}
@@ -198,7 +207,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
               <Text style={processTripStyles.locationLabel}>To</Text>
             </View>
             <Text style={processTripStyles.locationText} numberOfLines={2}>
-              {item.Destination_City}
+              {item.Destination}
             </Text>
             <Text style={processTripStyles.locationSubtext}>
               {item.Destination_State} • {item.Destination_Pincode}
@@ -230,7 +239,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
           <View style={processTripStyles.detailItem}>
             <Icon source="calendar" size={16} color="#5e6bff" />
             <Text style={processTripStyles.detailText}>
-              {formatDate(item.PostInsertDate)}
+              {item?.Approximate_weight}
             </Text>
           </View>
         </View>

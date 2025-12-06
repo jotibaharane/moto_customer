@@ -1,9 +1,9 @@
-// components/BottomModal.tsx
 import React, {
   forwardRef,
   useImperativeHandle,
   useRef,
   useState,
+  useEffect,
 } from 'react';
 import {
   Animated,
@@ -14,7 +14,11 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   View,
+  FlatList,
+  SectionList,
+  VirtualizedList,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -25,7 +29,7 @@ export interface BottomModalProps {
   animationDuration?: number;
   swipeThreshold?: number;
   disableSwipe?: boolean;
-  preventSwipeClose?: boolean; // 👈 NEW
+  preventSwipeClose?: boolean;
   customHeight?: number | string;
 }
 
@@ -43,7 +47,7 @@ const BottomModal = forwardRef<BottomModalRef, BottomModalProps>(
       animationDuration = 300,
       swipeThreshold = 100,
       disableSwipe = false,
-      preventSwipeClose = false, // 👈 NEW
+      preventSwipeClose = false,
       customHeight,
     },
     ref,
@@ -51,6 +55,28 @@ const BottomModal = forwardRef<BottomModalRef, BottomModalProps>(
     const [isVisible, setIsVisible] = useState(false);
     const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
     const backdropOpacityAnim = useRef(new Animated.Value(0)).current;
+    const [hasVirtualizedList, setHasVirtualizedList] = useState(false);
+
+    // Detect if children contain FlatList / SectionList / VirtualizedList
+    useEffect(() => {
+      const detectList = (node: React.ReactNode): boolean => {
+        if (!node) return false;
+        if (Array.isArray(node)) return node.some(detectList);
+        if (
+          React.isValidElement(node) &&
+          (node.type === FlatList ||
+            node.type === SectionList ||
+            node.type === VirtualizedList)
+        ) {
+          return true;
+        }
+        if (React.isValidElement(node) && node.props?.children) {
+          return detectList(node.props.children);
+        }
+        return false;
+      };
+      setHasVirtualizedList(detectList(children));
+    }, [children]);
 
     const panResponder = useRef(
       PanResponder.create({
@@ -117,7 +143,6 @@ const BottomModal = forwardRef<BottomModalRef, BottomModalProps>(
       close: closeModal,
     }));
 
-    // Only allow number, "auto", or percentage string for height
     let modalHeight: number | 'auto' | `${number}%` | undefined;
     if (typeof customHeight === 'number') {
       modalHeight = customHeight;
@@ -141,27 +166,37 @@ const BottomModal = forwardRef<BottomModalRef, BottomModalProps>(
       >
         <TouchableWithoutFeedback onPress={closeModal}>
           <Animated.View
-            style={[
-              styles.backdrop,
-              {
-                opacity: backdropOpacityAnim,
-              },
-            ]}
+            style={[styles.backdrop, { opacity: backdropOpacityAnim }]}
           />
         </TouchableWithoutFeedback>
 
         <Animated.View
           style={[
             styles.modalContainer,
-            modalHeight !== undefined ? { height: modalHeight } : {},
-            {
-              transform: [{ translateY }],
-            },
+            modalHeight !== undefined ? { height: modalHeight } : { flex: 1 },
+            { transform: [{ translateY }] },
           ]}
           {...panResponder.panHandlers}
         >
           <View style={styles.handleBar} />
-          <View style={styles.content}>{children}</View>
+
+          {hasVirtualizedList ? (
+            <View style={[styles.scrollContainer, styles.content]}>
+              {children}
+            </View>
+          ) : (
+            <KeyboardAwareScrollView
+              style={styles.scrollContainer}
+              contentContainerStyle={styles.content}
+              enableOnAndroid={true}
+              extraScrollHeight={150}
+              keyboardOpeningTime={0}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {children}
+            </KeyboardAwareScrollView>
+          )}
         </Animated.View>
       </Modal>
     );
@@ -192,9 +227,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 16,
   },
-  content: {
+  scrollContainer: {
     flex: 1,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+  },
+  content: {
+    flexGrow: 1,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
   },
 });
 

@@ -112,7 +112,7 @@ const MultipleSelectList: React.FC<MultipleSelectListProps> = ({
 
   const normalizeString = (str: any) => {
     if (str === null || str === undefined) return '';
-    return String(str).trim().toLowerCase();
+    return String(str).trim()?.toLowerCase();
   };
 
   const findItems = React.useCallback(

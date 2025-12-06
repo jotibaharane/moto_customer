@@ -1,4 +1,3 @@
-// ConfirmMPIN.tsx
 import MPINDots from '@components/mpin/MPINDots';
 import MPINHeader from '@components/mpin/MPINHeader';
 import MPINKeypad from '@components/mpin/MPINKeypad';
@@ -20,6 +19,7 @@ interface ConfirmMPINProps {
   onConfirm: () => void;
   onNumberPress: (num: string) => void;
   onBackspace: () => void;
+  onBack: () => void; // <-- NEW PROP
 }
 
 const ConfirmMPIN: React.FC<ConfirmMPINProps> = ({
@@ -27,15 +27,15 @@ const ConfirmMPIN: React.FC<ConfirmMPINProps> = ({
   onConfirm,
   onNumberPress,
   onBackspace,
+  onBack,
 }) => {
   const [error, setError] = useState('');
 
   const handleSubmit = () => {
     if (mpin.length === 6) {
-      // Changed from 4 to 6
       onConfirm();
     } else {
-      setError('Please enter 6-digit MPIN'); // Updated error message
+      setError('Please enter 6-digit MPIN');
     }
   };
 
@@ -47,21 +47,31 @@ const ConfirmMPIN: React.FC<ConfirmMPINProps> = ({
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <MPINHeader
           title="Confirm New MPIN"
-          subtitle="Re-enter your new 6-digit MPIN to confirm" // Updated subtitle
+          subtitle="Re-enter your new 6-digit MPIN to confirm"
         />
 
         <View style={styles.mpinContainer}>
-          <MPINDots value={mpin} /> {/* Added length prop */}
+          <MPINDots value={mpin} />
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      </ScrollView>
 
+      {/* FIXED BOTTOM AREA */}
+      <View style={styles.footer}>
         <MPINKeypad onNumberPress={onNumberPress} onBackspace={onBackspace} />
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>CONFIRM</Text>
-        </TouchableOpacity>
-      </ScrollView>
+        {/* ROW BUTTONS */}
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+            <Text style={styles.submitButtonText}>CONFIRM</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 };
@@ -75,6 +85,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: hp(20),
   },
+
   mpinContainer: {
     alignItems: 'center',
     marginBottom: hp(30),
@@ -85,23 +96,49 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: hp(10),
   },
-  submitButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: hp(14),
-    borderRadius: ms(8),
-    marginHorizontal: wp(24),
-    marginTop: hp(10),
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   submitButtonText: {
     color: colors.textOnPrimary,
     fontSize: fontSize(16),
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  footer: {
+    flexDirection: 'column',
+    paddingBottom: hp(20),
+    backgroundColor: colors.background,
+  },
+
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: wp(24),
+    marginTop: hp(10),
+  },
+
+  backButton: {
+    paddingVertical: hp(12),
+    paddingHorizontal: wp(20),
+    borderRadius: ms(8),
+    backgroundColor: colors.primaryLight, // choose if you want
+  },
+
+  backText: {
+    fontSize: fontSize(16),
+    color: '#fff',
+    fontWeight: '600',
+  },
+
+  submitButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: hp(12),
+    paddingHorizontal: wp(24),
+    borderRadius: ms(8),
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });
 

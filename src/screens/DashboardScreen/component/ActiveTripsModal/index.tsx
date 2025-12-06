@@ -70,7 +70,7 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
     useGetActiveTripsMutation();
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [refreshing, setRefreshing] = useState(false);
-
+  console.log('Active Trips:', activeTrips);
   useImperativeHandle(ref, () => ({
     open: () => bottomModalRef.current?.open(),
     close: () => bottomModalRef.current?.close(),
@@ -165,8 +165,8 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
               <Icon source="map-marker" size={16} color="#5e6bff" />
               <Text style={activeTripStyles.locationLabel}>Pickup</Text>
             </View>
-            <Text style={activeTripStyles.locationText} numberOfLines={1}>
-              {item.Origin_City}
+            <Text style={activeTripStyles.locationText} numberOfLines={3}>
+              {item.Origin}
             </Text>
             <Text style={activeTripStyles.locationSubtext}>
               {item.Origin_State}
@@ -179,8 +179,8 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
               <Icon source="map-marker-check" size={16} color="#FF6B6B" />
               <Text style={activeTripStyles.locationLabel}>Delivery</Text>
             </View>
-            <Text style={activeTripStyles.locationText} numberOfLines={1}>
-              {item.Destination_City}
+            <Text style={activeTripStyles.locationText} numberOfLines={3}>
+              {item.Destination}
             </Text>
             <Text style={activeTripStyles.locationSubtext}>
               {item.Destination_State}

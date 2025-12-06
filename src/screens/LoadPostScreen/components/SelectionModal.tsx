@@ -87,6 +87,7 @@ const SelectionModal = forwardRef<SelectionModalRef, SelectionModalProps>(
         backdropOpacity={0.8}
         animationDuration={400}
         swipeThreshold={50}
+        scrollEnabled={false}
         disableSwipe
       >
         <View style={styles.container}>

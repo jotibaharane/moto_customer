@@ -19,7 +19,7 @@ export enum routeName {
   REGISTRATION = 'registration',
   SET_MPIN = 'set-mpin',
   LOAD_POST = 'my-post',
-
+  EDIT_CUSTOMER = 'edit-customer',
   MPIN_LOGIN = 'mpin-login',
   DASHBOARD = 'dashboard',
   HOMESTACK = 'HomeStack',
@@ -27,6 +27,8 @@ export enum routeName {
   CUSTOMER_POSTS = 'customer-posts',
   POST_CREATE = 'post-create',
   NOTIFICATION = 'notification',
+  ADD_EMPLOYEE = 'addEmployee',
+  MULTISTEPFORM = 'multistep',
 
   // old
 
@@ -78,6 +80,7 @@ export enum routeName {
 export type RootStackParamList = {
   [routeName.LOGIN]: undefined;
   [routeName.REGISTRATION]: undefined;
+  [routeName.EDIT_CUSTOMER]: undefined;
   [routeName.SET_MPIN]: undefined;
   [routeName.DASHBOARD]: undefined;
   [routeName.MPIN_LOGIN]: undefined;
