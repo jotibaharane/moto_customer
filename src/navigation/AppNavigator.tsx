@@ -8,6 +8,10 @@ import SetMPINScreen from '@screens/SetMPINScreen';
 import SplashScreen from '@screens/SplashScreen';
 import { RootStackParamList, routeName } from '@utils/navigationHelpers';
 import DrawerNavigator from './drawer/DrawerNavigator';
+import Notification from '@screens/DashboardScreen/Notification';
+import EditCustomerScreen from '@screens/RegistrationScreen/ProfileEditscreen';
+import Employee from '@screens/RegistrationScreen/Employee';
+// import MultiStepForm from 'src/forms/Multistepform/MultiStepForm';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
@@ -32,6 +36,10 @@ const AppNavigator = () => {
           name={routeName.DASHBOARD}
           component={DrawerNavigator}
         />
+        {/* <RootStack.Screen
+          name={routeName.MULTISTEPFORM}
+          component={MultiStepForm}
+        /> */}
         <RootStack.Screen name={routeName.SET_MPIN} component={SetMPINScreen} />
         <RootStack.Screen
           name={routeName.LOAD_POST}
@@ -42,6 +50,18 @@ const AppNavigator = () => {
           }}
           component={LoadPostForm}
         />
+        <RootStack.Screen
+          name={routeName.EDIT_CUSTOMER}
+          component={EditCustomerScreen}
+        />
+        <RootStack.Screen
+          name={routeName.NOTIFICATION}
+          component={Notification}
+        ></RootStack.Screen>
+        <RootStack.Screen
+          name={routeName.ADD_EMPLOYEE}
+          component={Employee}
+        ></RootStack.Screen>
       </RootStack.Navigator>
     </NavigationContainer>
   );

@@ -1,6 +1,7 @@
 import React, {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -9,49 +10,45 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
-  Animated,
-  Dimensions,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  Modal,
+  Platform,
+  ScrollView,
+  KeyboardAvoidingView,
+  Dimensions,
 } from 'react-native';
-import MapView, {
-  LatLng,
-  Marker,
-  Polyline,
-  PROVIDER_GOOGLE,
-  Region,
-} from 'react-native-maps';
 import { RadioButton, TextInput } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
 import Entypo from 'react-native-vector-icons/Entypo';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import { ShipmentData } from '@api/api.type';
-import { useGetCurrentAddressQuery } from '@api/hooks_api';
+import {
+  useGetCurrentAddressQuery,
+  useGetDistrictMutation,
+  useGetPincodeDataMutation,
+  useGetStateQuery,
+} from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import ActionButton from '@components/common/ActionButton';
 import { SelectList } from '@components/common/Select';
 import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
 import {
-  calculateRoute,
-  geocodeCoordinates,
   getCurrentLocationWithFallback,
-  INDIA_DEFAULT_REGION,
   openLocationSettings,
-  reverseGeocode,
 } from '@utils/locationUtils';
 import tw from '@utils/tw';
 import { useFormikContext } from 'formik';
 
 import LocationHistoryModal from './LocationHistoryModal';
+import PickupModaldebug from './Pickupdebug';
+import { useCustomerhistoryQuery } from '@api/hooks_api';
+import { RootState } from '@store/index';
+import { useSelector } from 'react-redux';
 
 export interface PickupModalRef {
   open: () => void;
@@ -63,96 +60,189 @@ interface LocationSuggestion {
   value: string;
 }
 
-interface RouteData {
-  coordinates: Array<{
-    latitude: number;
-    longitude: number;
-  }>;
-  distance: number;
-  duration: number;
-}
-
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
+  const GoogleAddress = useSelector(
+    (state: RootState) => state.auth?.RegisteredAddress,
+  );
+  const CustomerID = useSelector(
+    (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
+  );
+  const CustomerDetail = useSelector(
+    (state: RootState) => state?.auth?.customerDetails,
+  );
+
+  console.log(CustomerDetail?.CompanyName, 'this is detail');
+  const currentlocation = useSelector((state: RootState) => state?.map?.origin);
+  const {
+    getCurrentLocation,
+    selectedLocation,
+    handleInputChange,
+    suggestions,
+  } = useGooglePlacesSelect();
+  console.log('RegisteredAddress in PickupModal:', GoogleAddress);
+
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [activeOriginButton, setActiveOriginButton] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [pickupType, setPickupType] = useState<'self' | 'other'>('self');
-  const [mapRegion, setMapRegion] = useState<Region>(INDIA_DEFAULT_REGION);
-  const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
-  const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [userLocation, setUserLocation] = useState<any>(null);
-  const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
-  const [showRouteInfo, setShowRouteInfo] = useState(false);
-  const [isMapDragging, setIsMapDragging] = useState(false);
-  const [centerPinCoordinate, setCenterPinCoordinate] = useState<LatLng | null>(
-    null,
-  );
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const { data: stateData } = useGetStateQuery();
+  const [availableDistricts, setAvailableDistricts] = useState<any[]>([]);
+  const [PincodeData] = useGetPincodeDataMutation();
+  const [getDistricts] = useGetDistrictMutation();
+  const { data, isLoading, error } = useCustomerhistoryQuery({
+    CustomerID: CustomerID,
+  });
+  const [pincodeCoords, setPincodeCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  console.log('customerHistory', CustomerID);
+
+  console.log('customerhstorydata', data);
 
   const scrollViewRef = useRef<ScrollView>(null);
-  const mapRef = useRef<MapView>(null);
-  const pinAnimation = useRef(new Animated.Value(0)).current;
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { values, setFieldValue } = useFormikContext<ShipmentData>();
+  const { values, setFieldValue, errors, touched, setFieldTouched } =
+    useFormikContext<ShipmentData>();
   const { currentData } = useGetCurrentAddressQuery<any>();
   const originPlaces = useGooglePlacesSelect();
 
-  const isOtherPickupType = useMemo(() => pickupType === 'other', [pickupType]);
+  const isOtherPickupType = useMemo(
+    () => values.PickupType === 'other',
+    [values.PickupType],
+  );
+  const isRegisteredPickupType = useMemo(
+    () => values.PickupType === 'Registered',
+    [values.PickupType],
+  );
+  const isselfPickupType = useMemo(
+    () => values.PickupType === 'self',
+    [values.PickupType],
+  );
 
-  // Custom debounce function without lodash
-  const debounce = useCallback(
-    (func: (...args: any[]) => void, wait: number) => {
-      return (...args: any[]) => {
-        if (debounceTimeoutRef.current) {
-          clearTimeout(debounceTimeoutRef.current);
+  const handleState = useCallback(
+    async (value: string) => {
+      try {
+        const response = await getDistricts({ state: value }).unwrap();
+        const DistrictsList = response?.data || [];
+        setAvailableDistricts(DistrictsList);
+        setFieldValue('state', value);
+      } catch (error) {
+        console.error('Error fetching districts:', error);
+      }
+    },
+    [getDistricts, setFieldValue],
+  );
+  const handlePinchange = useCallback(
+    async (value: string) => {
+      setFieldValue('Pincode', value);
+      if (value.length === 6) {
+        try {
+          const response = await PincodeData({ pincode: value }).unwrap();
+          const mapped = response?.data;
+          if (mapped) {
+            setFieldValue('state', mapped?.State);
+            setFieldValue('District', mapped?.District);
+
+            // ✅ Convert Pincode to coordinates using Google API
+            const geocodeRes = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?address=${value}&key=${GOOGLE_MAPS_API_KEY}`,
+            );
+            const geocodeJson = await geocodeRes.json();
+            console.log(geocodeJson);
+            if (geocodeJson?.results?.length) {
+              const { lat, lng } = geocodeJson.results[0]?.geometry?.location;
+              setPincodeCoords({ latitude: lat, longitude: lng });
+            }
+
+            const districtResponse = await getDistricts({
+              state: mapped?.State,
+            }).unwrap();
+            setAvailableDistricts(
+              districtResponse?.data ? districtResponse?.data : [],
+            );
+          }
+        } catch (error) {
+          console.error('Error fetching pincode data:', error);
         }
-        debounceTimeoutRef.current = setTimeout(() => {
-          func(...args);
-        }, wait);
-      };
+      }
     },
-    [],
+    [PincodeData, getDistricts, setFieldValue],
   );
-
-  // Animate the center pin
-  const animatePin = useCallback(
-    (toValue: number) => {
-      Animated.spring(pinAnimation, {
-        toValue,
-        useNativeDriver: true,
-        tension: 120,
-        friction: 8,
-        overshootClamping: false,
-      }).start();
-    },
-    [pinAnimation],
-  );
-
   const handleConfirm = useCallback(() => {
+    const errors: any = {};
+
     if (!values.origin?.address) {
-      Alert.alert('Error', 'Please select a pickup location');
-      return;
+      errors.origin = 'Please select a pickup location';
     }
 
     if (isOtherPickupType) {
       if (!values.ContactPerson?.trim()) {
-        Alert.alert('Error', 'Please enter contact person name');
-        return;
+        errors.ContactPerson = 'Please enter contact person name';
       }
       if (!values.ContactNumber?.trim()) {
-        Alert.alert('Error', 'Please enter contact number');
-        return;
+        errors.ContactNumber = 'Please enter contact number';
+      } else if (values.ContactNumber.length !== 10) {
+        errors.ContactNumber = 'Please enter a valid 10-digit number';
       }
     }
 
+    // ✅ Address validation
+    if (!values.Origin_1?.trim()) {
+      errors.Origin_1 = 'Please enter plot/unit/building details';
+    }
+    if (!values.Origin_2?.trim()) {
+      errors.Origin_2 = 'Please enter area/street details';
+    }
+
+    // ✅ If errors exist, store them and stop submission
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    // ✅ No errors → proceed
+    setFieldErrors({});
     handleModalClose();
-  }, [pickupType, values, isOtherPickupType]);
+  }, [values, isOtherPickupType, handleModalClose]);
+
+  const handleLocationSelected = useCallback(
+    (location: { latitude: number; longitude: number; address: string }) => {
+      console.log('Selected Location:', location);
+
+      const selectedLocation = {
+        address: location.address,
+        coordinates: {
+          lat: location.latitude,
+          lng: location.longitude,
+        },
+        components: {
+          dist: '',
+          pincode: '',
+          place: '',
+          state: '',
+          tal: '',
+        },
+      };
+
+      setFieldValue('origin', selectedLocation);
+      setShowMapModal(false);
+      setActiveOriginButton('');
+
+      Toast.show({
+        type: 'success',
+        text1: 'Location selected',
+        text2: 'Pickup location has been set',
+      });
+    },
+    [setFieldValue],
+  );
 
   const handleOriginSelect = useCallback(
     async (selected: LocationSuggestion) => {
@@ -160,18 +250,6 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         const location = await originPlaces.getPlaceDetails(selected.key);
         if (location) {
           setFieldValue('origin', location);
-          const newRegion = {
-            latitude: location.coordinates.lat,
-            longitude: location.coordinates.lng,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          };
-          setMapRegion(newRegion);
-          setCenterPinCoordinate({
-            latitude: location.coordinates.lat,
-            longitude: location.coordinates.lng,
-          });
-          setSelectedLocation(location);
         }
       } catch (error) {
         Alert.alert('Error', 'Failed to fetch location details');
@@ -179,231 +257,55 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     },
     [originPlaces, setFieldValue],
   );
+  useEffect(() => {
+    if (values.PickupType === 'Registered' && GoogleAddress) {
+      setFieldValue('origin', {
+        address: GoogleAddress.fullAddress,
+        coordinates: {
+          lat: GoogleAddress.latitude,
+          lng: GoogleAddress.longitude,
+        },
+
+        components: GoogleAddress.addressComponents,
+      });
+
+      setFieldValue('ContactPerson', CustomerDetail?.CompanyName || '');
+      setFieldValue('ContactNumber', CustomerDetail?.ContactNo || '');
+    } else if (values.PickupType == 'self') {
+      setFieldValue('ContactPerson', CustomerDetail?.CompanyName || '');
+      setFieldValue('ContactNumber', CustomerDetail?.ContactNo || '');
+    }
+  }, [GoogleAddress, CustomerDetail, values.PickupType]);
 
   const handleHistoryLocationSelect = useCallback(
-    (location: any) => {
+    item => {
+      setFieldValue('PickupType', 'other');
+
       setFieldValue('origin', {
-        ...values.origin,
-        address: location,
+        address: item?.Origin,
+        coordinates: {},
+        components: {},
       });
+
+      setFieldValue('Origin_1', item.Origin_1);
+      setFieldValue('Origin_2', item.Origin_2);
+      setFieldValue('State', item.State);
+      setFieldValue('ContactPerson', item.ContactPerson);
+      setFieldValue('ContactNumber', item.ContactNumber);
+
       setShowHistoryModal(false);
     },
-    [setFieldValue, values.origin],
+    [setFieldValue],
   );
-
-  const handleCurrentLocationPress = useCallback(async () => {
-    try {
-      setActiveOriginButton('current');
-      setIsLoadingLocation(true);
-
-      const { latitude, longitude } = await getCurrentLocationWithFallback();
-      const address = await geocodeCoordinates(latitude, longitude);
-
-      if (address) {
-        setFieldValue('origin', address);
-        setUserLocation({ latitude, longitude });
-
-        const newRegion = {
-          latitude,
-          longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        };
-        setMapRegion(newRegion);
-        setCenterPinCoordinate({ latitude, longitude });
-        setSelectedLocation(address);
-
-        if (selectedLocation) {
-          await calculateRouteBetweenPoints(
-            { latitude, longitude },
-            {
-              latitude: selectedLocation.coordinates.lat,
-              longitude: selectedLocation.coordinates.lng,
-            },
-          );
-        }
-      } else {
-        Alert.alert(
-          'Location Unavailable',
-          'Could not fetch address. Please select a location manually.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Select Manually', onPress: () => setShowMapModal(true) },
-          ],
-        );
-      }
-    } catch (error: any) {
-      console.error('Location error:', error);
-      Alert.alert(
-        'Location Error',
-        error.message.includes('permission') ||
-          error.message.includes('disabled')
-          ? 'Location services are disabled. Please enable them or select a location manually.'
-          : 'Failed to fetch location. Please try again or select manually.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          error.message.includes('permission') ||
-          error.message.includes('disabled')
-            ? { text: 'Open Settings', onPress: openLocationSettings }
-            : { text: 'Select Manually', onPress: () => setShowMapModal(true) },
-        ],
-      );
-    } finally {
-      setActiveOriginButton('');
-      setIsLoadingLocation(false);
-    }
-  }, [setFieldValue, selectedLocation]);
-
-  const calculateRouteBetweenPoints = useCallback(
-    async (
-      origin: { latitude: number; longitude: number },
-      destination: { latitude: number; longitude: number },
-    ) => {
-      try {
-        setIsCalculatingRoute(true);
-        const route = await calculateRoute(origin, destination);
-        setRouteData(route);
-        setShowRouteInfo(true);
-
-        if (mapRef.current && route.coordinates.length > 0) {
-          mapRef.current.fitToCoordinates(route.coordinates, {
-            edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-            animated: true,
-          });
-        }
-      } catch (error) {
-        console.error('Route calculation error:', error);
-        Alert.alert('Error', 'Could not calculate route');
-      } finally {
-        setIsCalculatingRoute(false);
-      }
-    },
-    [],
-  );
-
-  const handleMapLocationSelect = useCallback(
-    async (coordinate: LatLng) => {
-      try {
-        setIsLoadingLocation(true);
-        const address = await reverseGeocode(
-          coordinate.latitude,
-          coordinate.longitude,
-        );
-
-        if (address) {
-          const newLocation = {
-            ...address,
-            coordinates: {
-              lat: coordinate.latitude,
-              lng: coordinate.longitude,
-            },
-          };
-          setSelectedLocation(newLocation);
-
-          if (userLocation) {
-            await calculateRouteBetweenPoints(userLocation, coordinate);
-          }
-        } else {
-          Alert.alert(
-            'Error',
-            'Could not fetch address. Please try another location.',
-            [
-              { text: 'OK', style: 'cancel' },
-              { text: 'Select Manually', onPress: () => setShowMapModal(true) },
-            ],
-          );
-        }
-      } catch (error) {
-        Alert.alert('Error', 'Failed to get address for selected location');
-      } finally {
-        setIsLoadingLocation(false);
-      }
-    },
-    [userLocation, calculateRouteBetweenPoints],
-  );
-
-  const debouncedHandleMapLocationSelect = useCallback(
-    debounce(handleMapLocationSelect, 500),
-    [handleMapLocationSelect],
-  );
-
-  const handleMapRegionChangeComplete = useCallback(
-    async (region: Region) => {
-      setMapRegion(region);
-
-      const centerCoord = {
-        latitude: region.latitude,
-        longitude: region.longitude,
-      };
-
-      setCenterPinCoordinate(centerCoord);
-
-      if (isMapDragging) {
-        setIsMapDragging(false);
-        await debouncedHandleMapLocationSelect(centerCoord);
-      }
-    },
-    [isMapDragging, debouncedHandleMapLocationSelect],
-  );
-
-  const handleMapDragStart = useCallback(() => {
-    setIsMapDragging(true);
-    animatePin(-20);
-  }, [animatePin]);
-
-  const handleMapDragEnd = useCallback(() => {
-    animatePin(0);
-  }, [animatePin]);
-
-  const handleConfirmMapLocation = useCallback(() => {
-    if (selectedLocation) {
-      setFieldValue('origin', selectedLocation);
-      setShowMapModal(false);
-      setActiveOriginButton('');
-    }
-  }, [selectedLocation, setFieldValue]);
-
-  const handleMapRegionChange = useCallback((region: Region) => {
-    setMapRegion(region);
-  }, []);
-
-  const handleRecenterMap = useCallback(() => {
-    if (userLocation && mapRef.current) {
-      const newRegion = {
-        ...userLocation,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      };
-      mapRef.current.animateToRegion(newRegion, 1000);
-      setCenterPinCoordinate(userLocation);
-    }
-  }, [userLocation]);
-
-  const handleToggleMapType = useCallback(() => {
-    setMapType(current => {
-      const newType = current === 'standard' ? 'satellite' : 'standard';
-      Toast.show({
-        type: 'info',
-        text1: `Switched to ${newType} view`,
-        visibilityTime: 2000,
-      });
-      return newType;
-    });
-  }, []);
 
   const handleModalClose = useCallback(() => {
     setActiveOriginButton('');
     setShowHistoryModal(false);
     setShowMapModal(false);
     setIsModalOpen(false);
-    setRouteData(null);
-    setShowRouteInfo(false);
-    setCenterPinCoordinate(null);
-    setIsMapDragging(false);
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
     bottomModalRef.current?.close();
+    // ❌ Do NOT reset pickupType here!
+    // setPickupType('self'); ← remove this if it exists
   }, []);
 
   const handleBottomModalClose = useCallback(() => {
@@ -426,72 +328,8 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     close: handleModalClose,
   }));
 
-  const initializeCenterPin = useCallback(() => {
-    if (showMapModal && !centerPinCoordinate) {
-      setCenterPinCoordinate({
-        latitude: mapRegion.latitude,
-        longitude: mapRegion.longitude,
-      });
-
-      if (selectedLocation) {
-        setCenterPinCoordinate({
-          latitude: selectedLocation.coordinates.lat,
-          longitude: selectedLocation.coordinates.lng,
-        });
-      }
-    }
-  }, [showMapModal, centerPinCoordinate, mapRegion, selectedLocation]);
-
-  const CenterSelectionPin = useMemo(() => {
-    if (!centerPinCoordinate) return null;
-
-    return (
-      <View style={styles.centerPinContainer} pointerEvents="none">
-        <Animated.View
-          style={[
-            styles.centerPin,
-            {
-              transform: [
-                {
-                  translateY: pinAnimation.interpolate({
-                    inputRange: [-20, 0],
-                    outputRange: [-20, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <MaterialCommunityIcons name="map-marker" size={40} color="#EF4444" />
-          <View style={styles.pinPulse} />
-        </Animated.View>
-        <View style={styles.centerPinBase} />
-      </View>
-    );
-  }, [centerPinCoordinate, pinAnimation]);
-
   const actionButtons = useMemo(
     () => [
-      {
-        key: 'current',
-        icon: (
-          <Icon
-            name="my-location"
-            size={18}
-            color={
-              activeOriginButton === 'current' ? '#fff' : tw.color('blue-600')
-            }
-          />
-        ),
-        text: 'Current',
-        onPress: handleCurrentLocationPress,
-        color:
-          activeOriginButton === 'current'
-            ? tw.color('blue-600')
-            : 'transparent',
-        borderColor: 'blue-600',
-        loading: isLoadingLocation && activeOriginButton === 'current',
-      },
       {
         key: 'map',
         icon: (
@@ -507,41 +345,13 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         onPress: () => {
           setActiveOriginButton('map');
           setShowMapModal(true);
-          initializeCenterPin();
         },
         color:
           activeOriginButton === 'map' ? tw.color('purple-600') : 'transparent',
         borderColor: 'purple-600',
       },
-      {
-        key: 'history',
-        icon: (
-          <FontAwesome
-            name="history"
-            size={18}
-            color={
-              activeOriginButton === 'history' ? '#fff' : tw.color('gray-600')
-            }
-          />
-        ),
-        text: 'History',
-        onPress: () => {
-          setActiveOriginButton('history');
-          setShowHistoryModal(true);
-        },
-        color:
-          activeOriginButton === 'history'
-            ? tw.color('gray-600')
-            : 'transparent',
-        borderColor: 'gray-600',
-      },
     ],
-    [
-      activeOriginButton,
-      handleCurrentLocationPress,
-      isLoadingLocation,
-      initializeCenterPin,
-    ],
+    [activeOriginButton, isLoadingLocation],
   );
 
   const MapSelectionModal = useMemo(
@@ -553,13 +363,8 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         onRequestClose={() => {
           setShowMapModal(false);
           setIsLoadingLocation(false);
-          setIsCalculatingRoute(false);
           setActiveOriginButton('');
-          if (debounceTimeoutRef.current) {
-            clearTimeout(debounceTimeoutRef.current);
-          }
         }}
-        onShow={initializeCenterPin}
       >
         <View style={styles.mapContainer}>
           <View style={styles.mapHeader}>
@@ -574,293 +379,29 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.mapWrapper}>
-            <MapView
-              ref={mapRef}
-              style={styles.map}
-              provider={PROVIDER_GOOGLE}
-              region={mapRegion}
-              onRegionChange={handleMapRegionChange}
-              onRegionChangeComplete={handleMapRegionChangeComplete}
-              onPanDrag={handleMapDragStart}
-              onResponderRelease={handleMapDragEnd}
-              mapType={mapType}
-              showsUserLocation={true}
-              showsMyLocationButton={false}
-              showsCompass={true}
-              showsScale={true}
-              showsTraffic={false}
-              zoomControlEnabled={true}
-              scrollEnabled={true}
-              zoomEnabled={true}
-              rotateEnabled={true}
-              liteMode={Platform.OS === 'android' && !showMapModal}
-              accessible={true}
-              accessibilityLabel="Map for selecting pickup location"
-            >
-              {routeData && routeData.coordinates.length > 0 && (
-                <Polyline
-                  coordinates={routeData.coordinates}
-                  strokeWidth={4}
-                  strokeColor="#3B82F6"
-                  lineCap="round"
-                  lineJoin="round"
-                />
-              )}
-
-              {selectedLocation && (
-                <Marker
-                  coordinate={{
-                    latitude: selectedLocation.coordinates.lat,
-                    longitude: selectedLocation.coordinates.lng,
-                  }}
-                  title="Selected Location"
-                  description={selectedLocation.address}
-                >
-                  <View style={styles.selectedMarker}>
-                    <MaterialCommunityIcons
-                      name="map-marker-check"
-                      size={32}
-                      color="#10B981"
-                    />
-                  </View>
-                </Marker>
-              )}
-
-              {userLocation && (
-                <Marker
-                  coordinate={userLocation}
-                  title="Your Location"
-                  pinColor="#3B82F6"
-                />
-              )}
-            </MapView>
-
-            {CenterSelectionPin}
-
-            {(isLoadingLocation || isCalculatingRoute) && (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color="#3B82F6" />
-                <Text style={styles.loadingText}>
-                  {isLoadingLocation
-                    ? 'Fetching location...'
-                    : 'Calculating route...'}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.instructionsContainer}>
-              <Text style={styles.instructionsText}>
-                Drag map to move selection pin
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.mapControls}>
-            <TouchableOpacity
-              style={styles.mapControlButton}
-              onPress={handleRecenterMap}
-              accessibilityLabel="Recenter map to your location"
-              accessibilityHint="Moves the map view to your current location"
-            >
-              <Icon name="my-location" size={20} color="#374151" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.mapControlButton}
-              onPress={handleToggleMapType}
-              accessibilityLabel={`Switch to ${
-                mapType === 'standard' ? 'satellite' : 'standard'
-              } view`}
-              accessibilityHint="Toggles between standard and satellite map views"
-            >
-              <MaterialCommunityIcons
-                name={mapType === 'standard' ? 'satellite-variant' : 'map'}
-                size={20}
-                color="#374151"
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.nudgeControls}>
-            <TouchableOpacity
-              style={styles.nudgeButton}
-              onPress={() => {
-                if (centerPinCoordinate) {
-                  const newCoord = {
-                    ...centerPinCoordinate,
-                    latitude: centerPinCoordinate.latitude + 0.0001,
-                  };
-                  setCenterPinCoordinate(newCoord);
-                  debouncedHandleMapLocationSelect(newCoord);
-                }
-              }}
-              accessibilityLabel="Move pin up"
-              accessibilityHint="Adjusts the pin location slightly upward"
-            >
-              <Icon name="arrow-upward" size={20} color="#374151" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.nudgeButton}
-              onPress={() => {
-                if (centerPinCoordinate) {
-                  const newCoord = {
-                    ...centerPinCoordinate,
-                    longitude: centerPinCoordinate.longitude - 0.0001,
-                  };
-                  setCenterPinCoordinate(newCoord);
-                  debouncedHandleMapLocationSelect(newCoord);
-                }
-              }}
-              accessibilityLabel="Move pin left"
-              accessibilityHint="Adjusts the pin location slightly to the left"
-            >
-              <Icon name="arrow-back" size={20} color="#374151" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.nudgeButton}
-              onPress={() => {
-                if (centerPinCoordinate) {
-                  const newCoord = {
-                    ...centerPinCoordinate,
-                    longitude: centerPinCoordinate.longitude + 0.0001,
-                  };
-                  setCenterPinCoordinate(newCoord);
-                  debouncedHandleMapLocationSelect(newCoord);
-                }
-              }}
-              accessibilityLabel="Move pin right"
-              accessibilityHint="Adjusts the pin location slightly to the right"
-            >
-              <Icon name="arrow-forward" size={20} color="#374151" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.nudgeButton}
-              onPress={() => {
-                if (centerPinCoordinate) {
-                  const newCoord = {
-                    ...centerPinCoordinate,
-                    latitude: centerPinCoordinate.latitude - 0.0001,
-                  };
-                  setCenterPinCoordinate(newCoord);
-                  debouncedHandleMapLocationSelect(newCoord);
-                }
-              }}
-              accessibilityLabel="Move pin down"
-              accessibilityHint="Adjusts the pin location slightly downward"
-            >
-              <Icon name="arrow-downward" size={20} color="#374151" />
-            </TouchableOpacity>
-          </View>
-
-          {showRouteInfo && routeData && (
-            <View style={styles.routeInfoContainer}>
-              <View style={styles.routeInfo}>
-                <View style={styles.routeInfoItem}>
-                  <MaterialCommunityIcons
-                    name="road-variant"
-                    size={16}
-                    color="#6B7280"
-                  />
-                  <Text style={styles.routeInfoText}>
-                    {routeData.distance} km
-                  </Text>
-                </View>
-                <View style={styles.routeInfoItem}>
-                  <MaterialCommunityIcons
-                    name="clock-outline"
-                    size={16}
-                    color="#6B7280"
-                  />
-                  <Text style={styles.routeInfoText}>
-                    {routeData.duration} min
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.mapFooter}>
-            <View style={styles.selectedLocationInfo}>
-              {selectedLocation ? (
-                <>
-                  <Text style={styles.locationAddress} numberOfLines={2}>
-                    {selectedLocation.address}
-                  </Text>
-                  <Text style={styles.locationCoordinates}>
-                    {selectedLocation.coordinates.lat.toFixed(6)},{' '}
-                    {selectedLocation.coordinates.lng.toFixed(6)}
-                  </Text>
-                </>
-              ) : (
-                <Text style={styles.noLocationText}>
-                  Drag the map to select a location
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.mapActions}>
-              <TouchableOpacity
-                style={[styles.mapButton, styles.cancelMapButton]}
-                onPress={() => setShowMapModal(false)}
-                accessibilityLabel="Cancel map selection"
-                accessibilityHint="Closes the map without saving the selected location"
-              >
-                <Text style={styles.cancelMapButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              {!isMapDragging && (
-                <TouchableOpacity
-                  style={[
-                    styles.mapButton,
-                    styles.confirmMapButton,
-                    (!selectedLocation || isCalculatingRoute) &&
-                      styles.disabledButton,
-                  ]}
-                  onPress={handleConfirmMapLocation}
-                  disabled={!selectedLocation || isCalculatingRoute}
-                  accessibilityLabel="Confirm selected location"
-                  accessibilityHint="Saves the currently selected location and closes the map"
-                >
-                  {isCalculatingRoute ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.confirmMapButtonText}>
-                      Select Location
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
+          <PickupModaldebug
+            onLocationSelected={handleLocationSelected}
+            initialRegion={
+              userLocation
+                ? {
+                    latitude: userLocation.latitude,
+                    longitude: userLocation.longitude,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
+                  }
+                : undefined
+            }
+          />
         </View>
       </Modal>
     ),
-    [
-      showMapModal,
-      mapRegion,
-      selectedLocation,
-      userLocation,
-      mapType,
-      routeData,
-      showRouteInfo,
-      isCalculatingRoute,
-      isMapDragging,
-      handleMapRegionChange,
-      handleMapRegionChangeComplete,
-      handleMapDragStart,
-      handleMapDragEnd,
-      handleRecenterMap,
-      handleToggleMapType,
-      handleConfirmMapLocation,
-      CenterSelectionPin,
-      initializeCenterPin,
-    ],
+    [showMapModal, handleLocationSelected, userLocation],
   );
 
   return (
     <BottomModal
       ref={bottomModalRef}
-      customHeight="80%"
+      customHeight="85%"
       backdropOpacity={0.8}
       animationDuration={500}
       swipeThreshold={50}
@@ -882,187 +423,561 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
           </TouchableOpacity>
         </View>
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardAvoidingView}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollViewContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            bounces={true}
-            alwaysBounceVertical={false}
-          >
-            <View style={styles.sectionContainer}>
-              <View style={styles.sectionHeader}>
-                <View style={tw`w-2 h-6 bg-blue-500 mr-3 rounded-full`} />
-                <Text style={styles.sectionTitle}>Pickup For</Text>
-              </View>
+        <View style={styles.sectionContainer}>
+          {/* <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}></Text>
+              </View> */}
 
-              <View style={tw`flex-row items-center`}>
-                <View style={tw`flex-row items-center mr-6`}>
-                  <RadioButton
-                    value="self"
-                    status={pickupType === 'self' ? 'checked' : 'unchecked'}
-                    onPress={() => {
-                      setPickupType('self');
-                      setFieldValue('ContactPerson', '');
-                      setFieldValue('ContactNumber', '');
-                    }}
-                    color={tw.color('blue-500')}
-                  />
-                  <Text style={styles.radioLabel}>Self</Text>
-                </View>
+          {/* 🚚 Pickup Type Section */}
+          <View style={tw`flex-row items-center`}>
+            {/* Self Option */}
+            <View style={tw`flex-row items-center`}>
+              <RadioButton
+                value="Registered"
+                status={
+                  values.PickupType == 'Registered' ? 'checked' : 'unchecked'
+                }
+                onPress={() => {
+                  setFieldValue('PickupType', 'Registered');
 
-                <View style={tw`flex-row items-center`}>
-                  <RadioButton
-                    value="other"
-                    status={pickupType === 'other' ? 'checked' : 'unchecked'}
-                    onPress={() => setPickupType('other')}
-                    color={tw.color('blue-500')}
-                  />
-                  <Text style={styles.radioLabel}>Other</Text>
-                </View>
-              </View>
+                  if (GoogleAddress) {
+                    setFieldValue('origin', {
+                      address: GoogleAddress?.fullAddress,
+                      coordinates: {
+                        lat: GoogleAddress?.latitude,
+                        lng: GoogleAddress?.longitude,
+                      },
+                      components: GoogleAddress?.addressComponents,
+                    });
+                  }
+                }}
+                color={tw.color('blue-500')}
+              />
+              <Text style={styles.radioLabel}>Registered</Text>
             </View>
 
-            <View style={styles.sectionContainer}>
-              <View style={styles.sectionHeader}>
-                <View style={tw`w-2 h-6 bg-blue-500 mr-3 rounded-full`} />
-                <Text style={styles.sectionTitle}>Pickup Location</Text>
-              </View>
+            <View style={tw`flex-row items-center mr-6`}>
+              <RadioButton
+                value="self"
+                status={values.PickupType === 'self' ? 'checked' : 'unchecked'}
+                onPress={() => {
+                  setFieldValue('PickupType', 'self');
 
-              <SelectList
-                data={originPlaces?.suggestions}
-                displayKey="value"
-                value={values?.origin?.address}
-                save="object"
-                setSelected={handleOriginSelect}
-                placeholder="Search pickup location..."
-                search={true}
-                onSearchChange={originPlaces.handleInputChange}
-                searchValue={originPlaces.inputValue}
-                onClear={() => {
-                  setFieldValue('origin', {
-                    address: '',
-                    components: {
-                      dist: '',
-                      pincode: '',
-                      place: '',
-                      state: '',
-                      tal: '',
-                    },
-                    coordinates: {
-                      lat: 0,
-                      lng: 0,
-                    },
-                  });
+                  // Clear unwanted fields
+                  setFieldValue('ContactPerson', '');
+                  setFieldValue('ContactNumber', '');
+                  setFieldValue('Origin_1', '');
+                  setFieldValue('Origin_2', '');
+
+                  // 👉 Set current location from Redux (NOT GPS)
+                  if (currentlocation) {
+                    setFieldValue('origin', {
+                      address: currentlocation?.address,
+                      coordinates: {
+                        lat: currentlocation?.latitude,
+                        lng: currentlocation?.longitude,
+                      },
+                      components: currentlocation?.components ?? {}, // optional
+                    });
+                  }
                 }}
-                inputStyles={tw`border-gray-200`}
+                color={tw.color('blue-500')}
               />
 
-              <View style={styles.actionButtonsContainer}>
-                {actionButtons.map(button => (
-                  <ActionButton
-                    key={button.key}
-                    icon={button.icon}
-                    text={button.text}
-                    onPress={button.onPress}
-                    color={button.color || ''}
-                    style={[
-                      styles.actionButton,
-                      tw`border border-${button.borderColor}`,
-                    ]}
-                  />
-                ))}
-              </View>
+              <Text style={styles.radioLabel}>Current</Text>
             </View>
 
+            {/* Other Option + History */}
+            <View style={tw`flex-row items-center`}>
+              <RadioButton
+                value="other"
+                status={values.PickupType == 'other' ? 'checked' : 'unchecked'}
+                onPress={() => {
+                  if (values.PickupType !== 'other') {
+                    // 🧹 Clear self fields when switching to other
+                    setFieldValue('Origin_1', '');
+                    setFieldValue('Origin_2', '');
+                    setFieldValue('ContactPerson', '');
+                    setFieldValue('ContactNumber', '');
+                    setFieldValue('origin', {
+                      address: '',
+                      coordinates: {},
+                      components: {},
+                    });
+                  }
+                  setFieldValue('PickupType', 'other');
+                }}
+                color={tw.color('blue-500')}
+              />
+              <Text style={styles.radioLabel}>Other</Text>
+
+              {values.PickupType == 'other' && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setActiveOriginButton('history');
+                    setShowHistoryModal(true);
+                  }}
+                  style={tw`ml-3 flex-row items-center bg-gray-100 px-3 py-1 rounded-full border border-gray-300`}
+                >
+                  <FontAwesome
+                    name="history"
+                    size={16}
+                    color={tw.color('gray-700')}
+                  />
+                  <Text style={tw`ml-1 text-gray-700 text-sm font-medium`}>
+                    History
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.sectionContainer}>
+          {/* <View style={styles.sectionHeader}>
+                <View style={tw`w-2 h-3 bg-blue-500 mr-3 rounded-full`} />
+                <Text style={styles.sectionTitle}>Pickup Location</Text>
+              </View> */}
+
+          {isRegisteredPickupType && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Contact Name *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  fieldErrors.ContactPerson && {
+                    borderColor: 'red',
+                    borderWidth: 1,
+                  },
+                ]}
+                placeholder="Enter contact person name"
+                value={values.ContactPerson}
+                textTransform="capitalize"
+                onChangeText={text => {
+                  setFieldValue('ContactPerson', text);
+                  if (fieldErrors.ContactPerson) {
+                    setFieldErrors(prev => ({
+                      ...prev,
+                      ContactPerson: '',
+                    }));
+                  }
+                }}
+              />
+              {fieldErrors.ContactPerson && (
+                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                  {fieldErrors.ContactPerson}
+                </Text>
+              )}
+              <Text style={styles.label}>Contact Number *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  fieldErrors.ContactNumber && {
+                    borderColor: 'red',
+                    borderWidth: 1,
+                  },
+                ]}
+                placeholder="Enter contact number"
+                value={values.ContactNumber}
+                maxLength={10}
+                onChangeText={text => {
+                  setFieldValue('ContactNumber', text);
+                  if (fieldErrors.ContactNumber) {
+                    setFieldErrors(prev => ({
+                      ...prev,
+                      ContactNumber: '',
+                    }));
+                  }
+                }}
+                keyboardType="phone-pad"
+              />
+              {fieldErrors.ContactNumber && (
+                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                  {fieldErrors.ContactNumber}
+                </Text>
+              )}
+              <Text style={styles.label}>Registered Pickup Address *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  fieldErrors.origin && { borderColor: 'red', borderWidth: 1 },
+                ]}
+                placeholder="Enter registered pickup address"
+                value={values?.origin?.address || ''}
+                textTransform="capitalize"
+                onChangeText={text => {
+                  setFieldValue('origin', {
+                    ...values.origin,
+                    address: text,
+                  });
+
+                  if (fieldErrors.origin) {
+                    setFieldErrors(prev => ({ ...prev, origin: '' }));
+                  }
+                }}
+              />
+
+              {fieldErrors.origin && (
+                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                  {fieldErrors.origin}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {isOtherPickupType && (
             <View style={styles.sectionContainer}>
-              <View style={styles.sectionHeader}>
-                <View style={tw`w-2 h-6 bg-green-500 mr-3 rounded-full`} />
-                <Text style={styles.sectionTitle}>Address Details</Text>
+              {/* <View style={styles.sectionHeader}>
+                  <View style={tw`w-2 h-6 bg-orange-500 mr-3 rounded-full`} />
+                  <Text style={styles.sectionTitle}>Contact Details *</Text>
+                </View> */}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Contact Person *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    fieldErrors.ContactPerson && {
+                      borderColor: 'red',
+                      borderWidth: 1,
+                    },
+                  ]}
+                  placeholder="Enter contact person name"
+                  value={values.ContactPerson}
+                  textTransform="capitalize"
+                  onChangeText={text => {
+                    setFieldValue('ContactPerson', text);
+                    if (fieldErrors.ContactPerson) {
+                      setFieldErrors(prev => ({
+                        ...prev,
+                        ContactPerson: '',
+                      }));
+                    }
+                  }}
+                />
+                {fieldErrors.ContactPerson && (
+                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                    {fieldErrors.ContactPerson}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>
-                  Plot No/ Unit No/ Building / Flat / Company
-                </Text>
+                <Text style={styles.label}>Contact Number *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    fieldErrors.ContactNumber && {
+                      borderColor: 'red',
+                      borderWidth: 1,
+                    },
+                  ]}
+                  placeholder="Enter contact number"
+                  value={values.ContactNumber}
+                  maxLength={10}
+                  onChangeText={text => {
+                    setFieldValue('ContactNumber', text);
+                    if (fieldErrors.ContactNumber) {
+                      setFieldErrors(prev => ({
+                        ...prev,
+                        ContactNumber: '',
+                      }));
+                    }
+                  }}
+                  keyboardType="phone-pad"
+                />
+                {fieldErrors.ContactNumber && (
+                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                    {fieldErrors.ContactNumber}
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          {isselfPickupType && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Current Location (fetched)</Text>
+              <TextInput
+                style={[styles.input]}
+                placeholder="Current location"
+                value={values?.origin?.address || ''}
+                editable={false}
+              />
+              <Text style={styles.label}>Contact Name *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  fieldErrors.ContactPerson && {
+                    borderColor: 'red',
+                    borderWidth: 1,
+                  },
+                ]}
+                placeholder="Enter contact person name"
+                value={values.ContactPerson}
+                textTransform="capitalize"
+                onChangeText={text => {
+                  setFieldValue('ContactPerson', text);
+                  if (fieldErrors.ContactPerson) {
+                    setFieldErrors(prev => ({
+                      ...prev,
+                      ContactPerson: '',
+                    }));
+                  }
+                }}
+              />
+              {fieldErrors.ContactPerson && (
+                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                  {fieldErrors.ContactPerson}
+                </Text>
+              )}
+              <Text style={styles.label}>Contact Number *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  fieldErrors.ContactNumber && {
+                    borderColor: 'red',
+                    borderWidth: 1,
+                  },
+                ]}
+                placeholder="Enter contact number"
+                value={values.ContactNumber}
+                maxLength={10}
+                onChangeText={text => {
+                  setFieldValue('ContactNumber', text);
+                  if (fieldErrors.ContactNumber) {
+                    setFieldErrors(prev => ({
+                      ...prev,
+                      ContactNumber: '',
+                    }));
+                  }
+                }}
+                keyboardType="phone-pad"
+              />
+              {fieldErrors.ContactNumber && (
+                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                  {fieldErrors.ContactNumber}
+                </Text>
+              )}
+              {/* Manual fields visible for self */}
+              <Text style={[styles.label, { marginTop: 10 }]}>
+                Plot / Unit / Building *
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  fieldErrors.Origin_1 && {
+                    borderColor: 'red',
+                    borderWidth: 1,
+                  },
+                ]}
+                placeholder="Enter plot/unit number"
+                value={values.Origin_1}
+                onChangeText={text => setFieldValue('Origin_1', text)}
+              />
+
+              <Text style={styles.label}>Area / Street / Sector *</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  fieldErrors.Origin_2 && {
+                    borderColor: 'red',
+                    borderWidth: 1,
+                  },
+                ]}
+                placeholder="Enter area details"
+                value={values.Origin_2}
+                onChangeText={text => setFieldValue('Origin_2', text)}
+              />
+            </View>
+          )}
+          {isOtherPickupType && (
+            <>
+              <View style={styles.sectionContainer}>
+                <Text style={styles.label}>Plot / Unit / Building *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    fieldErrors.Origin_1 && {
+                      borderColor: 'red',
+                      borderWidth: 1,
+                    },
+                  ]}
                   placeholder="Enter plot/unit number"
                   value={values.Origin_1}
                   onChangeText={text => setFieldValue('Origin_1', text)}
                 />
-              </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Area/Street/Sector/Village</Text>
+                <Text style={styles.label}>Area / Street / Sector *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    fieldErrors.Origin_2 && {
+                      borderColor: 'red',
+                      borderWidth: 1,
+                    },
+                  ]}
                   placeholder="Enter area details"
                   value={values.Origin_2}
                   onChangeText={text => setFieldValue('Origin_2', text)}
                 />
+                <View style={tw`flex-row gap-3 mb-4`}>
+                  <View style={tw`flex-1`}>
+                    <Text style={styles.label}>Pincode *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter Pincode"
+                      value={values.Pincode}
+                      onChangeText={text => {
+                        handlePinchange(text);
+                        if (fieldErrors.Pincode) {
+                          setFieldErrors(prev => ({ ...prev, Pincode: '' }));
+                        }
+                      }}
+                      keyboardType="numeric"
+                      maxLength={6}
+                      error={!!fieldErrors.Pincode}
+                    />
+                    {fieldErrors.Pincode && (
+                      <Text style={{ color: 'red', fontSize: 12 }}>
+                        {fieldErrors.Pincode}
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={tw`flex-1`}>
+                    <Text style={styles.label}>State *</Text>
+                    <SelectList
+                      data={stateData?.data || []}
+                      displayKey="state"
+                      save="state"
+                      value={values.state}
+                      setSelected={value => {
+                        handleState(value);
+                        if (fieldErrors.state) {
+                          setFieldErrors(prev => ({ ...prev, state: '' }));
+                        }
+                      }}
+                      placeholder="Select State"
+                      onClear={() => setFieldValue('state', '')}
+                      inputStyles={tw`border-gray-200`}
+                      style={
+                        fieldErrors.state && {
+                          borderColor: 'red',
+                          borderWidth: 1,
+                        }
+                      }
+                    />
+                    {fieldErrors.state && (
+                      <Text style={{ color: 'red', fontSize: 12 }}>
+                        {fieldErrors.state}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Address Row 2 — District + Taluka */}
+                <View style={tw`flex-row gap-3 mb-4`}>
+                  <View style={tw`flex-1`}>
+                    <Text style={styles.label}>District / City *</Text>
+                    <SelectList
+                      data={availableDistricts}
+                      displayKey="region"
+                      save="region"
+                      value={values.District}
+                      setSelected={val => setFieldValue('District', val)}
+                      placeholder="Select District"
+                      onClear={() => setFieldValue('District', '')}
+                      disabled={!values.state}
+                      inputStyles={tw`border-gray-200`}
+                    />
+                  </View>
+
+                  <View style={tw`flex-1`}>
+                    <Text style={styles.label}>Taluka / Town</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter Taluka"
+                      value={values.Taluka}
+                      error={!!fieldErrors.Taluka}
+                      onChangeText={text => {
+                        setFieldValue('Taluka', text);
+                        if (fieldErrors.Taluka) {
+                          setFieldErrors(prev => ({ ...prev, Taluka: '' }));
+                        }
+                      }}
+                    />
+                    {fieldErrors.Taluka && (
+                      <Text style={{ color: 'red', fontSize: 12 }}>
+                        {fieldErrors.Taluka}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Google Search */}
+                <SelectList
+                  data={originPlaces?.suggestions}
+                  displayKey="value"
+                  value={
+                    originPlaces.inputValue || values?.origin?.address || ''
+                  }
+                  save="object"
+                  setSelected={handleOriginSelect}
+                  placeholder="Search pickup location..."
+                  search={true}
+                  onSearchChange={originPlaces.handleInputChange}
+                  searchValue={originPlaces.inputValue}
+                  inputStyles={[
+                    tw`border-gray-200`,
+                    fieldErrors.origin && {
+                      borderColor: 'red',
+                      borderWidth: 1,
+                    },
+                  ]}
+                />
+                <View style={styles.actionButtonsContainer}>
+                  {actionButtons.map(button => (
+                    <ActionButton
+                      key={button.key}
+                      icon={button.icon}
+                      text={button.text}
+                      onPress={button.onPress}
+                      color={button.color || ''}
+                      style={[
+                        styles.actionButton,
+                        tw`border border-${button.borderColor}`,
+                      ]}
+                    />
+                  ))}
+                </View>
               </View>
-            </View>
+            </>
+          )}
+        </View>
 
-            {isOtherPickupType && (
-              <View style={styles.sectionContainer}>
-                <View style={styles.sectionHeader}>
-                  <View style={tw`w-2 h-6 bg-orange-500 mr-3 rounded-full`} />
-                  <Text style={styles.sectionTitle}>Contact Details *</Text>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Contact Person *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter contact person name"
-                    value={values.ContactPerson}
-                    onChangeText={text => setFieldValue('ContactPerson', text)}
-                  />
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Contact Number *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter contact number"
-                    value={values.ContactNumber}
-                    onChangeText={text => setFieldValue('ContactNumber', text)}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              </View>
-            )}
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.cancelButton, tw`border border-gray-300`]}
-              onPress={handleModalClose}
-              accessibilityLabel="Cancel pickup selection"
-              accessibilityHint="Closes the modal without saving changes"
-            >
-              <Text style={[styles.cancelButtonText, tw`text-gray-700`]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.confirmButton, tw`bg-blue-600`]}
-              onPress={handleConfirm}
-              accessibilityLabel="Confirm pickup location"
-              accessibilityHint="Saves the selected pickup location and closes the modal"
-            >
-              <Text style={[styles.confirmButtonText, tw`text-white`]}>
-                Confirm Pickup
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+        <View style={styles.modalFooter}>
+          <TouchableOpacity
+            style={[styles.cancelButton, tw`border border-gray-300`]}
+            onPress={handleModalClose}
+            accessibilityLabel="Cancel pickup selection"
+            accessibilityHint="Closes the modal without saving changes"
+          >
+            <Text style={[styles.cancelButtonText, tw`text-gray-700`]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.confirmButton, tw`bg-blue-600`]}
+            onPress={handleConfirm}
+            accessibilityLabel="Confirm pickup location"
+            accessibilityHint="Saves the selected pickup location and closes the modal"
+          >
+            <Text style={[styles.confirmButtonText, tw`text-white`]}>
+              Confirm Pickup
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <LocationHistoryModal
@@ -1073,6 +988,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         }}
         onSelectLocation={handleHistoryLocationSelect}
         locations={currentData?.Address || []}
+        type="origin"
       />
 
       {MapSelectionModal}
@@ -1154,28 +1070,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sectionContainer: {
-    marginBottom: 24,
+    marginTop: 5,
+    marginBottom: 0,
     backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
+    padding: 10,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    // shadowColor: '#000',
+    // shadowOffset: {
+    //   width: 0,
+    //   height: 1,
+    // },
+    // shadowOpacity: 0.1,
+    // shadowRadius: 2,
+    // elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 0,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#374151',
   },
@@ -1186,22 +1103,24 @@ const styles = StyleSheet.create({
   actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    margin: 5,
     gap: 12,
   },
   actionButton: {
     flex: 1,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 5,
   },
   label: {
-    marginBottom: 6,
+    marginBottom: 0,
     fontWeight: '500',
     color: '#374151',
     fontSize: 14,
   },
   input: {
+    height: 45,
+    color: 'black',
     borderWidth: 1,
     borderColor: '#d1d5db',
     borderRadius: 8,
@@ -1228,212 +1147,6 @@ const styles = StyleSheet.create({
   },
   mapCloseButton: {
     padding: 4,
-  },
-  mapWrapper: {
-    flex: 1,
-    position: 'relative',
-  },
-  map: {
-    flex: 1,
-    width: screenWidth,
-  },
-  centerPinContainer: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -20,
-    marginTop: -40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-  centerPin: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1001,
-  },
-  centerPinBase: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#EF4444',
-    opacity: 0.2,
-    position: 'absolute',
-    top: 10,
-  },
-  pinPulse: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 20,
-    backgroundColor: '#EF4444',
-    opacity: 0.3,
-    transform: [{ scale: 1.5 }],
-  },
-  instructionsContainer: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  mapControls: {
-    position: 'absolute',
-    top: 80,
-    right: 16,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  mapControlButton: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  nudgeControls: {
-    position: 'absolute',
-    top: 160,
-    right: 16,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    flexDirection: 'column',
-  },
-  nudgeButton: {
-    padding: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  selectedMarker: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  routeInfoContainer: {
-    position: 'absolute',
-    top: 80,
-    left: 16,
-    right: 80,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  routeInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  routeInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  routeInfoText: {
-    marginLeft: 4,
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  mapFooter: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  selectedLocationInfo: {
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-  },
-  locationAddress: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 4,
-  },
-  locationCoordinates: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  noLocationText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  mapActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  mapButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 4,
-  },
-  cancelMapButton: {
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  confirmMapButton: {
-    backgroundColor: '#3B82F6',
-  },
-  disabledButton: {
-    backgroundColor: '#9ca3af',
-  },
-  cancelMapButtonText: {
-    color: '#374151',
-    fontWeight: '600',
-  },
-  confirmMapButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1002,
-  },
-  loadingText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
   },
 });
 

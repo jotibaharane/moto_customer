@@ -7,6 +7,27 @@ export interface CustomerDetails {
   ContactNo: string;
   MPIN_Flag: string;
 }
+export interface AddressComponents {
+  place: string;
+  dist: string;
+  tal: string;
+  state: string;
+  pincode: string;
+}
+
+export interface RegisteredAddress {
+  id: string;
+  fullAddress: string;
+  latitude: number;
+  longitude: number;
+  addressComponents: {
+    place: string;
+    dist: string;
+    tal: string;
+    state: string;
+    pincode: string;
+  };
+}
 
 export interface AuthState {
   isOnboarded: boolean;
@@ -14,6 +35,7 @@ export interface AuthState {
   isAuthenticated: boolean;
   mpinSet: boolean;
   profileCompleted: boolean;
+  RegisteredAddress: RegisteredAddress | null; // ← updated
   mpin: string | null;
   token: string | null;
   loading: boolean;

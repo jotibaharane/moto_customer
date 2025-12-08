@@ -1,10 +1,11 @@
 import {
   useGetActiveTripsMutation,
-  useGetCustomerPostsMutation,
-  useGetProcessTripsMutation,
+  useGetCustomerPostsQuery,
+  useGetProcessTripsQuery,
 } from '@api/hooks_api';
 import { RootState } from '@store/index';
 import {
+  addOrUpdateDriver,
   resetMap,
   selectDriver,
   setCustomerMap,
@@ -117,10 +118,17 @@ export const FloatingActionButton = () => {
   );
 
   const [getActiveTrips, { data: activeTrips }] = useGetActiveTripsMutation();
-  const [getCustomerPosts, { data: customerPosts }] =
-    useGetCustomerPostsMutation();
-  const [getProcessTrips, { data: processTrips }] =
-    useGetProcessTripsMutation();
+  const { data: customerPosts } = useGetCustomerPostsQuery(
+    { CustomerID },
+    { skip: !CustomerID },
+  );
+  console.log('Customer Posts:', activeTrips);
+  console.log({ customerPosts });
+  const {
+    data: processTrips,
+    isFetching,
+    refetch,
+  } = useGetProcessTripsQuery({ CustomerID });
   console.log({ customerPosts });
   const activeTripsModalRef = useRef<ProcessTripsModalRef>(null);
   const processTripsModalRef = useRef<ProcessTripsModalRef>(null);
@@ -146,7 +154,8 @@ export const FloatingActionButton = () => {
     console.log({ id: button?.id });
     if (button?.id === 'load-posts') {
       dispatch(setCustomerMap('Load'));
-      dispatch(selectDriver(null));
+
+      dispatch(addOrUpdateDriver([]));
       dispatch(setPostId(customerPosts?.data?.[0]?.LoadPostID || ''));
       dispatch(
         setOrigin({
@@ -155,53 +164,59 @@ export const FloatingActionButton = () => {
         }),
       );
       dispatch(setOriginAddress(customerPosts?.data?.[0]?.Origin || ''));
-      dispatch(setDestinationAddress(''));
+      dispatch(
+        setDestinationAddress(customerPosts?.data?.[0]?.Destination || ''),
+      );
       dispatch(setDestination(null));
+
       modalRef.current?.open();
     } else if (button?.id === 'active-trips') {
+      dispatch(addOrUpdateDriver([]));
       dispatch(setCustomerMap('Active'));
-      dispatch(setPostId(activeTrips?.data?.[0]?.Customer_LoadPostID));
+      dispatch(setPostId(activeTrips?.data?.[0]?.LoadPostID || ''));
       dispatch(
         setOrigin({
-          latitude: activeTrips?.data?.[0]?.Customer_Origin_Lat,
-          longitude: activeTrips?.data?.[0]?.Customer_Origin_Lng,
+          latitude: activeTrips?.data?.[0]?.Origin_Lat || 0,
+          longitude: activeTrips?.data?.[0]?.Origin_Lng || 0,
         }),
       );
-      dispatch(setOriginAddress(activeTrips?.data?.[0]?.ActiveTripID));
+      dispatch(setOriginAddress(activeTrips?.data?.[0]?.Origin || ''));
       dispatch(
-        setDestinationAddress(activeTrips?.data?.[0]?.Customer_Destination),
+        setDestinationAddress(activeTrips?.data?.[0]?.Destination || ''),
       );
       dispatch(
         selectDriver({
-          latitude: activeTrips?.data?.[0]?.Driver_Lat,
-          longitude: activeTrips?.data?.[0]?.Driver_Lng,
+          latitude: activeTrips?.data?.[0]?.DriverLat || 0,
+          longitude: activeTrips?.data?.[0]?.DriverLng || 0,
           available: true,
-          driver: activeTrips?.data?.[0]?.DriverID,
-          id: activeTrips?.data?.[0]?.DriverID,
-          licensePlate: activeTrips?.data?.[0]?.DriverID,
+          driver: activeTrips?.data?.[0]?.DriverID || '',
+          id: activeTrips?.data?.[0]?.DriverID || '',
+          licensePlate: activeTrips?.data?.[0]?.VehicleNumber || '',
           type: 'medium',
           rotation: 0,
         }),
       );
       dispatch(
         setDestination({
-          latitude: activeTrips?.data?.[0]?.Customer_Destination_Lat,
-          longitude: activeTrips?.data?.[0]?.Customer_Destination_Lng,
+          latitude: activeTrips?.data?.[0]?.Destination_Lat || 0,
+          longitude: activeTrips?.data?.[0]?.Destination_Lng || 0,
         }),
       );
+
       activeTripsModalRef.current?.open();
     } else if (button?.id === 'process-trips') {
+      dispatch(addOrUpdateDriver([]));
       dispatch(setCustomerMap('Process'));
-      dispatch(setPostId(processTrips?.data?.[0]?.LoadPostID));
+      dispatch(setPostId(processTrips?.data?.[0]?.LoadPostID || ''));
       dispatch(
         setOrigin({
-          latitude: processTrips?.data?.[0]?.Origin_Lat,
-          longitude: processTrips?.data?.[0]?.Origin_Lng,
+          latitude: processTrips?.data?.[0]?.Origin_Lat || 0,
+          longitude: processTrips?.data?.[0]?.Origin_Lng || 0,
         }),
       );
-      dispatch(setOriginAddress(processTrips?.data?.[0]?.Origin_City));
+      dispatch(setOriginAddress(processTrips?.data?.[0]?.Origin || ''));
       dispatch(
-        setDestinationAddress(processTrips?.data?.[0]?.Destination_City),
+        setDestinationAddress(processTrips?.data?.[0]?.Destination || ''),
       );
       if (
         processTrips?.data?.[0]?.DriverLat &&
@@ -209,12 +224,12 @@ export const FloatingActionButton = () => {
       ) {
         dispatch(
           selectDriver({
-            latitude: processTrips?.data?.[0]?.DriverLat,
-            longitude: processTrips?.data?.[0]?.DriverLng,
+            latitude: processTrips?.data?.[0].DriverLat,
+            longitude: processTrips?.data?.[0].DriverLng,
             available: true,
-            driver: processTrips?.data?.[0]?.DriverID || '',
-            id: processTrips?.data?.[0]?.DriverID || '',
-            licensePlate: processTrips?.data?.[0]?.DriverID || '',
+            driver: processTrips?.data?.[0].DriverID || '',
+            id: processTrips?.data?.[0].DriverID || '',
+            licensePlate: processTrips?.data?.[0].DriverID || '',
             type: 'medium',
             rotation: 0,
           }),
@@ -222,10 +237,11 @@ export const FloatingActionButton = () => {
       }
       dispatch(
         setDestination({
-          latitude: processTrips?.data?.[0]?.Destination_Lat,
-          longitude: processTrips?.data?.[0]?.Destination_Lng,
+          latitude: processTrips?.data?.[0]?.Destination_Lat || 0,
+          longitude: processTrips?.data?.[0]?.Destination_Lng || 0,
         }),
       );
+
       processTripsModalRef.current?.open();
     }
   };
@@ -236,9 +252,7 @@ export const FloatingActionButton = () => {
   });
 
   useLayoutEffect(() => {
-    getCustomerPosts({ CustomerID });
     getActiveTrips({ CustomerID });
-    getProcessTrips({ CustomerID });
   }, []);
 
   return (

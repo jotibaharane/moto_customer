@@ -79,22 +79,33 @@ export interface DistrictRequest {
 }
 
 // customer register
-export interface RegisterRequest {
+export type RegisterRequest = {
   CompanyType: string;
   CompanyName: string;
   ContactPerson: string;
+  ContactNo: string;
   EmailID: string;
   Address1: string;
   Address2: string;
   Pincode: string;
   State: string;
   Destination: string;
-  AadharNo: string;
-  GstNo: string;
-  PancardNo: string;
   City: string;
-  ContactNo?: string | number;
-}
+  RegisteredAddress?: {
+    id: string;
+    fullAddress: string;
+    latitude: number;
+    longitude: number;
+    addressComponents: {
+      place: string;
+      dist: string;
+      tal: string;
+      state: string;
+      pincode: string;
+    };
+  };
+};
+
 export interface CustomerDetails {
   CustomerID: string;
   CompanyName: string;
@@ -322,11 +333,16 @@ export interface Location {
 
 export interface ShipmentData {
   BodyType: string;
+  PickupType: string;
   CargoContent: string;
   CargoPackageType: string;
+  registeredAddress?: string;
+  cargo_type: string;
   CustomerID: string;
   destination: Location;
   ConsigneeName: string;
+  ContactNumber: string;
+  ExpectedAvailableDate?: string;
   Pincode: string;
   Taluka: string;
   Destination_1: string;
@@ -334,14 +350,16 @@ export interface ShipmentData {
   District: string;
   state: string;
   ContactPerson: string;
-  ContactNumber: string;
+  ConsigneeContactNumber: string;
   Origin_1: string;
   Origin_2: string;
   DhalaLength: string;
+  Approximate_weight: string;
   ExpectedAvailableTime: string;
   origin: Location;
   VehicleType: string;
   Weight: string;
+  // pickupType: string;
 }
 
 // body type

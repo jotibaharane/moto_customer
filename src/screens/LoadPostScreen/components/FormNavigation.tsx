@@ -35,6 +35,7 @@ const FormNavigation: React.FC<FormNavigationProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.buttonContainer}>
+        {/* Back button */}
         {!isFirstStep && (
           <TouchableOpacity
             style={[styles.button, styles.backButton]}
@@ -45,14 +46,15 @@ const FormNavigation: React.FC<FormNavigationProps> = ({
           </TouchableOpacity>
         )}
 
+        {/* ✅ Next / Submit button */}
         <TouchableOpacity
           style={[
             styles.button,
             styles.nextButton,
-            (!isValid || isSubmitting) && styles.nextButtonDisabled,
+            isSubmitting && styles.nextButtonDisabled, // disable only while submitting
           ]}
           onPress={isLastStep ? onSubmit : onNext}
-          disabled={!isValid || isSubmitting}
+          disabled={isSubmitting} // ❌ removed !isValid check
         >
           {isSubmitting ? (
             <ActivityIndicator color="white" />
@@ -64,25 +66,27 @@ const FormNavigation: React.FC<FormNavigationProps> = ({
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.stepIndicator}>
+      {/* <Text style={styles.stepIndicator}>
         Step {currentStepIndex} of {totalSteps}
-      </Text>
+      </Text> */}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
     backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#e9ecef',
+    padding: 0,
+    margin: 0,
   },
   buttonContainer: {
     flexDirection: 'row',
-    // justifyContent: isFirstStep ? 'flex-end' : 'space-between',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    margin: 0,
+    // paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   button: {
     paddingVertical: 12,
@@ -109,11 +113,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     fontSize: 16,
-  },
-  stepIndicator: {
-    textAlign: 'center',
-    color: '#6c757d',
-    fontSize: 14,
   },
 });
 

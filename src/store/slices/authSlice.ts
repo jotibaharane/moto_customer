@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { AuthState, CustomerDetails } from './authSliceType';
+import { AuthState, CustomerDetails, RegisteredAddress } from './authSliceType';
+import { RegisterRequest } from '@api/api.type';
 
 // --- Initial State ---
 const initialState: AuthState = {
@@ -8,6 +9,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   mpinSet: false,
   profileCompleted: false,
+  RegisteredAddress: null,
   mpin: null,
   token: null,
   loading: false,
@@ -32,6 +34,12 @@ const authSlice = createSlice({
     setMpin(state, action: PayloadAction<string>) {
       state.mpin = action.payload;
       state.mpinSet = true;
+    },
+    setRegisteredAddress(
+      state,
+      action: PayloadAction<RegisterRequest['RegisteredAddress']>,
+    ) {
+      state.RegisteredAddress = action.payload;
     },
     setCustomerDetails(state, action: PayloadAction<CustomerDetails>) {
       state.customerDetails = action.payload;
@@ -77,5 +85,6 @@ export const {
   resetAttempts,
   logout,
   resetAuthState,
+  setRegisteredAddress,
 } = authSlice.actions;
 export default authSlice.reducer;

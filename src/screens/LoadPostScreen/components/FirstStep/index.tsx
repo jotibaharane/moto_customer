@@ -6,8 +6,24 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import tw from '@utils/tw';
 import { useFormikContext } from 'formik';
-import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DropModal, { DropModalRef } from '../DropModal';
 import PickupModal, { PickupModalRef } from '../PickupModal';
@@ -23,8 +39,10 @@ const FirstStep: React.FC = () => {
   const { values, errors, setFieldValue, touched } =
     useFormikContext<ShipmentData>();
 
+  console.log(values, errors, touched);
+
   const [getTruck, { data: truckTypesData }] = useGetTruckTypeMutation();
-  const { data: ApproximateWeight, refetch } = useGetAproximateWeightQuery(
+  const { data: ApproximateWeight } = useGetAproximateWeightQuery(
     { vehicleType: values?.VehicleType },
     { skip: !values?.VehicleType },
   );
@@ -33,10 +51,10 @@ const FirstStep: React.FC = () => {
     getTruck();
   }, [navigation]);
 
-  // truck type
+  // Truck type
   const truckTypes =
     truckTypesData?.data?.map((truck: any) => ({
-      id: truck.VehicleType.toLowerCase().replace(' ', '-'),
+      id: truck?.VehicleType?.toLowerCase()?.replace(' ', '-'),
       label: truck.VehicleType,
       image: { uri: truck?.img },
       description: truck.WeightRange,
@@ -51,14 +69,10 @@ const FirstStep: React.FC = () => {
     [truckTypesData, values.VehicleType],
   );
 
-  const handleOpenVehicleModal = useCallback(() => {
-    vehicleModalRef.current?.open();
-  }, []);
-
   // Weight type
   const weightTypes =
     ApproximateWeight?.data?.map((weight: any) => ({
-      id: weight?.WeightRange?.toLowerCase().replace(' ', '-'),
+      id: weight?.WeightRange?.toLowerCase()?.replace(' ', '-'),
       label: weight?.WeightRange,
       image: { uri: weight?.img },
       color: '#3B82F6',
@@ -72,21 +86,24 @@ const FirstStep: React.FC = () => {
     [ApproximateWeight, values.Weight],
   );
 
-  const handleOpenWeightModal = useCallback(() => {
-    weightModalRef.current?.open();
-  }, []);
+  const handleOpenVehicleModal = useCallback(
+    () => vehicleModalRef.current?.open(),
+    [],
+  );
+  const handleOpenWeightModal = useCallback(
+    () => weightModalRef.current?.open(),
+    [],
+  );
+  const handleOpenPickupModal = useCallback(
+    () => pickupModalRef.current?.open(),
+    [],
+  );
 
-  // Handle pickup modal open
-  const handleOpenPickupModal = useCallback(() => {
-    pickupModalRef.current?.open();
-  }, []);
+  const handleOpenDropModal = useCallback(
+    () => dropModalRef.current?.open(),
+    [],
+  );
 
-  // Handle drop modal open
-  const handleOpenDropModal = useCallback(() => {
-    dropModalRef.current?.open();
-  }, []);
-
-  // Compact address display component
   const CompactAddressDisplay = ({
     type,
     address,
@@ -95,6 +112,7 @@ const FirstStep: React.FC = () => {
     contactPerson,
     contactNumber,
     consigneeName,
+    registeredAddress,
     pincode,
     state,
     district,
@@ -107,6 +125,7 @@ const FirstStep: React.FC = () => {
     contactPerson?: string;
     contactNumber?: string;
     consigneeName?: string;
+    registeredAddress?: string;
     pincode?: string;
     state?: string;
     district?: string;
@@ -131,34 +150,33 @@ const FirstStep: React.FC = () => {
     return (
       <View style={tw`flex-row justify-between items-start`}>
         <View style={tw`flex-1 mr-2`}>
-          <Text style={tw`text-sm text-gray-800 font-medium`} numberOfLines={1}>
-            {address}
-          </Text>
-
-          {/* Compact address lines */}
-          {(line1 || line2) && (
-            <Text style={tw`text-xs text-gray-600 mt-1`} numberOfLines={2}>
-              {[line1, line2].filter(Boolean).join(', ')}
-            </Text>
-          )}
-
-          {/* Contact info - show only if exists */}
           {(contactPerson || contactNumber) && (
-            <Text style={tw`text-xs text-gray-500 mt-1`} numberOfLines={1}>
-              {contactPerson && `Contact: ${contactPerson}`}
+            <Text
+              style={tw`text-sm text-gray-800 font-medium`}
+              numberOfLines={1}
+            >
+              {contactPerson && ` ${contactPerson}`}
               {contactPerson && contactNumber && ' • '}
               {contactNumber}
             </Text>
           )}
+          {(line1 || line2) && (
+            <Text
+              style={tw`text-sm text-gray-800 font-medium`}
+              numberOfLines={2}
+            >
+              {[line1, line2].filter(Boolean).join(', ')}
+            </Text>
+          )}
 
-          {/* Delivery specific fields */}
+          <Text style={tw`text-sm text-gray-800 font-medium`} numberOfLines={3}>
+            {registeredAddress} {address}
+          </Text>
           {consigneeName && (
             <Text style={tw`text-xs text-gray-500 mt-1`} numberOfLines={1}>
               Consignee: {consigneeName}
             </Text>
           )}
-
-          {/* Location details - compact format */}
           {(pincode || state || district || taluka) && (
             <Text style={tw`text-xs text-gray-500 mt-1`} numberOfLines={2}>
               {[pincode && `Pincode: ${pincode}`, state, district, taluka]
@@ -172,216 +190,327 @@ const FirstStep: React.FC = () => {
     );
   };
 
+  // Determine border colors based on errors + touched
+  const pickupBorderColor =
+    touched.origin && errors.origin ? '#ef4444' : '#d1d5db';
+  const deliveryBorderColor =
+    touched.destination && errors.destination ? '#ef4444' : '#d1d5db';
+  const vehicleBorderColor =
+    touched.VehicleType && errors.VehicleType
+      ? '#ef4444'
+      : values.VehicleType
+      ? '#EF476F'
+      : '#d1d5db';
+  const weightBorderColor =
+    touched.Weight && errors.Weight
+      ? '#ef4444'
+      : values.Weight
+      ? '#3B82F6'
+      : '#d1d5db';
+
   return (
-    <View style={styles.compactContainer}>
-      {/* Pickup Location Card - Compact */}
-      <View
-        style={tw`mb-4 bg-white p-4 rounded-xl border border-gray-100 shadow-xs`}
+    <KeyboardAvoidingView
+      style={styles.compactContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+        nestedScrollEnabled={true}
       >
-        <View style={tw`flex-row items-center mb-3`}>
-          <View style={tw`w-2 h-4 bg-blue-500 mr-2 rounded-full`} />
-          <Text style={tw`text-base font-bold text-gray-800`}>
-            Pickup Location
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={tw`p-3 border border-dashed border-gray-300 rounded-lg`}
-          onPress={handleOpenPickupModal}
-          activeOpacity={0.7}
+        {/* Pickup */}
+        <View
+          style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
         >
-          <CompactAddressDisplay
-            type="pickup"
-            address={values.origin?.address}
-            line1={values.Origin_1}
-            line2={values.Origin_2}
-            contactPerson={values.ContactPerson}
-            contactNumber={values.ContactNumber}
-          />
-        </TouchableOpacity>
+          <View style={tw`flex-row items-center mb-2`}>
+            <View style={tw`w-2 h-4 bg-blue-500 mr-2 rounded-full`} />
+            <Text style={tw`text-base font-bold text-gray-800`}>
+              Pickup Location
+            </Text>
+          </View>
 
-        {errors.origin && touched.origin && (
-          <Text style={styles.errorText}>{errors.origin as string}</Text>
-        )}
-      </View>
+          <TouchableOpacity
+            style={[
+              tw`p-3 border-2 border-dashed rounded-lg`,
+              { borderColor: pickupBorderColor },
+            ]}
+            onPress={handleOpenPickupModal}
+            activeOpacity={0.7}
+          >
+            <CompactAddressDisplay
+              type="pickup"
+              address={values.origin?.address}
+              line1={values.Origin_1}
+              line2={values.Origin_2}
+              contactPerson={values.ContactPerson}
+              contactNumber={values.ContactNumber}
+            />
+          </TouchableOpacity>
 
-      {/* Delivery Location Card - Compact */}
-      <View
-        style={tw`mb-4 bg-white p-4 rounded-xl border border-gray-100 shadow-xs`}
-      >
-        <View style={tw`flex-row items-center mb-3`}>
-          <View style={tw`w-2 h-4 bg-red-500 mr-2 rounded-full`} />
-          <Text style={tw`text-base font-bold text-gray-800`}>
-            Delivery Location
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={tw`p-3 border border-dashed border-gray-300 rounded-lg`}
-          onPress={handleOpenDropModal}
-          activeOpacity={0.7}
-        >
-          <CompactAddressDisplay
-            type="delivery"
-            address={values.destination?.address}
-            line1={values.Destination_1}
-            line2={values.Destination_2}
-            consigneeName={values.ConsigneeName}
-            pincode={values.Pincode}
-            state={values.state}
-            district={values.District}
-            taluka={values.Taluka}
-          />
-        </TouchableOpacity>
-
-        {errors.destination && touched.destination && (
-          <Text style={styles.errorText}>{errors.destination as string}</Text>
-        )}
-      </View>
-
-      {/* Vehicle Type - Compact */}
-      <View
-        style={tw`mb-4 bg-white p-4 rounded-xl border border-gray-100 shadow-xs`}
-      >
-        <View style={tw`flex-row items-center mb-3`}>
-          <View style={tw`w-2 h-4 bg-green-500 mr-2 rounded-full`} />
-          <Text style={tw`text-base font-bold text-gray-800`}>
-            Vehicle Type
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={tw`border-2 border-dashed ${
-            values?.VehicleType
-              ? `border-[#EF476F] bg-[#EF476F20]`
-              : 'border-gray-300 bg-gray-50'
-          } p-3 rounded-lg`}
-          onPress={handleOpenVehicleModal}
-          activeOpacity={0.7}
-        >
-          {values?.VehicleType ? (
-            <View style={tw`flex-row items-center gap-3`}>
-              <Image
-                source={
-                  selectedTruckType?.img
-                    ? { uri: selectedTruckType?.img }
-                    : undefined
-                }
-                style={tw`w-12 h-12`}
-                resizeMode="contain"
-              />
-              <View style={tw`flex-1`}>
-                <Text style={tw`text-sm font-bold text-gray-800`}>
-                  {selectedTruckType?.VehicleType}
-                </Text>
-                <Text style={tw`text-xs text-gray-600 mt-1`}>
-                  {selectedTruckType?.WeightRange}
-                </Text>
-              </View>
-              <Icon
-                name="keyboard-arrow-down"
-                size={20}
-                color={tw.color('gray-500')}
-              />
-            </View>
-          ) : (
-            <View style={tw`flex-row items-center gap-3`}>
-              <View style={tw`bg-gray-200 p-2 rounded-full`}>
-                <Icon name="directions-car" size={16} color="#6B7280" />
-              </View>
-              <Text style={tw`text-gray-500 text-sm flex-1`}>
-                Select vehicle type
-              </Text>
-              <Icon
-                name="keyboard-arrow-down"
-                size={20}
-                color={tw.color('gray-500')}
-              />
-            </View>
+          {errors.origin && touched.origin && (
+            <Text style={styles.errorText}>{errors.origin as string}</Text>
           )}
-        </TouchableOpacity>
-
-        {errors.VehicleType && touched.VehicleType && (
-          <Text style={styles.errorText}>
-            {(errors?.VehicleType as string) || ''}
-          </Text>
-        )}
-      </View>
-
-      {/* Weight Range - Compact */}
-      <View
-        style={tw`mb-4 bg-white p-4 rounded-xl border border-gray-100 shadow-xs`}
-      >
-        <View style={tw`flex-row items-center mb-3`}>
-          <View style={tw`w-2 h-4 bg-purple-500 mr-2 rounded-full`} />
-          <Text style={tw`text-base font-bold text-gray-800`}>
-            Weight Range
-          </Text>
         </View>
 
-        <TouchableOpacity
-          style={tw`border-2 border-dashed ${
-            values.Weight
-              ? `border-[#3B82F6] bg-[#3B82F620]`
-              : 'border-gray-300 bg-gray-50'
-          } p-3 rounded-lg`}
-          onPress={handleOpenWeightModal}
-          disabled={!values?.VehicleType}
-          activeOpacity={0.7}
+        {/* Delivery */}
+        <View
+          style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
         >
-          {values?.Weight ? (
-            <View style={tw`flex-row items-center gap-3`}>
-              <Image
-                source={
-                  selectedWeightType?.img
-                    ? { uri: selectedWeightType?.img }
-                    : undefined
-                }
-                style={tw`w-12 h-12`}
-                resizeMode="contain"
-              />
-              <View style={tw`flex-1`}>
-                <Text style={tw`text-sm font-bold text-gray-800`}>
-                  {selectedWeightType?.WeightRange}
+          <View style={tw`flex-row items-center mb-2`}>
+            <View style={tw`w-2 h-4 bg-red-500 mr-2 rounded-full`} />
+            <Text style={tw`text-base font-bold text-gray-800`}>
+              Delivery Location
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              tw`p-3 border-2 border-dashed rounded-lg`,
+              { borderColor: deliveryBorderColor },
+            ]}
+            onPress={handleOpenDropModal}
+            activeOpacity={0.7}
+          >
+            {values.destination?.address ? (
+              <View style={tw`flex-row rounded-lg`}>
+                <View style={tw` flex-1`}>
+                  <Text style={tw`text-sm text-gray-800 font-medium`}>
+                    {values.ConsigneeName || 'Consignee'}{' '}
+                    {values.ConsigneeContactNumber || 'Consignee'}
+                  </Text>
+
+                  <Text style={tw`text-sm text-gray-800 font-small`}>
+                    {values.Destination_1}, {values.Destination_2}
+                  </Text>
+                  <Text style={tw`text-sm text-gray-600 `}>
+                    {values.destination.address}
+                  </Text>
+
+                  <Text style={tw`text-sm text-gray-800 font-medium`}>
+                    {values.District}, {values.state} - {values.Pincode}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={handleOpenDropModal}>
+                  <Icon name="edit" size={20} color={tw.color('gray-500')} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={tw`flex-row items-center`}>
+                <Icon
+                  name="add-location-alt"
+                  size={18}
+                  color={tw.color('red-500')}
+                />
+                <Text style={tw`ml-2 text-red-500 text-sm`}>
+                  Add Delivery Address
                 </Text>
               </View>
-              <Icon
-                name="keyboard-arrow-down"
-                size={20}
-                color={tw.color('gray-500')}
-              />
-            </View>
-          ) : (
-            <View style={tw`flex-row items-center gap-3`}>
-              <View style={tw`bg-gray-200 p-2 rounded-full`}>
-                <Icon name="fitness-center" size={16} color="#6B7280" />
-              </View>
-              <Text style={tw`text-gray-500 text-sm flex-1`}>
-                {values?.VehicleType
-                  ? 'Select Weight Range'
-                  : 'Select vehicle type first'}
-              </Text>
-              <Icon
-                name="keyboard-arrow-down"
-                size={20}
-                color={
-                  values?.VehicleType
-                    ? tw.color('gray-500')
-                    : tw.color('gray-300')
-                }
-              />
-            </View>
+            )}
+
+            {/* <CompactAddressDisplay
+              type="delivery"
+              consigneeName={values.ConsigneeName}
+              address={values.destination?.address}
+              line1={values.Destination_1}
+              line2={values.Destination_2}
+              pincode={values.Pincode}
+              state={values.state}
+              district={values.District}
+              taluka={values.Taluka}
+            /> */}
+          </TouchableOpacity>
+
+          {errors.destination && touched.destination && (
+            <Text style={styles.errorText}>{errors.destination as string}</Text>
           )}
-        </TouchableOpacity>
+        </View>
 
-        {errors.Weight && touched.Weight && (
-          <Text style={styles.errorText}>
-            {(errors?.Weight as string) || ''}
-          </Text>
-        )}
-      </View>
+        {/* Vehicle Type */}
+        <View
+          style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
+        >
+          <View style={tw`flex-row items-center mb-2`}>
+            <View style={tw`w-2 h-2 bg-green-500 mr-2 rounded-full`} />
+            <Text style={tw`text-base font-bold text-gray-800`}>
+              Vehicle Type
+            </Text>
+          </View>
 
-      {/* Render modals */}
+          <TouchableOpacity
+            style={[
+              tw`p-3 border-2 border-dashed rounded-lg`,
+              {
+                borderColor: vehicleBorderColor,
+                backgroundColor: values.VehicleType ? '#EF476F20' : '#f9fafb',
+              },
+            ]}
+            onPress={handleOpenVehicleModal}
+            activeOpacity={0.7}
+          >
+            {values?.VehicleType ? (
+              <View style={tw`flex-row items-center gap-2`}>
+                <Image
+                  source={
+                    selectedTruckType?.img
+                      ? { uri: selectedTruckType?.img }
+                      : undefined
+                  }
+                  style={tw`w-12 h-12`}
+                  resizeMode="contain"
+                />
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-sm font-bold text-gray-800`}>
+                    {selectedTruckType?.VehicleType}
+                  </Text>
+                  <Text style={tw`text-xs text-gray-600 mt-1`}>
+                    {selectedTruckType?.WeightRange}
+                  </Text>
+                </View>
+                <Icon
+                  name="keyboard-arrow-down"
+                  size={20}
+                  color={tw.color('gray-500')}
+                />
+              </View>
+            ) : (
+              <View style={tw`flex-row items-center gap-2`}>
+                <View style={tw`bg-gray-200 p-2 rounded-full`}>
+                  <Icon name="directions-car" size={16} color="#6B7280" />
+                </View>
+                <Text style={tw`text-gray-500 text-sm flex-1`}>
+                  Select vehicle type
+                </Text>
+                <Icon
+                  name="keyboard-arrow-down"
+                  size={20}
+                  color={tw.color('gray-500')}
+                />
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {errors.VehicleType && touched.VehicleType && (
+            <Text style={styles.errorText}>{errors.VehicleType as string}</Text>
+          )}
+        </View>
+
+        {/* Weight Range Selection */}
+        <View
+          style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
+        >
+          <View style={tw`flex-row items-center mb-2`}>
+            <View style={tw`w-2 h-4 bg-purple-500 mr-2 rounded-full`} />
+            <Text style={tw`text-base font-bold text-gray-800`}>
+              Weight Range
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              tw`p-3 border-2 border-dashed rounded-lg`,
+              {
+                borderColor: weightBorderColor,
+                backgroundColor: values.Weight ? '#3B82F620' : '#f9fafb',
+              },
+            ]}
+            onPress={handleOpenWeightModal}
+            disabled={!values?.VehicleType}
+            activeOpacity={0.7}
+          >
+            {values?.Weight ? (
+              <View style={tw`flex-row items-center gap-3`}>
+                <Image
+                  source={
+                    selectedWeightType?.img
+                      ? { uri: selectedWeightType?.img }
+                      : undefined
+                  }
+                  style={tw`w-12 h-12`}
+                  resizeMode="contain"
+                />
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-sm font-bold text-gray-800`}>
+                    {selectedWeightType?.WeightRange}
+                  </Text>
+                </View>
+                <Icon
+                  name="keyboard-arrow-down"
+                  size={20}
+                  color={tw.color('gray-500')}
+                />
+              </View>
+            ) : (
+              <View style={tw`flex-row items-center gap-3`}>
+                <View style={tw`bg-gray-200 p-2 rounded-full`}>
+                  <Icon name="fitness-center" size={16} color="#6B7280" />
+                </View>
+                <Text style={tw`text-gray-500 text-sm flex-1`}>
+                  {values?.VehicleType
+                    ? 'Select Weight Range'
+                    : 'Select vehicle type first'}
+                </Text>
+                <Icon
+                  name="keyboard-arrow-down"
+                  size={20}
+                  color={
+                    values?.VehicleType
+                      ? tw.color('gray-500')
+                      : tw.color('gray-300')
+                  }
+                />
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {errors.Weight && touched.Weight && (
+            <Text style={styles.errorText}>{errors.Weight as string}</Text>
+          )}
+        </View>
+
+        {/* Exact Weight Input */}
+        <View
+          style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs`}
+        >
+          <View style={tw`flex-row items-center mb-3`}>
+            <View style={tw`w-2 h-4 bg-indigo-500 mr-2 rounded-full`} />
+            <Text style={tw`text-base font-bold text-gray-800`}>
+              Approximate Weight (kg)
+            </Text>
+          </View>
+
+          <View style={tw`flex-row items-center`}>
+            <View style={tw`flex-1`}>
+              <TextInput
+                style={[
+                  tw`border border-gray-300 rounded-lg p-3 text-gray-800 text-base`,
+                  touched.Approximate_weight &&
+                    errors.Approximate_weight &&
+                    tw`border-red-500`,
+                ]}
+                value={values.Approximate_weight}
+                onChangeText={text => setFieldValue('Approximate_weight', text)}
+                placeholder="Enter exact weight in kilograms"
+                keyboardType="numeric"
+                placeholderTextColor="#9CA3AF"
+              />
+              {errors.Approximate_weight && touched.Approximate_weight && (
+                <Text style={styles.errorText}>
+                  {errors.Approximate_weight}
+                </Text>
+              )}
+            </View>
+            <View style={tw`ml-3 bg-gray-100 px-3 py-3 rounded-lg`}>
+              <Text style={tw`text-gray-600 font-medium`}>kg</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Modals */}
       <PickupModal ref={pickupModalRef} />
       <DropModal ref={dropModalRef} />
       <SelectionModal
@@ -401,20 +530,25 @@ const FirstStep: React.FC = () => {
         title="Select Weight Range"
         options={weightTypes}
         selectedValue={values.Weight}
-        onSelect={(weight: any) => {
-          setFieldValue('Weight', weight);
-        }}
+        onSelect={(weight: any) => setFieldValue('Weight', weight)}
         numColumns={2}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   compactContainer: {
     flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: 16,
-    backgroundColor: '#f8fafc', // light gray background
+    paddingBottom: Platform.OS === 'ios' ? 40 : 80, // ensures last input isn’t hidden
   },
   errorText: {
     color: '#ef4444',
