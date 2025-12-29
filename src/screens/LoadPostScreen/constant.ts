@@ -6,55 +6,58 @@ interface CargoTypeOptions {
 }
 
 export const emptyShipmentData: ShipmentData = {
-  PickupType: 'Registered',
-  BodyType: '',
-  cargo_type: 'Normal',
-  CargoContent: '',
-  CargoPackageType: '',
-  CustomerID: '',
-  destination: {
-    address: '',
-    coordinates: {
-      lat: 0,
-      lng: 0,
-    },
-    components: {
-      dist: '',
-      pincode: '',
-      state: '',
-      place: '',
-      tal: '',
+  customerId: '',
+  pickup: {
+    pickupType: 'Registered',
+    contactName: '',
+    companyName: '',
+    contactNumber: '',
+    plotOrBuilding: '',
+    streetArea: '',
+    pincode: '',
+    state: '',
+    district: '',
+    taluka: '',
+    origin: {
+      address: '',
+      coordinates: { lat: 0, lng: 0 },
+      components: { dist: '', pincode: '', state: '', place: '', tal: '' },
     },
   },
-  ConsigneeName: '',
-  Pincode: '',
-  Taluka: '',
-  Destination_1: '',
-  Destination_2: '',
-  District: '',
-  state: '',
-  ContactPerson: '',
-  ContactNumber: '',
-  Origin_1: '',
-  Origin_2: '',
-  DhalaLength: '',
-  ExpectedAvailableTime: '',
-  origin: {
-    address: '',
-    coordinates: {
-      lat: 0,
-      lng: 0,
-    },
-    components: {
-      dist: '',
-      pincode: '',
-      state: '',
-      place: '',
-      tal: '',
+  delivery: {
+    consigneeName: '',
+    companyName: '',
+    contactPerson: '',
+    contactNumber: '',
+    plotOrBuilding: '',
+    streetArea: '',
+    pincode: '',
+    state: '',
+    district: '',
+    taluka: '',
+    destination: {
+      address: '',
+      coordinates: { lat: 0, lng: 0 },
+      components: { dist: '', pincode: '', state: '', place: '', tal: '' },
     },
   },
-  VehicleType: '',
-  Weight: '',
+  vehicle: {
+    vehicleType: '',
+    weightRange: '',
+    approximateWeightKg: '',
+  },
+  load: {
+    cargoType: 'Normal',
+    bodyType: '',
+    cargoContent: '',
+    packageType: '',
+    expectedVehicleAvailability: '',
+    dhalaLength: '',
+  },
+  schedule: {
+    date: '',
+    time: '',
+  },
 };
 
 export const STEPS: FormStep[] = ['Location', 'Load', 'Confirmation'];

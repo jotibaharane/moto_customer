@@ -31,9 +31,8 @@ const MPINKeypad: React.FC<MPINKeypadProps> = ({
           disabled={num === ''}
         >
           {num === 'backspace' ? (
-            <Button icon="arrow-left-bold"></Button>
+            <Icon source="close" size={28} color={colors.textPrimary} />
           ) : (
-            // <Image source={undefined} style={styles.backspaceIcon} />
             <Text style={styles.keyText}>{num}</Text>
           )}
         </TouchableOpacity>

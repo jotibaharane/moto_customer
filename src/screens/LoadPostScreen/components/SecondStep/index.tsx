@@ -236,18 +236,17 @@ const SecondStep: React.FC = () => {
   const { CustomerID } = useSelector(
     (state: RootState) => state.auth.customerDetails,
   ) || { CustomerID: '' };
-  // Add state for history modals
-  // const [cargoTypeHistoryVisible, setCargoTypeHistoryVisible] = useState(false);
+
   const [cargoContentHistoryVisible, setCargoContentHistoryVisible] =
     useState(false);
   const [bodyTypeHistoryVisible, setBodyTypeHistoryVisible] = useState(false);
-  const [selectedIsNextDay, setSelectedIsNextDay] = useState(false);
+
   const { data: BodyTypeData } = useGetBodyTypeQuery(
     {
-      vehicleType: values.VehicleType,
-      weightRange: values.Weight,
+      vehicleType: values.vehicle.vehicleType,
+      weightRange: values.vehicle.weightRange,
     },
-    { skip: !values.VehicleType || !values.Weight },
+    { skip: !values.vehicle.vehicleType || !values.vehicle.weightRange },
   );
   const [expectedDay, setExpectedDay] = useState('current');
   console.log('BodyTypeData', BodyTypeData);
@@ -260,8 +259,8 @@ const SecondStep: React.FC = () => {
   } = useCargoType_BodyType_HistoryQuery({ CustomerID: CustomerID });
 
   const { data: packageTypeData } = useGetPackageTypeQuery(
-    { cargotype: values?.CargoContent },
-    { skip: !values?.CargoContent },
+    { cargotype: values.load.cargoContent },
+    { skip: !values.load.cargoContent },
   );
 
   const { data: cargoContentData } = useGetCargoContentQuery();
@@ -293,16 +292,25 @@ const SecondStep: React.FC = () => {
     count: historyList.filter(x => x.CargoContent === item.CargoContent).length,
   }));
 
-  const updateExpectedAvailableTime = (
-    dayType: string,
-    date: string,
-    time: string,
-  ) => {
+  const updateSchedule = (dayType: string, date: string, time: string) => {
     if (!date || !time) return;
 
-    const dateTime = `${date} ${time}`; // format as required
-    setFieldValue('ExpectedAvailableTime', dateTime);
+    const dateTime = `${date} ${time}`;
+    setFieldValue(
+      'load.expectedVehicleAvailability',
+      dayType === 'current' ? 'Current Day' : 'Next Day',
+    );
+    setFieldValue('schedule.date', date);
+    setFieldValue('schedule.time', time);
   };
+
+  const isNextDayRadioEnabled = () => {
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+
+    return minutes >= 15 * 60; // enabled only after 3:00 PM
+  };
+  console.log({ BodyTypeData });
   // Format options for modals
   const bodyTypeOptions =
     BodyTypeData?.data?.map(item => ({
@@ -312,8 +320,9 @@ const SecondStep: React.FC = () => {
     })) || [];
 
   const selectedBodyType = useMemo(
-    () => BodyTypeData?.data.find(body => body.BodyType === values.BodyType),
-    [BodyTypeData, values.BodyType],
+    () =>
+      BodyTypeData?.data.find(body => body.BodyType === values.load.bodyType),
+    [BodyTypeData, values.load.bodyType],
   );
 
   const cargoContentOptions =
@@ -326,9 +335,9 @@ const SecondStep: React.FC = () => {
   const selectedCargoContentType = useMemo(
     () =>
       cargoContentData?.data.find(
-        content => content.cargo_type === values.CargoContent,
+        content => content.cargo_type === values.load.cargoContent,
       ),
-    [cargoContentData, values.CargoContent],
+    [cargoContentData, values.load.cargoContent],
   );
 
   const packageTypeOptions =
@@ -341,9 +350,9 @@ const SecondStep: React.FC = () => {
   const selectedPackageType = useMemo(
     () =>
       packageTypeData?.data.find(
-        pkg => pkg.packaging_type === values.CargoPackageType,
+        pkg => pkg.packaging_type === values.load.packageType,
       ),
-    [packageTypeData, values.CargoPackageType],
+    [packageTypeData, values.load.packageType],
   );
 
   const handleHistorySelect = (
@@ -351,11 +360,11 @@ const SecondStep: React.FC = () => {
     type: 'bodyType' | 'cargoContent',
   ) => {
     if (type === 'cargoContent') {
-      setFieldValue('CargoContent', item.label);
+      setFieldValue('load.cargoContent', item.label);
       setCargoContentHistoryVisible(false);
-      setFieldValue('CargoPackageType', '');
+      setFieldValue('load.packageType', '');
     } else if (type === 'bodyType') {
-      setFieldValue('BodyType', item.label);
+      setFieldValue('load.bodyType', item.label);
       setBodyTypeHistoryVisible(false);
     }
   };
@@ -376,8 +385,8 @@ const SecondStep: React.FC = () => {
           <SelectionCard
             title="Select Cargo Type"
             color="#F59E0B"
-            error={errors.DhalaLength as string}
-            touched={touched.DhalaLength as boolean}
+            error={errors.load?.dhalaLength as string}
+            touched={touched.load?.dhalaLength as boolean}
             testID="dhala-length-card"
           >
             <View
@@ -385,9 +394,9 @@ const SecondStep: React.FC = () => {
             >
               <CustomRadioButton
                 options={Cargotypeoptions}
-                selectedOption={values?.cargo_type}
+                selectedOption={values.load.cargoType}
                 onSelect={(value: string) => {
-                  setFieldValue('cargo_type', value);
+                  setFieldValue('load.cargoType', value);
                 }}
                 selectedColor="#3B82F6"
                 containerStyle={tw`p-2`}
@@ -397,218 +406,214 @@ const SecondStep: React.FC = () => {
         </View>
 
         {/* Dhala Length Selection */}
-        {(values?.VehicleType === 'Medium' ||
-          values?.VehicleType === 'Multi Axle') && (
-          <SelectionCard
-            title="Select Dhala Length"
-            color="#F59E0B"
-            error={errors.DhalaLength as string}
-            touched={touched.DhalaLength as boolean}
-            testID="dhala-length-card"
+        <SelectionCard
+          title="Select Dhala Length"
+          color="#F59E0B"
+          error={errors.load?.dhalaLength as string}
+          touched={touched.load?.dhalaLength as boolean}
+          testID="dhala-length-card"
+        >
+          <View
+            style={tw`border-2 border-dashed border-gray-300 bg-gray-50 p-3 rounded-lg`}
           >
-            <View
-              style={tw`border-2 border-dashed border-gray-300 bg-gray-50 p-3 rounded-lg`}
-            >
-              <CustomRadioButton
-                options={DhalaLengthOptions}
-                selectedOption={values?.DhalaLength}
-                onSelect={(value: string) => {
-                  setFieldValue('DhalaLength', value);
-                  setFieldValue('isVolumetric', true);
-                }}
-                selectedColor="#3B82F6"
-                containerStyle={tw`p-2`}
-              />
-            </View>
-          </SelectionCard>
-        )}
+            <CustomRadioButton
+              options={DhalaLengthOptions}
+              selectedOption={values.load.dhalaLength}
+              onSelect={(value: string) => {
+                setFieldValue('load.dhalaLength', value);
+              }}
+              selectedColor="#3B82F6"
+              containerStyle={tw`p-2`}
+            />
+          </View>
+        </SelectionCard>
 
         {/* Body Type Selection */}
-        {values.VehicleType && (
-          <SelectionCard
-            title="Body Type"
-            color="#3B82F6"
-            error={errors.BodyType as string}
-            touched={touched.BodyType as boolean}
-            testID="body-type-card"
-          >
-            <SelectionButton
-              value={values?.BodyType}
-              placeholder="Choose Body Type"
-              iconName="local-shipping"
-              onPress={() => bodyTypeRef.current?.open()}
-              hasError={!!errors.BodyType && !!touched.BodyType}
-              testID="body-type-button"
-              renderSelected={() => (
-                <View style={tw`flex-row items-center gap-2`}>
-                  <Image
-                    source={
-                      selectedBodyType?.img
-                        ? { uri: selectedBodyType?.img }
-                        : undefined
-                    }
-                    style={tw`w-10 h-10`}
-                    resizeMode="contain"
-                  />
-                  <View style={tw`flex-1`}>
-                    <Text style={tw`text-sm font-bold text-gray-800`}>
-                      {selectedBodyType?.BodyType}
-                    </Text>
-                    <Text style={tw`text-xs text-gray-600 mt-1`}>
-                      Selected body type
-                    </Text>
+        <SelectionCard
+          title="Body Type"
+          color="#3B82F6"
+          error={errors.load?.bodyType as string}
+          touched={touched.load?.bodyType as boolean}
+          testID="body-type-card"
+        >
+          <View style={tw`flex-row items-center gap-2`}>
+            <View style={tw`flex-1`}>
+              <SelectionButton
+                value={values.load.bodyType}
+                placeholder="Choose Body Type"
+                iconName="local-shipping"
+                onPress={() => bodyTypeRef.current?.open()}
+                hasError={!!errors.load?.bodyType && !!touched.load?.bodyType}
+                testID="body-type-button"
+                renderSelected={() => (
+                  <View style={tw`flex-row items-center gap-2`}>
+                    <Image
+                      source={
+                        selectedBodyType?.img
+                          ? { uri: selectedBodyType?.img }
+                          : undefined
+                      }
+                      style={tw`w-10 h-10`}
+                      resizeMode="contain"
+                    />
+                    <View style={tw`flex-1`}>
+                      <Text style={tw`text-sm font-bold text-gray-800`}>
+                        {selectedBodyType?.BodyType}
+                      </Text>
+                      <Text style={tw`text-xs text-gray-600 mt-1`}>
+                        Selected body type
+                      </Text>
+                    </View>
+                    <Icon
+                      name="keyboard-arrow-down"
+                      size={20}
+                      color={tw.color('gray-500')}
+                    />
                   </View>
-                  <Icon
-                    name="keyboard-arrow-down"
-                    size={20}
-                    color={tw.color('gray-500')}
-                  />
-                </View>
-              )}
-            />
-            <SelectionModal
-              ref={bodyTypeRef}
-              title="Select Body Type"
-              options={bodyTypeOptions}
-              selectedValue={values.BodyType}
-              onSelect={(bodyType: any) => {
-                setFieldValue('BodyType', bodyType);
-              }}
-              numColumns={2}
-            />
+                )}
+              />
+            </View>
             <TouchableOpacity
               onPress={() => setBodyTypeHistoryVisible(true)}
-              style={tw`self-end mt-2 px-4 py-2 rounded-full border border-gray-300 bg-white flex-row items-center shadow-xs`}
+              style={tw`h-12 w-12 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 shadow-xs`}
             >
-              <Icon name="history" size={14} color="#6B7280" />
-              <Text style={tw`text-xs text-gray-600 ml-1 font-medium`}>
-                History
-              </Text>
+              <Icon name="history" size={20} color="#6B7280" />
             </TouchableOpacity>
-          </SelectionCard>
-        )}
+          </View>
+          <SelectionModal
+            ref={bodyTypeRef}
+            title="Select Body Type"
+            options={bodyTypeOptions}
+            selectedValue={values.load.bodyType}
+            onSelect={(bodyType: any) => {
+              setFieldValue('load.bodyType', bodyType);
+            }}
+            numColumns={2}
+          />
+        </SelectionCard>
 
         {/* Cargo Content Selection with History */}
         <View>
           <SelectionCard
             title="Cargo Content | Material"
             color="#10B981"
-            error={errors.CargoContent as string}
-            touched={touched.CargoContent as boolean}
+            error={errors.load?.cargoContent as string}
+            touched={touched.load?.cargoContent as boolean}
             testID="cargo-content-card"
           >
-            <SelectionButton
-              value={values?.CargoContent}
-              placeholder="Choose Cargo Content"
-              iconName="inventory"
-              onPress={() => cargoContentRef.current?.open()}
-              hasError={!!errors.CargoContent && !!touched.CargoContent}
-              testID="cargo-content-button"
-              renderSelected={() => (
-                <View style={tw`flex-row items-center gap-3`}>
-                  <Image
-                    source={
-                      selectedCargoContentType?.img
-                        ? { uri: selectedCargoContentType?.img }
-                        : undefined
-                    }
-                    style={tw`w-10 h-10`}
-                    resizeMode="contain"
-                  />
-                  <View style={tw`flex-1`}>
-                    <Text style={tw`text-sm font-bold text-gray-800`}>
-                      {selectedCargoContentType?.cargo_type}
-                    </Text>
-                    <Text style={tw`text-xs text-gray-600 mt-1`}>
-                      Selected cargo type
-                    </Text>
-                  </View>
-                  <Icon
-                    name="keyboard-arrow-down"
-                    size={20}
-                    color={tw.color('gray-500')}
-                  />
-                </View>
-              )}
-            />
+            <View style={tw`flex-row items-center gap-2`}>
+              <View style={tw`flex-1`}>
+                <SelectionButton
+                  value={values.load.cargoContent}
+                  placeholder="Choose Cargo Content"
+                  iconName="inventory"
+                  onPress={() => cargoContentRef.current?.open()}
+                  hasError={
+                    !!errors.load?.cargoContent && !!touched.load?.cargoContent
+                  }
+                  testID="cargo-content-button"
+                  renderSelected={() => (
+                    <View style={tw`flex-row items-center gap-3`}>
+                      <Image
+                        source={
+                          selectedCargoContentType?.img
+                            ? { uri: selectedCargoContentType?.img }
+                            : undefined
+                        }
+                        style={tw`w-10 h-10`}
+                        resizeMode="contain"
+                      />
+                      <View style={tw`flex-1`}>
+                        <Text style={tw`text-sm font-bold text-gray-800`}>
+                          {selectedCargoContentType?.cargo_type}
+                        </Text>
+                        <Text style={tw`text-xs text-gray-600 mt-1`}>
+                          Selected cargo type
+                        </Text>
+                      </View>
+                      <Icon
+                        name="keyboard-arrow-down"
+                        size={20}
+                        color={tw.color('gray-500')}
+                      />
+                    </View>
+                  )}
+                />
+              </View>
+              <TouchableOpacity
+                onPress={() => setCargoContentHistoryVisible(true)}
+                style={tw`h-12 w-12 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 shadow-xs`}
+              >
+                <Icon name="history" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
             <SelectionModal
               ref={cargoContentRef}
               title="Select Cargo Content"
               options={cargoContentOptions}
-              selectedValue={values.CargoContent}
+              selectedValue={values.load.cargoContent}
               onSelect={(cargoContent: any) => {
-                setFieldValue('CargoContent', cargoContent);
-                setFieldValue('CargoPackageType', '');
+                setFieldValue('load.cargoContent', cargoContent);
+                setFieldValue('load.packageType', '');
               }}
               numColumns={2}
             />
           </SelectionCard>
-          <TouchableOpacity
-            onPress={() => setCargoContentHistoryVisible(true)}
-            style={tw`self-end mt-2 px-4 py-2 rounded-full border border-gray-300 bg-white flex-row items-center shadow-xs`}
-          >
-            <Icon name="history" size={14} color="#6B7280" />
-            <Text style={tw`text-xs text-gray-600 ml-1 font-medium`}>
-              History
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* Package Type Selection */}
-        {values.CargoContent && values.CargoContent !== 'other' && (
-          <SelectionCard
-            title="Package Type"
-            color="#8B5CF6"
-            error={errors.CargoPackageType as string}
-            touched={touched.CargoPackageType as boolean}
-            testID="package-type-card"
-          >
-            <SelectionButton
-              value={values?.CargoPackageType}
-              placeholder="Choose Package Type"
-              iconName="storefront"
-              onPress={() => packageTypeRef.current?.open()}
-              hasError={!!errors.CargoPackageType && !!touched.CargoPackageType}
-              testID="package-type-button"
-              renderSelected={() => (
-                <View style={tw`flex-row items-center gap-3`}>
-                  <Image
-                    source={
-                      selectedPackageType?.img
-                        ? { uri: selectedPackageType?.img }
-                        : undefined
-                    }
-                    style={tw`w-10 h-10`}
-                    resizeMode="contain"
-                  />
-                  <View style={tw`flex-1`}>
-                    <Text style={tw`text-sm font-bold text-gray-800`}>
-                      {selectedPackageType?.packaging_type}
-                    </Text>
-                    <Text style={tw`text-xs text-gray-600 mt-1`}>
-                      Selected package type
-                    </Text>
-                  </View>
-                  <Icon
-                    name="keyboard-arrow-down"
-                    size={20}
-                    color={tw.color('gray-500')}
-                  />
+        <SelectionCard
+          title="Package Type"
+          color="#8B5CF6"
+          error={errors.load?.packageType as string}
+          touched={touched.load?.packageType as boolean}
+          testID="package-type-card"
+        >
+          <SelectionButton
+            value={values.load.packageType}
+            placeholder="Choose Package Type"
+            iconName="storefront"
+            onPress={() => packageTypeRef.current?.open()}
+            hasError={!!errors.load?.packageType && !!touched.load?.packageType}
+            testID="package-type-button"
+            renderSelected={() => (
+              <View style={tw`flex-row items-center gap-3`}>
+                <Image
+                  source={
+                    selectedPackageType?.img
+                      ? { uri: selectedPackageType?.img }
+                      : undefined
+                  }
+                  style={tw`w-10 h-10`}
+                  resizeMode="contain"
+                />
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-sm font-bold text-gray-800`}>
+                    {selectedPackageType?.packaging_type}
+                  </Text>
+                  <Text style={tw`text-xs text-gray-600 mt-1`}>
+                    Selected package type
+                  </Text>
                 </View>
-              )}
-            />
-            <SelectionModal
-              ref={packageTypeRef}
-              title="Select Package Type"
-              options={packageTypeOptions}
-              selectedValue={values.CargoPackageType}
-              onSelect={(packageType: any) => {
-                setFieldValue('CargoPackageType', packageType);
-              }}
-              numColumns={2}
-            />
-          </SelectionCard>
-        )}
+                <Icon
+                  name="keyboard-arrow-down"
+                  size={20}
+                  color={tw.color('gray-500')}
+                />
+              </View>
+            )}
+          />
+          <SelectionModal
+            ref={packageTypeRef}
+            title="Select Package Type"
+            options={packageTypeOptions}
+            selectedValue={values.load.packageType}
+            onSelect={(packageType: any) => {
+              setFieldValue('load.packageType', packageType);
+            }}
+            numColumns={2}
+          />
+        </SelectionCard>
 
         {/* Time Picker */}
         {/* Expected Availability Section */}
@@ -627,25 +632,20 @@ const SecondStep: React.FC = () => {
           <RadioButton.Group
             value={expectedDay}
             onValueChange={v => {
-              setExpectedDay(v);
-              if (v === 'next') {
-                Alert.alert(
-                  'Note',
-                  'You can select the next day booking timing between 00:00 to 15:00  ',
-                );
+              if (v === 'next' && !isNextDayRadioEnabled()) {
+                return; // block selection before 3 PM
               }
+
+              setExpectedDay(v);
+
               if (v === 'current') {
-                updateExpectedAvailableTime(
+                updateSchedule(
                   'current',
                   values.CurrentDate,
                   values.CurrentTime,
                 );
               } else {
-                updateExpectedAvailableTime(
-                  'next',
-                  values.NextDate,
-                  values.NextTime,
-                );
+                updateSchedule('next', values.NextDate, values.NextTime);
               }
             }}
           >
@@ -659,19 +659,38 @@ const SecondStep: React.FC = () => {
               timeValue={values.CurrentTime}
               onDateChange={d => {
                 setFieldValue('CurrentDate', d);
-                updateExpectedAvailableTime('current', d, values.CurrentTime);
+                updateSchedule('current', d, values.CurrentTime);
               }}
               onTimeChange={t => {
                 setFieldValue('CurrentTime', t);
-                updateExpectedAvailableTime('current', values.CurrentDate, t);
+                updateSchedule('current', values.CurrentDate, t);
               }}
               disabled={expectedDay !== 'current'}
             />
-            {/* NEXT DAY */}(
+            {/* NEXT DAY */}
             <>
               <View style={tw`flex-row items-center mt-5 mb-2`}>
-                <RadioButton value="next" color="#3B82F6" />
-                <Text>Next Day</Text>
+                <RadioButton
+                  value="next"
+                  color="#3B82F6"
+                  disabled={!isNextDayRadioEnabled()}
+                />
+
+                <View style={tw`flex-row items-center flex-wrap`}>
+                  <Text
+                    style={
+                      !isNextDayRadioEnabled()
+                        ? tw`text-gray-400`
+                        : tw`text-gray-800`
+                    }
+                  >
+                    Next Day
+                  </Text>
+
+                  <Text style={tw`text-xs text-red-500 ml-2`}>
+                    (This will be active between 15:00 to 23:59)
+                  </Text>
+                </View>
               </View>
 
               <NextDatePicker
@@ -679,16 +698,15 @@ const SecondStep: React.FC = () => {
                 timeValue={values.NextTime}
                 onDateChange={d => {
                   setFieldValue('NextDate', d);
-                  updateExpectedAvailableTime('next', d, values.NextTime);
+                  updateSchedule('next', d, values.NextTime);
                 }}
                 onTimeChange={t => {
                   setFieldValue('NextTime', t);
-                  updateExpectedAvailableTime('next', values.NextDate, t);
+                  updateSchedule('next', values.NextDate, t);
                 }}
                 disabled={expectedDay !== 'next'}
               />
             </>
-            )
           </RadioButton.Group>
         </View>
 
@@ -717,7 +735,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     flexGrow: 1,
     padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 120 : 80, // ensures last input isn’t hidden
+    paddingBottom: Platform.OS === 'ios' ? 120 : 80,
   },
   compactContainer: {
     flex: 1,

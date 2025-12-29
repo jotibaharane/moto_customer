@@ -123,10 +123,6 @@ const Dashboard: React.FC = () => {
     return () => socket.off('driverNearbyAlert', handleDriverNearbyAlert);
   }, [CustomerID]);
 
-  // 🗺️ Fetch customer posts when CustomerID is ready
-  // useEffect(() => {
-  //   if (CustomerID) customerPosts({ CustomerID });
-  // }, [CustomerID]);
   useEffect(() => {
     if (!CustomerID) return;
     -(
@@ -177,11 +173,11 @@ const Dashboard: React.FC = () => {
         dispatch(setPostId(firstPost.LoadPostID));
         dispatch(
           setOrigin({
-            latitude: firstPost.Origin_Lat,
-            longitude: firstPost.Origin_Lng,
+            latitude: firstPost.PickupLat,
+            longitude: firstPost.PickupLng,
           }),
         );
-        dispatch(setOriginAddress(firstPost.Origin));
+        dispatch(setOriginAddress(firstPost.PickupAddress));
         dispatch(setDestinationAddress(''));
         dispatch(setDestination(null));
       }
@@ -301,7 +297,7 @@ const Dashboard: React.FC = () => {
 
       {/* 🔹 Driver Arrived Modal */}
       <Modal
-        visible={showDriverArrivedDialog}
+        visible={false}
         transparent
         animationType="fade"
         statusBarTranslucent

@@ -40,6 +40,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
   } = useGetCustomerPostsQuery(
     { CustomerID },
     {
+      skip: !CustomerID, // ✅ typesafe skip condition
       refetchOnMountOrArgChange: true,
       keepUnusedDataFor: 0,
     },
@@ -70,10 +71,10 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
     dispatch(addOrUpdateDriver([]));
     dispatch(setPostId(item?.LoadPostID));
     dispatch(
-      setOrigin({ latitude: item?.Origin_Lat, longitude: item?.Origin_Lng }),
+      setOrigin({ latitude: item?.PickupLat, longitude: item?.PickupLng }),
     );
-    dispatch(setOriginAddress(item?.Origin));
-    dispatch(setDestinationAddress(item?.Destination));
+    dispatch(setOriginAddress(item?.PickupAddress));
+    dispatch(setDestinationAddress(item?.DeliveryAddress));
     dispatch(setDestination(null));
     if (ref && typeof ref !== 'function' && ref.current) {
       ref.current.close();
@@ -95,20 +96,20 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
       <View style={styles.cardHeader}>
         <View style={styles.idContainer}>
           <Icon source="identifier" size={14} color="#666" />
-          <Text style={styles.cardId}>ID: {item.LoadPostID}</Text>
+          <Text style={styles.cardId}>ID: {item?.LoadPostID}</Text>
         </View>
 
         <View>
-          <Text> {formatDate(item?.PostInsertDate || '')}</Text>
+          <Text> {formatDate(item?.LoadPost_InsertDate || '')}</Text>
         </View>
         <View
           style={[
             styles.statusBadge,
-            { backgroundColor: getStatusColor(item.trip_status) },
+            { backgroundColor: getStatusColor(item?.LP_Status) },
           ]}
         >
           <Text style={styles.statusText}>
-            {item.trip_status.toUpperCase()}
+            {item?.LP_Status?.toUpperCase()}
           </Text>
         </View>
       </View>
@@ -129,10 +130,10 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
               <Text style={styles.locationLabel}>From</Text>
             </View>
             <Text style={styles.locationText} numberOfLines={2}>
-              {item.Origin}
+              {item?.PickupAddress}
             </Text>
             <Text style={styles.locationSubtext}>
-              {item.Origin_State} • {item.Origin_Pincode}
+              {item.PickupState} • {item.PickupPincode}
             </Text>
           </View>
 
@@ -143,10 +144,10 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
               <Text style={styles.locationLabel}>To</Text>
             </View>
             <Text style={styles.locationText} numberOfLines={2}>
-              {item.Destination}
+              {item.DeliveryAddress}
             </Text>
             <Text style={styles.locationSubtext}>
-              {item.Destination_State} • {item.Destination_Pincode}
+              {item.DeliveryState} • {item.DeliveryPincode}
             </Text>
           </View>
         </View>
@@ -192,7 +193,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
       </View>
 
       {/* Pending Status Indicator */}
-      {item.trip_status === 'Pending' && (
+      {item.LP_Status === 'Pending' && (
         <View style={styles.pendingContainer}>
           <Icon source="clock-outline" size={14} color="#FF9800" />
           <Text style={styles.pendingText}>Awaiting driver assignment</Text>

@@ -11,6 +11,8 @@ import DrawerNavigator from './drawer/DrawerNavigator';
 import Notification from '@screens/DashboardScreen/Notification';
 import EditCustomerScreen from '@screens/RegistrationScreen/ProfileEditscreen';
 import Employee from '@screens/RegistrationScreen/Employee';
+import Component from 'react-native-paper/lib/typescript/components/List/ListItem';
+import Individual from '@screens/VerificationScreens/Individual';
 // import MultiStepForm from 'src/forms/Multistepform/MultiStepForm';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -25,17 +27,19 @@ const AppNavigator = () => {
         <RootStack.Screen name={routeName.SPLASH} component={SplashScreen} />
         <RootStack.Screen name={routeName.LOGIN} component={OtpLoginScreen} />
         <RootStack.Screen
+          name={routeName.DASHBOARD}
+          component={DrawerNavigator}
+        />
+        <RootStack.Screen
           name={routeName.REGISTRATION}
           component={RegistrationScreen}
         />
+
         <RootStack.Screen
           name={routeName.MPIN_LOGIN}
           component={EnterMPINScreen}
         />
-        <RootStack.Screen
-          name={routeName.DASHBOARD}
-          component={DrawerNavigator}
-        />
+
         {/* <RootStack.Screen
           name={routeName.MULTISTEPFORM}
           component={MultiStepForm}
@@ -58,10 +62,8 @@ const AppNavigator = () => {
           name={routeName.NOTIFICATION}
           component={Notification}
         ></RootStack.Screen>
-        <RootStack.Screen
-          name={routeName.ADD_EMPLOYEE}
-          component={Employee}
-        ></RootStack.Screen>
+        <RootStack.Screen name={routeName.ADD_EMPLOYEE} component={Employee} />
+        <RootStack.Screen name={routeName.INDIVIDUAL} component={Individual} />
       </RootStack.Navigator>
     </NavigationContainer>
   );

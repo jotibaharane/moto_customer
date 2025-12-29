@@ -88,6 +88,9 @@ export type RegisterRequest = {
   Address1: string;
   Address2: string;
   Pincode: string;
+  Factory: 'Y' | 'N';
+  Warehouse: 'Y' | 'N';
+  Office: 'Y' | 'N';
   State: string;
   Destination: string;
   City: string;
@@ -147,38 +150,113 @@ export interface MpinLoginResponse {
 export interface CustomerPostRequest {
   CustomerID: string;
 }
+// export interface CustomerLoadPost {
+//   LoadPostID: string;
+//   CustomerID: string;
+//   Origin: string;
+//   Destination: string;
+//   VehicleType: string;
+//   Weight: string;
+//   verify_flag: string;
+//   verification_code: string;
+//   trip_status: string;
+//   BodyType: string;
+//   CargoContent: string;
+//   CargoPackageType: string;
+//   ExpectedAvailableTime: string;
+//   PostInsertDate: string | null;
+//   PostUpdateDate: string | null;
+//   Origin_Lat: number;
+//   Origin_Lng: number;
+//   Origin_City: string;
+//   Origin_District: string;
+//   Origin_Taluka: string;
+//   Origin_State: string;
+//   Origin_Pincode: string;
+//   Destination_Lat: number;
+//   Destination_Lng: number;
+//   Destination_City: string;
+//   Destination_District: string;
+//   Destination_Taluka: string;
+//   Destination_State: string;
+//   Destination_Pincode: string;
+//   AddressInsertDate: string | null;
+//   AddressUpdateDate: string | null;
+// }
 export interface CustomerLoadPost {
   LoadPostID: string;
   CustomerID: string;
-  Origin: string;
-  Destination: string;
+
+  // Pickup Details
+  PickupContactPerson: string;
+  PickupCompanyName: string;
+  PickupContactNumber: string;
+  PickupPlotBuilding: string;
+  PickupStreetArea: string;
+  PickupAddress: string;
+
+  // Delivery Details
+  DeliveryContactPerson: string;
+  DeliveryCompanyName: string;
+  DeliveryContactNumber: string;
+  DeliveryPlotBuilding: string;
+  DeliveryStreetArea: string;
+  DeliveryAddress: string;
+
+  // Vehicle & Cargo
   VehicleType: string;
   Weight: string;
-  verify_flag: string;
-  verification_code: string;
-  trip_status: string;
+  Approximate_weight: number;
+  cargo_type: string;
   BodyType: string;
   CargoContent: string;
   CargoPackageType: string;
+
+  // Schedule & Flags
   ExpectedAvailableTime: string;
-  PostInsertDate: string | null;
-  PostUpdateDate: string | null;
-  Origin_Lat: number;
-  Origin_Lng: number;
-  Origin_City: string;
-  Origin_District: string;
-  Origin_Taluka: string;
-  Origin_State: string;
-  Origin_Pincode: string;
-  Destination_Lat: number;
-  Destination_Lng: number;
-  Destination_City: string;
-  Destination_District: string;
-  Destination_Taluka: string;
-  Destination_State: string;
-  Destination_Pincode: string;
-  AddressInsertDate: string | null;
-  AddressUpdateDate: string | null;
+  ScheduleDate: string | null;
+  ScheduleTime: string | null;
+  isVolumetric: boolean;
+  DhalaLength: number | null;
+  cost: number;
+  master_status: string;
+
+  // Verification
+  verification_code: string;
+  verify_flag: boolean;
+
+  // Dates
+  LoadPost_InsertDate: string | null;
+  LoadPost_UpdateDate: string | null;
+  Address_InsertDate: string | null;
+  Address_UpdateDate: string | null;
+
+  // Pickup Location
+  PickupCity: string;
+  PickupDistrict: string;
+  PickupTaluka: string;
+  PickupState: string;
+  PickupPincode: string;
+  PickupLat: number;
+  PickupLng: number;
+
+  // Delivery Location
+  DeliveryCity: string;
+  DeliveryDistrict: string;
+  DeliveryTaluka: string;
+  DeliveryState: string;
+  DeliveryPincode: string;
+  DeliveryLat: number;
+  DeliveryLng: number;
+
+  // Status & Relations
+  CustomerPostID: string;
+  VendorID: string | null;
+  DriverID: string | null;
+  CustomerStatus: string;
+  VendorStatus: string | null;
+  DriverStatus: string | null;
+  LP_Status: string;
 }
 
 export interface CustomerPostResponse {
@@ -330,36 +408,89 @@ export interface Location {
   coordinates: Coordinates;
   components: AddressComponents;
 }
+export interface LocationCoordinates {
+  lat: number;
+  lng: number;
+}
+
+export interface AddressComponents {
+  dist: string;
+  pincode: string;
+  state: string;
+  place: string;
+  tal: string;
+}
+
+export interface Location {
+  address: string;
+  components: AddressComponents;
+  coordinates: LocationCoordinates;
+}
+
+// Pickup Interface
+export interface PickupData {
+  pickupType: 'Registered' | 'self' | 'other';
+  contactName: string;
+  companyName: string;
+  contactNumber: string;
+  plotOrBuilding: string;
+  streetArea: string;
+  pincode: string;
+  state: string;
+  district: string;
+  taluka: string;
+  origin: Location;
+}
+
+// Delivery Interface
+export interface DeliveryData {
+  consigneeName: string;
+  companyName: string;
+  contactPerson: string;
+  contactNumber: string;
+  plotOrBuilding: string;
+  streetArea: string;
+  pincode: string;
+  state: string;
+  district: string;
+  taluka: string;
+  destination: Location;
+}
+
+// Vehicle Interface
+export interface VehicleData {
+  vehicleType: string;
+  weightRange: string;
+  approximateWeightKg: string;
+}
+
+// Load Interface
+export interface LoadData {
+  cargoType: string;
+  bodyType: string;
+  cargoContent: string;
+  packageType: string;
+  expectedVehicleAvailability: string;
+  dhalaLength?: string;
+}
+
+// Schedule Interface
+export interface ScheduleData {
+  date: string;
+  time: string;
+}
 
 export interface ShipmentData {
-  BodyType: string;
-  PickupType: string;
-  CargoContent: string;
-  CargoPackageType: string;
-  registeredAddress?: string;
-  cargo_type: string;
-  CustomerID: string;
-  destination: Location;
-  ConsigneeName: string;
-  ContactNumber: string;
-  ExpectedAvailableDate?: string;
-  Pincode: string;
-  Taluka: string;
-  Destination_1: string;
-  Destination_2: string;
-  District: string;
-  state: string;
-  ContactPerson: string;
-  ConsigneeContactNumber: string;
-  Origin_1: string;
-  Origin_2: string;
-  DhalaLength: string;
-  Approximate_weight: string;
-  ExpectedAvailableTime: string;
-  origin: Location;
-  VehicleType: string;
-  Weight: string;
-  // pickupType: string;
+  customerId: string;
+  pickup: PickupData;
+  delivery: DeliveryData;
+  vehicle: VehicleData;
+  load: LoadData;
+  schedule: ScheduleData;
+  CurrentDate?: string;
+  CurrentTime?: string;
+  NextDate?: string;
+  NextTime?: string;
 }
 
 // body type

@@ -8,17 +8,12 @@ import React, {
   useState,
 } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   Modal,
-  Platform,
-  ScrollView,
-  KeyboardAvoidingView,
-  Dimensions,
 } from 'react-native';
 import { RadioButton, TextInput } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
@@ -37,10 +32,6 @@ import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import ActionButton from '@components/common/ActionButton';
 import { SelectList } from '@components/common/Select';
 import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
-import {
-  getCurrentLocationWithFallback,
-  openLocationSettings,
-} from '@utils/locationUtils';
 import tw from '@utils/tw';
 import { useFormikContext } from 'formik';
 
@@ -60,7 +51,19 @@ interface LocationSuggestion {
   value: string;
 }
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+interface LocalPickupData {
+  pickupType: 'Registered' | 'self' | 'other';
+  origin: any;
+  contactName: string;
+  contactNumber: string;
+  plotOrBuilding: string;
+  streetArea: string;
+  state: string;
+  district: string;
+  taluka: string;
+  pincode: string;
+  companyName: string;
+}
 
 const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const GoogleAddress = useSelector(
@@ -72,25 +75,22 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const CustomerDetail = useSelector(
     (state: RootState) => state?.auth?.customerDetails,
   );
-
-  console.log(CustomerDetail?.CompanyName, 'this is detail');
   const currentlocation = useSelector((state: RootState) => state?.map?.origin);
+
   const {
     getCurrentLocation,
     selectedLocation,
     handleInputChange,
     suggestions,
   } = useGooglePlacesSelect();
-  console.log('RegisteredAddress in PickupModal:', GoogleAddress);
 
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [activeOriginButton, setActiveOriginButton] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const [userLocation, setUserLocation] = useState<any>(null);
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+
   const { data: stateData } = useGetStateQuery();
   const [availableDistricts, setAvailableDistricts] = useState<any[]>([]);
   const [PincodeData] = useGetPincodeDataMutation();
@@ -102,28 +102,57 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     latitude: number;
     longitude: number;
   } | null>(null);
-  console.log('customerHistory', CustomerID);
-
-  console.log('customerhstorydata', data);
-
-  const scrollViewRef = useRef<ScrollView>(null);
 
   const { values, setFieldValue, errors, touched, setFieldTouched } =
     useFormikContext<ShipmentData>();
   const { currentData } = useGetCurrentAddressQuery<any>();
   const originPlaces = useGooglePlacesSelect();
 
+  // Local state for form values
+  const [localValues, setLocalValues] = useState<LocalPickupData>({
+    pickupType: 'self',
+    origin: null,
+    contactName: '',
+    contactNumber: '',
+    plotOrBuilding: '',
+    streetArea: '',
+    state: '',
+    district: '',
+    taluka: '',
+    pincode: '',
+    companyName: '',
+  });
+
+  // Initialize local values when modal opens
+  useEffect(() => {
+    if (isModalOpen) {
+      setLocalValues({
+        pickupType: values.pickup.pickupType || 'self',
+        origin: values.pickup.origin || null,
+        contactName: values.pickup.contactName || '',
+        contactNumber: values.pickup.contactNumber || '',
+        plotOrBuilding: values.pickup.plotOrBuilding || '',
+        streetArea: values.pickup.streetArea || '',
+        state: values.pickup.state || '',
+        district: values.pickup.district || '',
+        taluka: values.pickup.taluka || '',
+        pincode: values.pickup.pincode || '',
+        companyName: values.pickup.companyName || '',
+      });
+    }
+  }, [isModalOpen, values]);
+
   const isOtherPickupType = useMemo(
-    () => values.PickupType === 'other',
-    [values.PickupType],
+    () => localValues.pickupType === 'other',
+    [localValues.pickupType],
   );
   const isRegisteredPickupType = useMemo(
-    () => values.PickupType === 'Registered',
-    [values.PickupType],
+    () => localValues.pickupType === 'Registered',
+    [localValues.pickupType],
   );
   const isselfPickupType = useMemo(
-    () => values.PickupType === 'self',
-    [values.PickupType],
+    () => localValues.pickupType === 'self',
+    [localValues.pickupType],
   );
 
   const handleState = useCallback(
@@ -132,34 +161,27 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         const response = await getDistricts({ state: value }).unwrap();
         const DistrictsList = response?.data || [];
         setAvailableDistricts(DistrictsList);
-        setFieldValue('state', value);
+        setLocalValues(prev => ({ ...prev, state: value, district: '' }));
       } catch (error) {
         console.error('Error fetching districts:', error);
       }
     },
-    [getDistricts, setFieldValue],
+    [getDistricts],
   );
+
   const handlePinchange = useCallback(
     async (value: string) => {
-      setFieldValue('Pincode', value);
+      setLocalValues(prev => ({ ...prev, pincode: value }));
       if (value.length === 6) {
         try {
           const response = await PincodeData({ pincode: value }).unwrap();
           const mapped = response?.data;
           if (mapped) {
-            setFieldValue('state', mapped?.State);
-            setFieldValue('District', mapped?.District);
-
-            // ✅ Convert Pincode to coordinates using Google API
-            const geocodeRes = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?address=${value}&key=${GOOGLE_MAPS_API_KEY}`,
-            );
-            const geocodeJson = await geocodeRes.json();
-            console.log(geocodeJson);
-            if (geocodeJson?.results?.length) {
-              const { lat, lng } = geocodeJson.results[0]?.geometry?.location;
-              setPincodeCoords({ latitude: lat, longitude: lng });
-            }
+            setLocalValues(prev => ({
+              ...prev,
+              state: mapped?.State || '',
+              district: mapped?.District || '',
+            }));
 
             const districtResponse = await getDistricts({
               state: mapped?.State,
@@ -173,44 +195,57 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         }
       }
     },
-    [PincodeData, getDistricts, setFieldValue],
+    [PincodeData, getDistricts],
   );
+
   const handleConfirm = useCallback(() => {
     const errors: any = {};
 
-    if (!values.origin?.address) {
+    if (!localValues.origin?.address) {
       errors.origin = 'Please select a pickup location';
     }
 
     if (isOtherPickupType) {
-      if (!values.ContactPerson?.trim()) {
-        errors.ContactPerson = 'Please enter contact person name';
+      if (!localValues.contactName?.trim()) {
+        errors.contactName = 'Please enter contact person name';
       }
-      if (!values.ContactNumber?.trim()) {
-        errors.ContactNumber = 'Please enter contact number';
-      } else if (values.ContactNumber.length !== 10) {
-        errors.ContactNumber = 'Please enter a valid 10-digit number';
+      if (!localValues.contactNumber?.trim()) {
+        errors.contactNumber = 'Please enter contact number';
+      } else if (localValues.contactNumber.length !== 10) {
+        errors.contactNumber = 'Please enter a valid 10-digit number';
       }
     }
 
-    // ✅ Address validation
-    if (!values.Origin_1?.trim()) {
-      errors.Origin_1 = 'Please enter plot/unit/building details';
-    }
-    if (!values.Origin_2?.trim()) {
-      errors.Origin_2 = 'Please enter area/street details';
+    if (localValues.pickupType !== 'Registered') {
+      if (!localValues.plotOrBuilding?.trim()) {
+        errors.plotOrBuilding = 'Please enter plot/unit/building details';
+      }
+      if (!localValues.streetArea?.trim()) {
+        errors.streetArea = 'Please enter area/street details';
+      }
     }
 
-    // ✅ If errors exist, store them and stop submission
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
     }
 
-    // ✅ No errors → proceed
+    // ✅ Set all values to Formik at once
+    setFieldValue('pickup.pickupType', localValues.pickupType);
+    setFieldValue('pickup.origin', localValues.origin);
+    setFieldValue('pickup.contactName', localValues.contactName);
+    setFieldValue('pickup.contactNumber', localValues.contactNumber);
+    setFieldValue('pickup.plotOrBuilding', localValues.plotOrBuilding);
+    setFieldValue('pickup.streetArea', localValues.streetArea);
+    setFieldValue('pickup.state', localValues.state);
+    setFieldValue('pickup.district', localValues.district);
+    setFieldValue('pickup.taluka', localValues.taluka);
+    setFieldValue('pickup.pincode', localValues.pincode);
+    setFieldValue('pickup.companyName', localValues.companyName);
+
     setFieldErrors({});
     handleModalClose();
-  }, [values, isOtherPickupType, handleModalClose]);
+  }, [localValues, isOtherPickupType, setFieldValue, handleModalClose]);
 
   const handleLocationSelected = useCallback(
     (location: { latitude: number; longitude: number; address: string }) => {
@@ -231,7 +266,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         },
       };
 
-      setFieldValue('origin', selectedLocation);
+      setLocalValues(prev => ({ ...prev, origin: selectedLocation }));
       setShowMapModal(false);
       setActiveOriginButton('');
 
@@ -241,7 +276,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         text2: 'Pickup location has been set',
       });
     },
-    [setFieldValue],
+    [],
   );
 
   const handleOriginSelect = useCallback(
@@ -249,54 +284,78 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       try {
         const location = await originPlaces.getPlaceDetails(selected.key);
         if (location) {
-          setFieldValue('origin', location);
+          setLocalValues(prev => ({ ...prev, origin: location }));
         }
       } catch (error) {
         Alert.alert('Error', 'Failed to fetch location details');
       }
     },
-    [originPlaces, setFieldValue],
+    [originPlaces],
   );
+
+  // Handle pickup type changes
   useEffect(() => {
-    if (values.PickupType === 'Registered' && GoogleAddress) {
-      setFieldValue('origin', {
-        address: GoogleAddress.fullAddress,
-        coordinates: {
-          lat: GoogleAddress.latitude,
-          lng: GoogleAddress.longitude,
+    if (localValues.pickupType === 'Registered' && GoogleAddress) {
+      setLocalValues(prev => ({
+        ...prev,
+        origin: {
+          address: GoogleAddress.fullAddress,
+          coordinates: {
+            lat: GoogleAddress.latitude,
+            lng: GoogleAddress.longitude,
+          },
+          components: GoogleAddress.addressComponents,
         },
-
-        components: GoogleAddress.addressComponents,
-      });
-
-      setFieldValue('ContactPerson', CustomerDetail?.CompanyName || '');
-      setFieldValue('ContactNumber', CustomerDetail?.ContactNo || '');
-    } else if (values.PickupType == 'self') {
-      setFieldValue('ContactPerson', CustomerDetail?.CompanyName || '');
-      setFieldValue('ContactNumber', CustomerDetail?.ContactNo || '');
+        contactName: CustomerDetail?.CompanyName || '',
+        contactNumber: CustomerDetail?.ContactNo || '',
+        plotOrBuilding: '',
+        streetArea: '',
+      }));
+    } else if (localValues.pickupType === 'self' && currentlocation) {
+      setLocalValues(prev => ({
+        ...prev,
+        origin: {
+          address: currentlocation?.address,
+          coordinates: {
+            lat: currentlocation?.latitude,
+            lng: currentlocation?.longitude,
+          },
+          components: currentlocation?.components ?? {},
+        },
+        contactName: CustomerDetail?.CompanyName || '',
+        contactNumber: CustomerDetail?.ContactNo || '',
+      }));
+    } else if (localValues.pickupType === 'other') {
+      // Clear fields for other type
+      setLocalValues(prev => ({
+        ...prev,
+        origin: null,
+        contactName: '',
+        contactNumber: '',
+        plotOrBuilding: '',
+        streetArea: '',
+      }));
     }
-  }, [GoogleAddress, CustomerDetail, values.PickupType]);
+  }, [localValues.pickupType, GoogleAddress, CustomerDetail, currentlocation]);
 
-  const handleHistoryLocationSelect = useCallback(
-    item => {
-      setFieldValue('PickupType', 'other');
-
-      setFieldValue('origin', {
+  const handleHistoryLocationSelect = useCallback(item => {
+    setLocalValues(prev => ({
+      ...prev,
+      pickupType: 'other',
+      origin: {
         address: item?.Origin,
         coordinates: {},
         components: {},
-      });
+      },
+      plotOrBuilding: item.plotOrBuilding,
+      streetArea: item.streetArea,
+      state: item.State,
+      contactName: item.contactName,
+      contactNumber: item.contactNumber,
+    }));
 
-      setFieldValue('Origin_1', item.Origin_1);
-      setFieldValue('Origin_2', item.Origin_2);
-      setFieldValue('State', item.State);
-      setFieldValue('ContactPerson', item.ContactPerson);
-      setFieldValue('ContactNumber', item.ContactNumber);
-
-      setShowHistoryModal(false);
-    },
-    [setFieldValue],
-  );
+    setShowHistoryModal(false);
+  }, []);
 
   const handleModalClose = useCallback(() => {
     setActiveOriginButton('');
@@ -304,8 +363,6 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     setShowMapModal(false);
     setIsModalOpen(false);
     bottomModalRef.current?.close();
-    // ❌ Do NOT reset pickupType here!
-    // setPickupType('self'); ← remove this if it exists
   }, []);
 
   const handleBottomModalClose = useCallback(() => {
@@ -314,16 +371,8 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
 
   useImperativeHandle(ref, () => ({
     open: () => {
-      if (isModalOpen) {
-        bottomModalRef.current?.close();
-        setTimeout(() => {
-          setIsModalOpen(true);
-          bottomModalRef.current?.open();
-        }, 100);
-      } else {
-        setIsModalOpen(true);
-        bottomModalRef.current?.open();
-      }
+      setIsModalOpen(true);
+      bottomModalRef.current?.open();
     },
     close: handleModalClose,
   }));
@@ -351,7 +400,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         borderColor: 'purple-600',
       },
     ],
-    [activeOriginButton, isLoadingLocation],
+    [activeOriginButton],
   );
 
   const MapSelectionModal = useMemo(
@@ -362,7 +411,6 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         presentationStyle="pageSheet"
         onRequestClose={() => {
           setShowMapModal(false);
-          setIsLoadingLocation(false);
           setActiveOriginButton('');
         }}
       >
@@ -381,21 +429,12 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
 
           <PickupModaldebug
             onLocationSelected={handleLocationSelected}
-            initialRegion={
-              userLocation
-                ? {
-                    latitude: userLocation.latitude,
-                    longitude: userLocation.longitude,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
-                  }
-                : undefined
-            }
+            initialRegion={undefined}
           />
         </View>
       </Modal>
     ),
-    [showMapModal, handleLocationSelected, userLocation],
+    [showMapModal, handleLocationSelected],
   );
 
   return (
@@ -424,66 +463,39 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         </View>
 
         <View style={styles.sectionContainer}>
-          {/* <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}></Text>
-              </View> */}
-
-          {/* 🚚 Pickup Type Section */}
           <View style={tw`flex-row items-center`}>
-            {/* Self Option */}
+            {/* Registered Option */}
             <View style={tw`flex-row items-center`}>
               <RadioButton
                 value="Registered"
                 status={
-                  values.PickupType == 'Registered' ? 'checked' : 'unchecked'
+                  localValues.pickupType == 'Registered'
+                    ? 'checked'
+                    : 'unchecked'
                 }
                 onPress={() => {
-                  setFieldValue('PickupType', 'Registered');
-
-                  if (GoogleAddress) {
-                    setFieldValue('origin', {
-                      address: GoogleAddress?.fullAddress,
-                      coordinates: {
-                        lat: GoogleAddress?.latitude,
-                        lng: GoogleAddress?.longitude,
-                      },
-                      components: GoogleAddress?.addressComponents,
-                    });
-                  }
+                  setLocalValues(prev => ({
+                    ...prev,
+                    pickupType: 'Registered',
+                  }));
                 }}
                 color={tw.color('blue-500')}
               />
               <Text style={styles.radioLabel}>Registered</Text>
             </View>
 
+            {/* Current Option */}
             <View style={tw`flex-row items-center mr-6`}>
               <RadioButton
                 value="self"
-                status={values.PickupType === 'self' ? 'checked' : 'unchecked'}
+                status={
+                  localValues.pickupType === 'self' ? 'checked' : 'unchecked'
+                }
                 onPress={() => {
-                  setFieldValue('PickupType', 'self');
-
-                  // Clear unwanted fields
-                  setFieldValue('ContactPerson', '');
-                  setFieldValue('ContactNumber', '');
-                  setFieldValue('Origin_1', '');
-                  setFieldValue('Origin_2', '');
-
-                  // 👉 Set current location from Redux (NOT GPS)
-                  if (currentlocation) {
-                    setFieldValue('origin', {
-                      address: currentlocation?.address,
-                      coordinates: {
-                        lat: currentlocation?.latitude,
-                        lng: currentlocation?.longitude,
-                      },
-                      components: currentlocation?.components ?? {}, // optional
-                    });
-                  }
+                  setLocalValues(prev => ({ ...prev, pickupType: 'self' }));
                 }}
                 color={tw.color('blue-500')}
               />
-
               <Text style={styles.radioLabel}>Current</Text>
             </View>
 
@@ -491,27 +503,17 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
             <View style={tw`flex-row items-center`}>
               <RadioButton
                 value="other"
-                status={values.PickupType == 'other' ? 'checked' : 'unchecked'}
+                status={
+                  localValues.pickupType == 'other' ? 'checked' : 'unchecked'
+                }
                 onPress={() => {
-                  if (values.PickupType !== 'other') {
-                    // 🧹 Clear self fields when switching to other
-                    setFieldValue('Origin_1', '');
-                    setFieldValue('Origin_2', '');
-                    setFieldValue('ContactPerson', '');
-                    setFieldValue('ContactNumber', '');
-                    setFieldValue('origin', {
-                      address: '',
-                      coordinates: {},
-                      components: {},
-                    });
-                  }
-                  setFieldValue('PickupType', 'other');
+                  setLocalValues(prev => ({ ...prev, pickupType: 'other' }));
                 }}
                 color={tw.color('blue-500')}
               />
               <Text style={styles.radioLabel}>Other</Text>
 
-              {values.PickupType == 'other' && (
+              {localValues.pickupType == 'other' && (
                 <TouchableOpacity
                   onPress={() => {
                     setActiveOriginButton('history');
@@ -534,66 +536,61 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         </View>
 
         <View style={styles.sectionContainer}>
-          {/* <View style={styles.sectionHeader}>
-                <View style={tw`w-2 h-3 bg-blue-500 mr-3 rounded-full`} />
-                <Text style={styles.sectionTitle}>Pickup Location</Text>
-              </View> */}
-
           {isRegisteredPickupType && (
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Contact Name *</Text>
               <TextInput
                 style={[
                   styles.input,
-                  fieldErrors.ContactPerson && {
+                  fieldErrors.contactName && {
                     borderColor: 'red',
                     borderWidth: 1,
                   },
                 ]}
                 placeholder="Enter contact person name"
-                value={values.ContactPerson}
+                value={localValues.contactName}
                 textTransform="capitalize"
                 onChangeText={text => {
-                  setFieldValue('ContactPerson', text);
-                  if (fieldErrors.ContactPerson) {
+                  setLocalValues(prev => ({ ...prev, contactName: text }));
+                  if (fieldErrors.contactName) {
                     setFieldErrors(prev => ({
                       ...prev,
-                      ContactPerson: '',
+                      contactName: '',
                     }));
                   }
                 }}
               />
-              {fieldErrors.ContactPerson && (
+              {fieldErrors.contactName && (
                 <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                  {fieldErrors.ContactPerson}
+                  {fieldErrors.contactName}
                 </Text>
               )}
               <Text style={styles.label}>Contact Number *</Text>
               <TextInput
                 style={[
                   styles.input,
-                  fieldErrors.ContactNumber && {
+                  fieldErrors.contactNumber && {
                     borderColor: 'red',
                     borderWidth: 1,
                   },
                 ]}
                 placeholder="Enter contact number"
-                value={values.ContactNumber}
+                value={localValues.contactNumber}
                 maxLength={10}
                 onChangeText={text => {
-                  setFieldValue('ContactNumber', text);
-                  if (fieldErrors.ContactNumber) {
+                  setLocalValues(prev => ({ ...prev, contactNumber: text }));
+                  if (fieldErrors.contactNumber) {
                     setFieldErrors(prev => ({
                       ...prev,
-                      ContactNumber: '',
+                      contactNumber: '',
                     }));
                   }
                 }}
                 keyboardType="phone-pad"
               />
-              {fieldErrors.ContactNumber && (
+              {fieldErrors.contactNumber && (
                 <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                  {fieldErrors.ContactNumber}
+                  {fieldErrors.contactNumber}
                 </Text>
               )}
               <Text style={styles.label}>Registered Pickup Address *</Text>
@@ -603,13 +600,16 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                   fieldErrors.origin && { borderColor: 'red', borderWidth: 1 },
                 ]}
                 placeholder="Enter registered pickup address"
-                value={values?.origin?.address || ''}
+                value={localValues?.origin?.address || ''}
                 textTransform="capitalize"
                 onChangeText={text => {
-                  setFieldValue('origin', {
-                    ...values.origin,
-                    address: text,
-                  });
+                  setLocalValues(prev => ({
+                    ...prev,
+                    origin: {
+                      ...prev.origin,
+                      address: text,
+                    },
+                  }));
 
                   if (fieldErrors.origin) {
                     setFieldErrors(prev => ({ ...prev, origin: '' }));
@@ -627,37 +627,60 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
 
           {isOtherPickupType && (
             <View style={styles.sectionContainer}>
-              {/* <View style={styles.sectionHeader}>
-                  <View style={tw`w-2 h-6 bg-orange-500 mr-3 rounded-full`} />
-                  <Text style={styles.sectionTitle}>Contact Details *</Text>
-                </View> */}
-
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Contact Person *</Text>
+                <Text style={styles.label}>Contact Name *</Text>
                 <TextInput
                   style={[
                     styles.input,
-                    fieldErrors.ContactPerson && {
+                    fieldErrors.contactName && {
                       borderColor: 'red',
                       borderWidth: 1,
                     },
                   ]}
                   placeholder="Enter contact person name"
-                  value={values.ContactPerson}
+                  value={localValues.contactName}
                   textTransform="capitalize"
                   onChangeText={text => {
-                    setFieldValue('ContactPerson', text);
-                    if (fieldErrors.ContactPerson) {
+                    setLocalValues(prev => ({ ...prev, contactName: text }));
+                    if (fieldErrors.contactName) {
                       setFieldErrors(prev => ({
                         ...prev,
-                        ContactPerson: '',
+                        contactName: '',
                       }));
                     }
                   }}
                 />
-                {fieldErrors.ContactPerson && (
+                {fieldErrors.contactName && (
                   <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                    {fieldErrors.ContactPerson}
+                    {fieldErrors.contactName}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Company / Warehouse Name *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    fieldErrors.companyName && {
+                      borderColor: 'red',
+                      borderWidth: 1,
+                    },
+                  ]}
+                  placeholder="Enter Company / Warehouse Name"
+                  value={localValues.companyName}
+                  onChangeText={text => {
+                    setLocalValues(prev => ({ ...prev, companyName: text }));
+                    if (fieldErrors.companyName) {
+                      setFieldErrors(prev => ({
+                        ...prev,
+                        companyName: '',
+                      }));
+                    }
+                  }}
+                />
+                {fieldErrors.companyName && (
+                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                    {fieldErrors.companyName}
                   </Text>
                 )}
               </View>
@@ -667,28 +690,28 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                 <TextInput
                   style={[
                     styles.input,
-                    fieldErrors.ContactNumber && {
+                    fieldErrors.contactNumber && {
                       borderColor: 'red',
                       borderWidth: 1,
                     },
                   ]}
                   placeholder="Enter contact number"
-                  value={values.ContactNumber}
+                  value={localValues.contactNumber}
                   maxLength={10}
                   onChangeText={text => {
-                    setFieldValue('ContactNumber', text);
-                    if (fieldErrors.ContactNumber) {
+                    setLocalValues(prev => ({ ...prev, contactNumber: text }));
+                    if (fieldErrors.contactNumber) {
                       setFieldErrors(prev => ({
                         ...prev,
-                        ContactNumber: '',
+                        contactNumber: '',
                       }));
                     }
                   }}
                   keyboardType="phone-pad"
                 />
-                {fieldErrors.ContactNumber && (
+                {fieldErrors.contactNumber && (
                   <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                    {fieldErrors.ContactNumber}
+                    {fieldErrors.contactNumber}
                   </Text>
                 )}
               </View>
@@ -701,96 +724,102 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
               <TextInput
                 style={[styles.input]}
                 placeholder="Current location"
-                value={values?.origin?.address || ''}
+                value={localValues?.origin?.address || ''}
                 editable={false}
               />
               <Text style={styles.label}>Contact Name *</Text>
               <TextInput
                 style={[
                   styles.input,
-                  fieldErrors.ContactPerson && {
+                  fieldErrors.contactName && {
                     borderColor: 'red',
                     borderWidth: 1,
                   },
                 ]}
                 placeholder="Enter contact person name"
-                value={values.ContactPerson}
+                value={localValues.contactName}
                 textTransform="capitalize"
                 onChangeText={text => {
-                  setFieldValue('ContactPerson', text);
-                  if (fieldErrors.ContactPerson) {
+                  setLocalValues(prev => ({ ...prev, contactName: text }));
+                  if (fieldErrors.contactName) {
                     setFieldErrors(prev => ({
                       ...prev,
-                      ContactPerson: '',
+                      contactName: '',
                     }));
                   }
                 }}
               />
-              {fieldErrors.ContactPerson && (
+              {fieldErrors.contactName && (
                 <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                  {fieldErrors.ContactPerson}
+                  {fieldErrors.contactName}
                 </Text>
               )}
               <Text style={styles.label}>Contact Number *</Text>
               <TextInput
                 style={[
                   styles.input,
-                  fieldErrors.ContactNumber && {
+                  fieldErrors.contactNumber && {
                     borderColor: 'red',
                     borderWidth: 1,
                   },
                 ]}
                 placeholder="Enter contact number"
-                value={values.ContactNumber}
+                value={localValues.contactNumber}
                 maxLength={10}
                 onChangeText={text => {
-                  setFieldValue('ContactNumber', text);
-                  if (fieldErrors.ContactNumber) {
+                  setLocalValues(prev => ({ ...prev, contactNumber: text }));
+                  if (fieldErrors.contactNumber) {
                     setFieldErrors(prev => ({
                       ...prev,
-                      ContactNumber: '',
+                      contactNumber: '',
                     }));
                   }
                 }}
                 keyboardType="phone-pad"
               />
-              {fieldErrors.ContactNumber && (
+              {fieldErrors.contactNumber && (
                 <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                  {fieldErrors.ContactNumber}
+                  {fieldErrors.contactNumber}
                 </Text>
               )}
-              {/* Manual fields visible for self */}
               <Text style={[styles.label, { marginTop: 10 }]}>
                 Plot / Unit / Building *
               </Text>
               <TextInput
                 style={[
                   styles.input,
-                  fieldErrors.Origin_1 && {
+                  fieldErrors.plotOrBuilding && {
                     borderColor: 'red',
                     borderWidth: 1,
                   },
                 ]}
                 placeholder="Enter plot/unit number"
-                value={values.Origin_1}
-                onChangeText={text => setFieldValue('Origin_1', text)}
+                value={localValues.plotOrBuilding}
+                onChangeText={text =>
+                  setLocalValues(prev => ({ ...prev, plotOrBuilding: text }))
+                }
               />
 
-              <Text style={styles.label}>Area / Street / Sector *</Text>
+              <Text style={styles.label}>
+                Street / Area /Sector / Village *
+              </Text>
               <TextInput
                 style={[
                   styles.input,
-                  fieldErrors.Origin_2 && {
+                  fieldErrors.streetArea && {
                     borderColor: 'red',
                     borderWidth: 1,
                   },
                 ]}
                 placeholder="Enter area details"
-                value={values.Origin_2}
-                onChangeText={text => setFieldValue('Origin_2', text)}
+                value={localValues.streetArea}
+                onChangeText={text =>
+                  setLocalValues(prev => ({ ...prev, streetArea: text }))
+                }
               />
             </View>
           )}
+
           {isOtherPickupType && (
             <>
               <View style={styles.sectionContainer}>
@@ -798,28 +827,34 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                 <TextInput
                   style={[
                     styles.input,
-                    fieldErrors.Origin_1 && {
+                    fieldErrors.plotOrBuilding && {
                       borderColor: 'red',
                       borderWidth: 1,
                     },
                   ]}
                   placeholder="Enter plot/unit number"
-                  value={values.Origin_1}
-                  onChangeText={text => setFieldValue('Origin_1', text)}
+                  value={localValues.plotOrBuilding}
+                  onChangeText={text =>
+                    setLocalValues(prev => ({ ...prev, plotOrBuilding: text }))
+                  }
                 />
 
-                <Text style={styles.label}>Area / Street / Sector *</Text>
+                <Text style={styles.label}>
+                  Street / Area /Sector /Village *
+                </Text>
                 <TextInput
                   style={[
                     styles.input,
-                    fieldErrors.Origin_2 && {
+                    fieldErrors.streetArea && {
                       borderColor: 'red',
                       borderWidth: 1,
                     },
                   ]}
                   placeholder="Enter area details"
-                  value={values.Origin_2}
-                  onChangeText={text => setFieldValue('Origin_2', text)}
+                  value={localValues.streetArea}
+                  onChangeText={text =>
+                    setLocalValues(prev => ({ ...prev, streetArea: text }))
+                  }
                 />
                 <View style={tw`flex-row gap-3 mb-4`}>
                   <View style={tw`flex-1`}>
@@ -827,20 +862,20 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                     <TextInput
                       style={styles.input}
                       placeholder="Enter Pincode"
-                      value={values.Pincode}
+                      value={localValues.pincode}
                       onChangeText={text => {
                         handlePinchange(text);
-                        if (fieldErrors.Pincode) {
-                          setFieldErrors(prev => ({ ...prev, Pincode: '' }));
+                        if (fieldErrors.pincode) {
+                          setFieldErrors(prev => ({ ...prev, pincode: '' }));
                         }
                       }}
                       keyboardType="numeric"
                       maxLength={6}
-                      error={!!fieldErrors.Pincode}
+                      error={!!fieldErrors.pincode}
                     />
-                    {fieldErrors.Pincode && (
+                    {fieldErrors.pincode && (
                       <Text style={{ color: 'red', fontSize: 12 }}>
-                        {fieldErrors.Pincode}
+                        {fieldErrors.pincode}
                       </Text>
                     )}
                   </View>
@@ -851,7 +886,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                       data={stateData?.data || []}
                       displayKey="state"
                       save="state"
-                      value={values.state}
+                      value={localValues.state}
                       setSelected={value => {
                         handleState(value);
                         if (fieldErrors.state) {
@@ -859,7 +894,9 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                         }
                       }}
                       placeholder="Select State"
-                      onClear={() => setFieldValue('state', '')}
+                      onClear={() =>
+                        setLocalValues(prev => ({ ...prev, state: '' }))
+                      }
                       inputStyles={tw`border-gray-200`}
                       style={
                         fieldErrors.state && {
@@ -876,7 +913,6 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                   </View>
                 </View>
 
-                {/* Address Row 2 — District + Taluka */}
                 <View style={tw`flex-row gap-3 mb-4`}>
                   <View style={tw`flex-1`}>
                     <Text style={styles.label}>District / City *</Text>
@@ -884,11 +920,15 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                       data={availableDistricts}
                       displayKey="region"
                       save="region"
-                      value={values.District}
-                      setSelected={val => setFieldValue('District', val)}
+                      value={localValues.district}
+                      setSelected={val =>
+                        setLocalValues(prev => ({ ...prev, district: val }))
+                      }
                       placeholder="Select District"
-                      onClear={() => setFieldValue('District', '')}
-                      disabled={!values.state}
+                      onClear={() =>
+                        setLocalValues(prev => ({ ...prev, district: '' }))
+                      }
+                      disabled={!localValues.state}
                       inputStyles={tw`border-gray-200`}
                     />
                   </View>
@@ -898,29 +938,30 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                     <TextInput
                       style={styles.input}
                       placeholder="Enter Taluka"
-                      value={values.Taluka}
-                      error={!!fieldErrors.Taluka}
+                      value={localValues.taluka}
+                      error={!!fieldErrors.taluka}
                       onChangeText={text => {
-                        setFieldValue('Taluka', text);
-                        if (fieldErrors.Taluka) {
-                          setFieldErrors(prev => ({ ...prev, Taluka: '' }));
+                        setLocalValues(prev => ({ ...prev, taluka: text }));
+                        if (fieldErrors.taluka) {
+                          setFieldErrors(prev => ({ ...prev, taluka: '' }));
                         }
                       }}
                     />
-                    {fieldErrors.Taluka && (
+                    {fieldErrors.taluka && (
                       <Text style={{ color: 'red', fontSize: 12 }}>
-                        {fieldErrors.Taluka}
+                        {fieldErrors.taluka}
                       </Text>
                     )}
                   </View>
                 </View>
 
-                {/* Google Search */}
                 <SelectList
                   data={originPlaces?.suggestions}
                   displayKey="value"
                   value={
-                    originPlaces.inputValue || values?.origin?.address || ''
+                    originPlaces.inputValue ||
+                    localValues?.origin?.address ||
+                    ''
                   }
                   save="object"
                   setSelected={handleOriginSelect}
@@ -1028,16 +1069,6 @@ const styles = StyleSheet.create({
     padding: 4,
     marginLeft: 16,
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    flexGrow: 1,
-    padding: 16,
-  },
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1077,24 +1108,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    // shadowColor: '#000',
-    // shadowOffset: {
-    //   width: 0,
-    //   height: 1,
-    // },
-    // shadowOpacity: 0.1,
-    // shadowRadius: 2,
-    // elevation: 2,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 0,
-  },
-  sectionTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#374151',
   },
   radioLabel: {
     marginLeft: 8,

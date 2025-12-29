@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// Step1_VehicleCustomer.tsx
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
   Card,
@@ -10,650 +11,492 @@ import {
   Portal,
   Button,
 } from 'react-native-paper';
-import { Picker } from '@react-native-picker/picker';
-import LoadpostDropdown from '@components/common/DropDown/LoadpostDropdown';
-import { useFormikContext } from 'formik';
 
-export default function Step1_VehicleCustomer() {
-  const { values, setFieldValue } = useFormikContext();
-  const [pickupOpen, setPickupOpen] = useState(false);
-  const [dropOpen, setDropOpen] = useState(false);
-  const [selectedLoadPost, setSelectedLoadPost] = useState('');
+// ========== TYPES ==========
+interface Step1_VehicleCustomerProps {
+  values: any;
+  setFieldValue: (field: string, value: any) => void;
+  selectedLoadPost?: string;
+  dropdownItems?: any[];
+}
 
-  const allData = [
-    {
-      loadPostId: 'LP001',
-      pickupName: 'Abhishek',
-      pickupPhone: '9899999999',
-      pickupAddress1: 'Address Line 1',
-      pickupAddress2: 'Address Line 2',
-      pickupGoogle: 'Google Address',
-      pickupCity: 'Mumbai',
-      pickupState: 'Maharashtra',
-      pickupPincode: '400001',
-      dropName: 'Ramesh',
-      dropPhone: '9876543210',
-      dropAddress1: 'Drop Address 1',
-      dropAddress2: 'Drop Address 2',
-      dropGoogle: 'Google Drop Address',
-      dropCity: 'Varanasi',
-      dropState: 'Uttar Pradesh',
-      dropPincode: '221001',
-    },
+interface LocationModalProps {
+  visible: boolean;
+  onDismiss: () => void;
+  type: 'pickup' | 'drop';
+  values: any;
+  setFieldValue: (field: string, value: any) => void;
+}
 
-    {
-      loadPostId: 'LP002',
-      pickupName: 'Suresh',
-      pickupPhone: '9123456780',
-      pickupAddress1: 'Same Building',
-      pickupAddress2: '3rd Floor',
-      pickupGoogle: 'Google Address 2',
-      pickupCity: 'Pune',
-      pickupState: 'Maharashtra',
-      pickupPincode: '411001',
-      dropName: 'Mahesh',
-      dropPhone: '9988776655',
-      dropAddress1: 'Drop Area 2',
-      dropAddress2: 'Near Market',
-      dropGoogle: 'Google Drop 2',
-      dropCity: 'Delhi',
-      dropState: 'Delhi',
-      dropPincode: '110001',
-    },
+// ========== HELPER FUNCTIONS ==========
+const formatAddress = (address1?: string, address2?: string): string => {
+  if (address1 && address2) return `${address1}, ${address2}`;
+  return address1 || address2 || 'Address not specified';
+};
 
-    {
-      loadPostId: 'LP003',
-      pickupName: 'Vikas',
-      pickupPhone: '9000000000',
-      pickupAddress1: 'Pickup Street 3',
-      pickupAddress2: 'Landmark XYZ',
-      pickupGoogle: 'Google Address 3',
-      pickupCity: 'Nashik',
-      pickupState: 'Maharashtra',
-      pickupPincode: '422001',
-      dropName: 'Amit',
-      dropPhone: '9090909090',
-      dropAddress1: 'Drop Road 3',
-      dropAddress2: 'Opposite Temple',
-      dropGoogle: 'Google Drop 3',
-      dropCity: 'Indore',
-      dropState: 'Madhya Pradesh',
-      dropPincode: '452001',
-    },
-  ];
+const getFullAddressText = (values: any, prefix: 'pickup' | 'drop') => {
+  const parts: string[] = [];
 
-  const [filters, setFilters] = useState({
-    loadPostId: '',
-    origin: '',
-    destination: '',
-  });
+  if (values[`${prefix}Address1`]) parts.push(values[`${prefix}Address1`]);
+  if (values[`${prefix}Address2`]) parts.push(values[`${prefix}Address2`]);
 
-  const [pickupForm, setPickupForm] = useState({
-    name: '',
-    mobile: '',
-    address1: '',
-    address2: '',
-    googleAddress: '',
-    state: '',
-    city: '',
-    taluka: '',
-    pincode: '',
-  });
+  if (values[`${prefix}Google`]) {
+    parts.push('-------------------------------------------------------------');
+    parts.push(values[`${prefix}Google`]);
+  }
 
-  const [dropForm, setDropForm] = useState({
-    ConsigneeName: '',
-    Consigneemobileno: '',
-    address1: '',
-    address2: '',
-    state: '',
-    city: '',
-    taluka: '',
-    pincode: '',
-  });
+  const cityDistrict = [values[`${prefix}City`], values[`${prefix}District`]]
+    .filter(Boolean)
+    .join(', ');
+  if (cityDistrict) parts.push(cityDistrict);
 
-  const showModal = (values: {
-    loadPostId?: string;
-    pickupName: any;
-    pickupPhone: any;
-    pickupAddress1: any;
-    pickupAddress2: any;
-    pickupGoogle: any;
-    pickupCity: any;
-    pickupState: any;
-    pickupPincode: any;
-    dropName?: string;
-    dropPhone?: string;
-    dropAddress1?: string;
-    dropAddress2?: string;
-    dropGoogle?: string;
-    dropCity?: string;
-    dropState?: string;
-    dropPincode?: string;
-  }) => {
-    setPickupForm({
-      name: values.pickupName,
-      mobile: values.pickupPhone,
-      address1: values.pickupAddress1,
-      address2: values.pickupAddress2,
-      googleAddress: values.pickupGoogle,
-      state: values.pickupState,
-      city: values.pickupCity,
-      taluka: '',
-      pincode: values.pickupPincode,
-    });
-    setPickupOpen(true);
-  };
+  const statePincode = [values[`${prefix}State`], values[`${prefix}Pincode`]]
+    .filter(Boolean)
+    .join(', ');
+  if (statePincode) parts.push(statePincode);
 
-  const hideModal = () => setPickupOpen(false);
+  return parts.join('\n');
+};
 
-  const containerStyle = {
-    backgroundColor: 'white',
-    padding: 18,
-    margin: 10,
-    borderRadius: 12,
-  };
+// ========== REUSABLE COMPONENTS ==========
+const LocationCard: React.FC<{
+  title: string;
+  values: any;
+  onEdit: () => void;
+  type: 'pickup' | 'drop';
+}> = ({ title, values, onEdit, type }) => {
+  const prefix = type;
 
-  const handleFilterChange = (key: string, value: string) =>
-    setFilters(prev => ({ ...prev, [key]: value }));
-
-  const filteredData = allData.filter(item => {
-    return (
-      (!filters.loadPostId || item.loadPostId === filters.loadPostId) &&
-      (!filters.origin || item.pickupCity === filters.origin) &&
-      (!filters.destination || item.dropCity === filters.destination)
-    );
-  });
-
-  const uniqueOptions = (field: string) => [
-    ...new Set(allData.map(item => item[field])),
-  ];
-  const showDropModal = (values: {
-    loadPostId?: string;
-    pickupName?: string;
-    pickupPhone?: string;
-    pickupAddress1?: string;
-    pickupAddress2?: string;
-    pickupGoogle?: string;
-    pickupCity?: string;
-    pickupState?: string;
-    pickupPincode?: string;
-    dropName: any;
-    dropPhone: any;
-    dropAddress1: any;
-    dropAddress2: any;
-    dropGoogle?: string;
-    dropCity: any;
-    dropState: any;
-    dropPincode: any;
-  }) => {
-    setDropForm({
-      ConsigneeName: values.dropName,
-      Consigneemobileno: values.dropPhone,
-      address1: values.dropAddress1,
-      address2: values.dropAddress2,
-      state: values.dropState,
-      city: values.dropCity,
-      taluka: '',
-      pincode: values.dropPincode,
-    });
-
-    setDropOpen(true);
-  };
   return (
-    <ScrollView style={styles.container}>
-      {/* ---------------- FILTERS ---------------- */}
-      <View style={styles.filterContainer}>
-        <LoadpostDropdown
-          allData={allData}
-          selected={filters.loadPostId}
-          onSelect={(value: string) => handleFilterChange('loadPostId', value)}
-        />
+    <Card style={styles.card} elevation={0}>
+      <View style={styles.cardHeader}>
+        <View style={styles.titleRow}>
+          <Text variant="titleSmall" style={styles.cardTitle}>
+            {title}
+          </Text>
+          <IconButton
+            icon="pencil"
+            size={16}
+            onPress={onEdit}
+            style={styles.editButton}
+          />
+        </View>
       </View>
 
-      {/* ---------------- CARDS ---------------- */}
-      {filteredData.map((values, index) => (
-        <View key={index}>
-          {/* PICKUP CARD */}
-          <Card style={styles.card}>
-            <View style={styles.headerRow}>
-              <Text style={styles.title}>Pickup Location</Text>
-              <IconButton icon="pencil" onPress={() => showModal(values)} />
-            </View>
+      <Divider style={styles.divider} />
 
-            <Divider />
-
-            <View style={styles.content}>
-              <Text style={styles.value}>
-                {values.pickupName} · {values.pickupPhone}
-              </Text>
-              <Text style={styles.value}>
-                {values.pickupAddress1}, {values.pickupAddress2}
-              </Text>
-              <Text style={styles.value}>{values.pickupGoogle}</Text>
-              <Text style={styles.value}>
-                {values.pickupCity}, {values.pickupState} -{' '}
-                {values.pickupPincode}
-              </Text>
-            </View>
-          </Card>
-
-          {/* ---------------- MODAL FORM ---------------- */}
-          <Portal>
-            <Modal
-              visible={pickupOpen}
-              onDismiss={hideModal}
-              contentContainerStyle={containerStyle}
-            >
-              <Text style={styles.formTitle}>Update Pickup Location</Text>
-
-              <View style={styles.formContainer}>
-                {/* Row 1 — Name + Mobile */}
-                <View style={styles.row}>
-                  <TextInput
-                    label="Name"
-                    value={pickupForm.name}
-                    onChangeText={t =>
-                      setPickupForm({ ...pickupForm, name: t })
-                    }
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label="Mobile"
-                    keyboardType="number-pad"
-                    value={pickupForm.mobile}
-                    onChangeText={t =>
-                      setPickupForm({ ...pickupForm, mobile: t })
-                    }
-                    style={styles.input}
-                  />
-                </View>
-
-                {/* Address 1 */}
-                <TextInput
-                  label="Address Line 1"
-                  value={pickupForm.address1}
-                  onChangeText={t =>
-                    setPickupForm({ ...pickupForm, address1: t })
-                  }
-                  style={styles.fullInput}
-                />
-
-                {/* Address 2 */}
-                <TextInput
-                  label="Address Line 2"
-                  value={pickupForm.address2}
-                  onChangeText={t =>
-                    setPickupForm({ ...pickupForm, address2: t })
-                  }
-                  style={styles.fullInput}
-                />
-
-                {/* Google Address */}
-                <TextInput
-                  label="Google Address"
-                  disabled
-                  value={pickupForm.googleAddress}
-                  onChangeText={t =>
-                    setPickupForm({ ...pickupForm, googleAddress: t })
-                  }
-                  style={styles.fullInput}
-                />
-
-                {/* State + City */}
-                <View style={styles.row}>
-                  <TextInput
-                    label="State"
-                    value={pickupForm.state}
-                    onChangeText={t =>
-                      setPickupForm({ ...pickupForm, state: t })
-                    }
-                    disabled
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label="City"
-                    disabled
-                    value={pickupForm.city}
-                    onChangeText={t =>
-                      setPickupForm({ ...pickupForm, city: t })
-                    }
-                    style={styles.input}
-                  />
-                </View>
-
-                {/* Taluka + Pincode */}
-                <View style={styles.row}>
-                  <TextInput
-                    label="Taluka"
-                    value={pickupForm.taluka}
-                    disabled
-                    onChangeText={t =>
-                      setPickupForm({ ...pickupForm, taluka: t })
-                    }
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label="Pincode"
-                    keyboardType="number-pad"
-                    value={pickupForm.pincode}
-                    disabled
-                    onChangeText={t =>
-                      setPickupForm({ ...pickupForm, pincode: t })
-                    }
-                    style={styles.input}
-                  />
-                </View>
-
-                {/* ACTION BUTTONS */}
-                <View style={styles.actionRow}>
-                  <Button mode="outlined" onPress={hideModal}>
-                    <Text> Cancel</Text>
-                  </Button>
-                  <Button mode="contained" onPress={() => hideModal()}>
-                    <Text> Update</Text>
-                  </Button>
-                </View>
-              </View>
-            </Modal>
-          </Portal>
-
-          {/* DROP CARD */}
-          <Card style={styles.card}>
-            <View style={styles.headerRow}>
-              <Text style={styles.title}>Drop Location</Text>
-              <IconButton icon="pencil" onPress={() => showDropModal(values)} />
-            </View>
-            <Divider />
-            <View style={styles.content}>
-              <Text style={styles.value}>
-                {values.dropName} · {values.dropPhone}
-              </Text>
-              <Text style={styles.value}>
-                {values.dropAddress1}, {values.dropAddress2}
-              </Text>
-              <Text style={styles.value}>{values.dropGoogle}</Text>
-              <Text style={styles.value}>
-                {values.dropCity}, {values.dropState} - {values.dropPincode}
-              </Text>
-            </View>
-          </Card>
-          {/* ---------------- DROP MODAL ---------------- */}
-          <Portal>
-            <Modal
-              visible={dropOpen}
-              onDismiss={() => setDropOpen(false)}
-              contentContainerStyle={containerStyle}
-            >
-              <Text style={styles.formTitle}>Update Drop Location</Text>
-
-              <View style={styles.formContainer}>
-                {/* Row 1 — Consignee Name + Mobile */}
-                <View style={styles.row}>
-                  <TextInput
-                    label="Consignee Name"
-                    value={dropForm.ConsigneeName}
-                    onChangeText={t =>
-                      setDropForm({ ...dropForm, ConsigneeName: t })
-                    }
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label="Consignee Mobile"
-                    keyboardType="number-pad"
-                    value={dropForm.Consigneemobileno}
-                    onChangeText={t =>
-                      setDropForm({ ...dropForm, Consigneemobileno: t })
-                    }
-                    style={styles.input}
-                  />
-                </View>
-
-                {/* Address 1 */}
-                <TextInput
-                  label="Address Line 1"
-                  value={dropForm.address1}
-                  onChangeText={t => setDropForm({ ...dropForm, address1: t })}
-                  style={styles.fullInput}
-                />
-
-                {/* Address 2 */}
-                <TextInput
-                  label="Address Line 2"
-                  value={dropForm.address2}
-                  onChangeText={t => setDropForm({ ...dropForm, address2: t })}
-                  style={styles.fullInput}
-                />
-
-                {/* State + City */}
-                <View style={styles.row}>
-                  <TextInput
-                    label="State"
-                    value={dropForm.state}
-                    onChangeText={t => setDropForm({ ...dropForm, state: t })}
-                    style={styles.input}
-                    disabled
-                  />
-
-                  <TextInput
-                    label="City"
-                    value={dropForm.city}
-                    onChangeText={t => setDropForm({ ...dropForm, city: t })}
-                    style={styles.input}
-                    disabled
-                  />
-                </View>
-
-                {/* Taluka + Pincode */}
-                <View style={styles.row}>
-                  <TextInput
-                    label="Taluka"
-                    value={dropForm.taluka}
-                    onChangeText={t => setDropForm({ ...dropForm, taluka: t })}
-                    style={styles.input}
-                    disabled
-                  />
-                  <TextInput
-                    label="Pincode"
-                    keyboardType="number-pad"
-                    value={dropForm.pincode}
-                    onChangeText={t => setDropForm({ ...dropForm, pincode: t })}
-                    style={styles.input}
-                    disabled
-                  />
-                </View>
-
-                {/* ACTION BUTTONS */}
-                <View style={styles.actionRow}>
-                  <Button mode="outlined" onPress={() => setDropOpen(false)}>
-                    <Text> Cancel</Text>
-                  </Button>
-                  <Button mode="contained" onPress={() => setDropOpen(false)}>
-                    <Text> Update</Text>
-                  </Button>
-                </View>
-              </View>
-            </Modal>
-          </Portal>
-
-          {/* ---------------- DROP MODAL ---------------- */}
-          <Portal>
-            <Modal
-              visible={dropOpen}
-              onDismiss={() => setDropOpen(false)}
-              contentContainerStyle={containerStyle}
-            >
-              <Text style={styles.formTitle}>Update Drop Location</Text>
-
-              <View style={styles.formContainer}>
-                {/* Row 1 — Consignee Name + Mobile */}
-                <View style={styles.row}>
-                  <TextInput
-                    label="Consignee Name"
-                    value={dropForm.ConsigneeName}
-                    onChangeText={t =>
-                      setDropForm({ ...dropForm, ConsigneeName: t })
-                    }
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label="Consignee Mobile"
-                    keyboardType="number-pad"
-                    value={dropForm.Consigneemobileno}
-                    onChangeText={t =>
-                      setDropForm({ ...dropForm, Consigneemobileno: t })
-                    }
-                    style={styles.input}
-                  />
-                </View>
-
-                {/* Address 1 */}
-                <TextInput
-                  label="Address Line 1"
-                  value={dropForm.address1}
-                  onChangeText={t => setDropForm({ ...dropForm, address1: t })}
-                  style={styles.fullInput}
-                />
-
-                {/* Address 2 */}
-                <TextInput
-                  label="Address Line 2"
-                  value={dropForm.address2}
-                  onChangeText={t => setDropForm({ ...dropForm, address2: t })}
-                  style={styles.fullInput}
-                />
-
-                {/* State + City */}
-                <View style={styles.row}>
-                  <TextInput
-                    label="State"
-                    value={dropForm.state}
-                    onChangeText={t => setDropForm({ ...dropForm, state: t })}
-                    style={styles.input}
-                    disabled
-                  />
-
-                  <TextInput
-                    label="City"
-                    value={dropForm.city}
-                    onChangeText={t => setDropForm({ ...dropForm, city: t })}
-                    style={styles.input}
-                    disabled
-                  />
-                </View>
-
-                {/* Taluka + Pincode */}
-                <View style={styles.row}>
-                  <TextInput
-                    label="Taluka"
-                    value={dropForm.taluka}
-                    onChangeText={t => setDropForm({ ...dropForm, taluka: t })}
-                    style={styles.input}
-                    disabled
-                  />
-                  <TextInput
-                    label="Pincode"
-                    keyboardType="number-pad"
-                    value={dropForm.pincode}
-                    onChangeText={t => setDropForm({ ...dropForm, pincode: t })}
-                    style={styles.input}
-                    disabled
-                  />
-                </View>
-
-                {/* ACTION BUTTONS */}
-                <View style={styles.actionRow}>
-                  <Button mode="outlined" onPress={() => setDropOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button mode="contained" onPress={() => setDropOpen(false)}>
-                    Update
-                  </Button>
-                </View>
-              </View>
-            </Modal>
-          </Portal>
+      <View style={styles.cardContent}>
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldContainer}>
+            <Text variant="labelSmall" style={styles.fieldLabel}>
+              NAME
+            </Text>
+            <Text variant="bodySmall" style={styles.fieldValue}>
+              {values[`${prefix}Name`] || '—'}
+            </Text>
+          </View>
+          <View style={styles.fieldContainer}>
+            <Text variant="labelSmall" style={styles.fieldLabel}>
+              PHONE
+            </Text>
+            <Text variant="bodySmall" style={styles.fieldValue}>
+              {values[`${prefix}Phone`] || '—'}
+            </Text>
+          </View>
         </View>
-      ))}
-    </ScrollView>
+
+        <View style={styles.fieldContainer}>
+          <Text variant="labelSmall" style={styles.fieldLabel}>
+            GST NO
+          </Text>
+          <Text variant="bodySmall" style={styles.fieldValue}>
+            {values[`${prefix}Gst`] || 'Not specified'}
+          </Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text variant="labelSmall" style={styles.fieldLabel}>
+            ADDRESS
+          </Text>
+          <Text variant="bodySmall" style={styles.fieldValue}>
+            {formatAddress(
+              values[`${prefix}Address1`],
+              values[`${prefix}Address2`],
+            ) || '—'}
+          </Text>
+          {values[`${prefix}Google`] && (
+            <View style={styles.fieldContainer}>
+              <Text variant="bodySmall" style={styles.googleValue}>
+                {values[`${prefix}Google`]}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldContainer}>
+            <Text variant="labelSmall" style={styles.fieldLabel}>
+              CITY
+            </Text>
+            <Text variant="bodySmall" style={styles.fieldValue}>
+              {values[`${prefix}City`] || '—'}
+            </Text>
+          </View>
+          <View style={styles.fieldContainer}>
+            <Text variant="labelSmall" style={styles.fieldLabel}>
+              STATE
+            </Text>
+            <Text variant="bodySmall" style={styles.fieldValue}>
+              {values[`${prefix}State`] || '—'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldContainer}>
+            <Text variant="labelSmall" style={styles.fieldLabel}>
+              PINCODE
+            </Text>
+            <Text variant="bodySmall" style={styles.fieldValue}>
+              {values[`${prefix}Pincode`] || '—'}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Card>
+  );
+};
+
+const LocationModal: React.FC<LocationModalProps> = ({
+  visible,
+  onDismiss,
+  type,
+  values,
+  setFieldValue,
+}) => {
+  const prefix = type;
+  const title =
+    type === 'pickup' ? 'Update Consigner Details' : 'Update Consignee Details';
+
+  const handleSave = () => {
+    onDismiss();
+  };
+
+  return (
+    <Portal>
+      <Modal
+        visible={visible}
+        onDismiss={onDismiss}
+        contentContainerStyle={styles.modalContainer}
+      >
+        <Card style={styles.modalCard}>
+          <Card.Content>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{title}</Text>
+              <IconButton
+                icon="close"
+                size={24}
+                onPress={onDismiss}
+                style={styles.closeButton}
+              />
+            </View>
+            <Divider style={styles.modalDivider} />
+
+            <ScrollView style={styles.modalContent}>
+              <TextInput
+                label="GST Number"
+                value={values[`${prefix}Gst`] || ''}
+                onChangeText={t => setFieldValue(`${prefix}Gst`, t)}
+                mode="outlined"
+                style={styles.input}
+              />
+
+              <TextInput
+                label={
+                  type === 'pickup'
+                    ? 'Consigner Name / Shipper Name'
+                    : 'Consignee Name'
+                }
+                value={values[`${prefix}Name`]}
+                onChangeText={t => setFieldValue(`${prefix}Name`, t)}
+                mode="outlined"
+                style={styles.input}
+              />
+
+              <TextInput
+                label="Full Address"
+                value={getFullAddressText(values, prefix)}
+                mode="outlined"
+                multiline
+                numberOfLines={6}
+                editable={true}
+                style={styles.fullAddressInput}
+              />
+
+              <TextInput
+                label="Pincode"
+                keyboardType="numeric"
+                value={values[`${prefix}Pincode`]}
+                onChangeText={t => setFieldValue(`${prefix}Pincode`, t)}
+                mode="outlined"
+                style={styles.halfInput}
+              />
+
+              <TextInput
+                label={type === 'pickup' ? 'Origin' : 'Destination'}
+                value={values[`${prefix}City`] || ''}
+                onChangeText={t => setFieldValue(`${prefix}City`, t)}
+                mode="outlined"
+                style={styles.input}
+              />
+
+              <TextInput
+                label="State"
+                value={values[`${prefix}State`]}
+                onChangeText={t => setFieldValue(`${prefix}State`, t)}
+                mode="outlined"
+                style={styles.halfInput}
+              />
+
+              <View style={styles.modalActions}>
+                <Button
+                  mode="outlined"
+                  onPress={onDismiss}
+                  style={styles.cancelButton}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={handleSave}
+                  style={styles.saveButton}
+                >
+                  Save Changes
+                </Button>
+              </View>
+            </ScrollView>
+          </Card.Content>
+        </Card>
+      </Modal>
+    </Portal>
+  );
+};
+
+// ========== MAIN COMPONENT ==========
+export default function Step1_VehicleCustomer({
+  values,
+  setFieldValue,
+  selectedLoadPost: propSelectedLoadPost,
+  dropdownItems: propDropdownItems,
+}: Step1_VehicleCustomerProps) {
+  const [pickupOpen, setPickupOpen] = useState(false);
+  const [dropOpen, setDropOpen] = useState(false);
+
+  const selectedLoadPost = propSelectedLoadPost || '';
+  const dropdownItems = propDropdownItems || [];
+
+  const selectedCard = useMemo(
+    () =>
+      dropdownItems.find(item => item.loadPostId === selectedLoadPost)?.full,
+    [selectedLoadPost, dropdownItems],
+  );
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.contentContainer}
+      >
+        {selectedCard ? (
+          <>
+            <LocationCard
+              title="Consignor Details"
+              values={values}
+              onEdit={() => setPickupOpen(true)}
+              type="pickup"
+            />
+
+            <LocationCard
+              title="Consignee Details"
+              values={values}
+              onEdit={() => setDropOpen(true)}
+              type="drop"
+            />
+          </>
+        ) : (
+          <View style={styles.placeholderContainer}>
+            <Text style={styles.placeholderText}>
+              Select a load post to view details
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+
+      <LocationModal
+        visible={pickupOpen}
+        onDismiss={() => setPickupOpen(false)}
+        type="pickup"
+        values={values}
+        setFieldValue={setFieldValue}
+      />
+
+      <LocationModal
+        visible={dropOpen}
+        onDismiss={() => setDropOpen(false)}
+        type="drop"
+        values={values}
+        setFieldValue={setFieldValue}
+      />
+    </View>
   );
 }
 
-/* --------------------------- STYLES ------------------------------- */
+// ========== STYLES ==========
 const styles = StyleSheet.create({
   container: {
-    padding: 10,
+    flex: 1,
+    backgroundColor: '#f8fafc',
   },
-  filterScroll: {
-    marginBottom: 10,
+  scrollView: {
+    flex: 1,
   },
-  picker: {
-    width: 150,
-    height: 50,
-    marginHorizontal: 5,
-    backgroundColor: '#fff',
+  contentContainer: {
+    padding: 0,
+    paddingTop: 0,
   },
-  card: {
-    borderRadius: 14,
-    elevation: 2,
-    backgroundColor: '#fff',
-    marginBottom: 12,
-    paddingBottom: 6,
+  modalContainer: {
+    paddingHorizontal: 20,
+    flex: 1,
+    justifyContent: 'center',
   },
-  headerRow: {
+  modalCard: {
+    maxHeight: '85%',
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+  },
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
+    paddingRight: 8,
   },
-  title: {
-    fontSize: 17,
+  modalTitle: {
+    fontSize: 20,
     fontWeight: '700',
+    color: '#1e293b',
   },
-  content: {
-    padding: 14,
-    gap: 6,
+  closeButton: {
+    margin: 0,
   },
-  value: {
-    fontSize: 14,
-    color: '#333',
+  modalDivider: {
+    marginVertical: 12,
   },
-
-  /* FORM */
-  formTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  formContainer: {
-    marginTop: 10,
-  },
-
-  row: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
+  modalContent: {
+    maxHeight: 500,
   },
   input: {
-    flex: 1,
+    marginBottom: 16,
+    backgroundColor: '#f8fafc',
   },
-  fullInput: {
-    width: '100%',
-    marginBottom: 12,
+  fullAddressInput: {
+    backgroundColor: '#f8fafc',
+    fontSize: 14,
+    lineHeight: 20,
   },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 10,
-  },
-  filterContainer: {
-    width: '100%',
-    // paddingHorizontal: 10, // small space on left/right
-    // marginBottom: 10,
-  },
-  fullPicker: {
-    width: '100%',
+  card: {
     backgroundColor: '#fff',
     borderRadius: 8,
+    marginVertical: 0,
+    marginHorizontal: 0,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  editButton: {
+    margin: 0,
+  },
+  cardContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  divider: {
+    backgroundColor: '#f0f0f0',
+    height: 1,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  fieldContainer: {
+    flex: 1,
+  },
+  fieldLabel: {
+    color: '#000000ff',
+    fontWeight: '500',
+    marginBottom: 2,
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+  fieldValue: {
+    color: '#212121',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  googleValue: {
+    color: '#1d1d1dff',
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  halfInput: {
+    flex: 1,
+    fontSize: 13,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  cancelButton: {
+    borderColor: '#ddd',
+    borderRadius: 2,
+  },
+  saveButton: {
+    backgroundColor: '#1a73e8',
+    borderRadius: 2,
+  },
+  placeholderContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    fontSize: 12,
+    color: '#9e9e9e',
   },
 });

@@ -29,6 +29,7 @@ export enum routeName {
   NOTIFICATION = 'notification',
   ADD_EMPLOYEE = 'addEmployee',
   MULTISTEPFORM = 'multistep',
+  INDIVIDUAL = 'individual',
 
   // old
 

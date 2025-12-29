@@ -69,7 +69,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
   const [showMap, setShowMap] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const { values, setFieldValue } = useFormikContext<ShipmentData>();
-  const [fieldName, setFieldName] = useState<'origin' | 'destination' | ''>('');
+  const [fieldName, setFieldName] = useState<'pickup' | 'delivery' | ''>('');
   const [activeDestinationButton, setActiveDestinationButton] =
     useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -80,14 +80,15 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
   const destinationPlaces = useGooglePlacesSelect();
 
   type FieldErrors = {
-    ConsigneeName?: string;
-    ConsigneeContactNumber?: string;
-    Pincode?: string;
+    consigneeName?: string;
+    contactPerson?: string;
+    contactNumber?: string;
+    pincode?: string;
     state?: string;
-    District?: string;
-    Taluka?: string;
-    Destination_1?: string;
-    Destination_2?: string;
+    district?: string;
+    taluka?: string;
+    plotOrBuilding?: string;
+    streetArea?: string;
     destination?: string;
   };
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -103,13 +104,8 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
     async (selected: any) => {
       const location = await destinationPlaces.getPlaceDetails(selected.key);
       if (location) {
-        setFieldValue('destination', location);
-        setMapRegion({
-          latitude: location.coordinates?.lat,
-          longitude: location.coordinates?.lng,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
+        setFieldValue('delivery.destination', location);
+        // Update map region if needed
       }
     },
     [destinationPlaces, setFieldValue],
@@ -125,36 +121,37 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
     console.log('Selected history item:', item);
 
     // Consignee details
-    setFieldValue('ConsigneeName', item.ConsigneeName || '');
-    setFieldValue('ConsigneeContactNumber', item.ConsigneeContactNumber || '');
+    setFieldValue('delivery.consigneeName', item.consigneeName || '');
+    setFieldValue('delivery.contactNumber', item.contactNumber || '');
+    setFieldValue('delivery.contactPerson', item.contactPerson || '');
 
     // Address fields
-    setFieldValue('Destination_1', item.Destination_1 || '');
-    setFieldValue('Destination_2', item.Destination_2 || '');
+    setFieldValue('delivery.plotOrBuilding', item.plotOrBuilding || '');
+    setFieldValue('delivery.streetArea', item.streetArea || '');
 
     // Extract pincode from item.address or database field
     const pincode = item.Pincode || item.address?.match(/\b\d{6}\b/)?.[0] || '';
 
-    setFieldValue('Pincode', pincode);
+    setFieldValue('delivery.pincode', pincode);
 
     // Set district + state if present
-    setFieldValue('District', item.Destination_District || '');
-    setFieldValue('Taluka', item.Destination_Taluka || '');
-    setFieldValue('state', item.Destination_State || '');
+    setFieldValue('delivery.district', item.district || '');
+    setFieldValue('delivery.taluka', item.taluka || '');
+    setFieldValue('delivery.state', item.state || '');
 
     // Google-like structure for destination
-    setFieldValue('destination', {
+    setFieldValue('delivery.destination', {
       address: item.address || '',
       components: {
-        dist: item.District || '',
-        Pincode: pincode,
-        place: item.Place || item.City || item.District || '',
-        state: item.State || '',
-        tal: item.Taluka || '',
+        dist: item.district || '',
+        pincode: pincode,
+        place: item.place || item.city || item.district || '',
+        state: item.state || '',
+        tal: item.taluka || '',
       },
       coordinates: {
-        lat: item.Latitude || 0,
-        lng: item.Longitude || 0,
+        lat: item.latitude || 0,
+        lng: item.longitude || 0,
       },
     });
 
@@ -166,19 +163,24 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
   const handleConfirm = useCallback(() => {
     const newErrors: any = {};
 
-    if (!values.ConsigneeName)
-      newErrors.ConsigneeName = 'Please enter consignee name';
-    if (!values.destination?.address)
+    if (!values.delivery.consigneeName && !values.delivery.contactPerson) {
+      newErrors.consigneeName =
+        'Either Consignee/Company Name or Contact Person Name is required';
+      newErrors.contactPerson =
+        'Either Consignee/Company Name or Contact Person Name is required';
+    }
+    if (!values.delivery.destination?.address)
       newErrors.destination = 'Please select a drop-off location';
-    if (!values.Pincode || values.Pincode.length !== 6)
-      newErrors.Pincode = 'Please enter a valid 6-digit pincode';
-    if (!values.state) newErrors.state = 'Please select a state';
-    if (!values.District) newErrors.District = 'Please select a district';
+    if (!values.delivery.pincode || values.delivery.pincode.length !== 6)
+      newErrors.pincode = 'Please enter a valid 6-digit pincode';
+    if (!values.delivery.state) newErrors.state = 'Please select a state';
+    if (!values.delivery.district)
+      newErrors.district = 'Please select a district';
 
-    if (!values.Destination_1)
-      newErrors.Destination_1 = 'Please enter a valid destination';
-    if (!values.Destination_2)
-      newErrors.Destination_2 = 'Please enter a valid destination';
+    if (!values.delivery.plotOrBuilding)
+      newErrors.plotOrBuilding = 'Please enter a valid destination';
+    if (!values.delivery.streetArea)
+      newErrors.streetArea = 'Please enter a valid destination';
 
     setFieldErrors(newErrors);
 
@@ -196,7 +198,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
         const response = await getDistricts({ state: value }).unwrap();
         const DistrictsList = response?.data || [];
         setAvailableDistricts(DistrictsList);
-        setFieldValue('state', value);
+        setFieldValue('delivery.state', value);
       } catch (error) {
         console.error('Error fetching districts:', error);
       }
@@ -206,14 +208,14 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
 
   const handlePinchange = useCallback(
     async (value: string) => {
-      setFieldValue('Pincode', value);
+      setFieldValue('delivery.pincode', value);
       if (value.length === 6) {
         try {
           const response = await PincodeData({ pincode: value }).unwrap();
           const mapped = response?.data;
           if (mapped) {
-            setFieldValue('state', mapped?.State);
-            setFieldValue('District', mapped?.District);
+            setFieldValue('delivery.state', mapped?.State);
+            setFieldValue('delivery.district', mapped?.District);
 
             // ✅ Convert Pincode to coordinates using Google API
             const geocodeRes = await fetch(
@@ -299,15 +301,15 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
           // Use pincodeCoords if available, otherwise fallback to Formik destination coordinates
           pincodeCoords={
             pincodeCoords ||
-            (values.destination?.coordinates?.lat
+            (values.delivery.destination?.coordinates?.lat
               ? {
-                  latitude: values.destination.coordinates.lat,
-                  longitude: values.destination.coordinates.lng,
+                  latitude: values.delivery.destination.coordinates.lat,
+                  longitude: values.delivery.destination.coordinates.lng,
                 }
               : null)
           }
           onLocationSelected={location => {
-            setFieldValue('destination', {
+            setFieldValue('delivery.destination', {
               address: location.address,
               coordinates: {
                 lat: location.latitude,
@@ -318,7 +320,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
                 dist: '',
                 place: '',
                 tal: '',
-                Pincode: '',
+                pincode: '',
               },
             });
 
@@ -372,54 +374,81 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
         </View>
         <View style={tw` bg-white p-4 rounded-2xl    border-gray-100`}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Consignee Name *</Text>
+            <Text style={styles.label}>Consignee / Company Name *</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter consignee name"
               textTransform="capitalize"
-              value={values.ConsigneeName}
-              error={!!fieldErrors.ConsigneeName}
+              value={values.delivery.consigneeName}
+              error={!!fieldErrors.consigneeName}
               onChangeText={text => {
-                setFieldValue('ConsigneeName', text);
+                setFieldValue('delivery.consigneeName', text);
 
-                // ✅ clear error when user starts typing in this field
-                if (fieldErrors.ConsigneeName) {
+                if (fieldErrors.consigneeName || fieldErrors.contactPerson) {
                   setFieldErrors(prev => ({
                     ...prev,
-                    ConsigneeName: '',
+                    consigneeName: '',
+                    contactPerson: '',
                   }));
                 }
               }}
             />
 
-            {fieldErrors.ConsigneeName && (
+            {fieldErrors.consigneeName && (
               <Text style={{ color: 'red', fontSize: 12 }}>
-                {fieldErrors.ConsigneeName}
+                {fieldErrors.consigneeName}
               </Text>
             )}
           </View>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Consignee Mobile Number *</Text>
+            <Text style={styles.label}>Contact Person Name *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter Contact Person name"
+              textTransform="capitalize"
+              value={values.delivery.contactPerson}
+              error={!!fieldErrors.contactPerson}
+              onChangeText={text => {
+                setFieldValue('delivery.contactPerson', text);
+
+                if (fieldErrors.consigneeName || fieldErrors.contactPerson) {
+                  setFieldErrors(prev => ({
+                    ...prev,
+                    consigneeName: '',
+                    contactPerson: '',
+                  }));
+                }
+              }}
+            />
+
+            {fieldErrors.contactPerson && (
+              <Text style={{ color: 'red', fontSize: 12 }}>
+                {fieldErrors.contactPerson}
+              </Text>
+            )}
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Contact Mobile Number *</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter mobile number"
-              value={values.ConsigneeContactNumber}
+              value={values.delivery.contactNumber}
               onChangeText={text => {
-                setFieldValue('ConsigneeContactNumber', text);
-                if (fieldErrors.ConsigneeContactNumber) {
+                setFieldValue('delivery.contactNumber', text);
+                if (fieldErrors.contactNumber) {
                   setFieldErrors(prev => ({
                     ...prev,
-                    ConsigneeContactNumber: '',
+                    contactNumber: '',
                   }));
                 }
               }}
               keyboardType="numeric"
               maxLength={10}
-              error={!!fieldErrors.ConsigneeContactNumber}
+              error={!!fieldErrors.contactNumber}
             />
-            {fieldErrors.ConsigneeContactNumber && (
+            {fieldErrors.contactNumber && (
               <Text style={{ color: 'red', fontSize: 12 }}>
-                {fieldErrors.ConsigneeContactNumber}
+                {fieldErrors.contactNumber}
               </Text>
             )}
           </View>
@@ -430,20 +459,20 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
               <TextInput
                 style={styles.input}
                 placeholder="Enter Pincode"
-                value={values.Pincode}
+                value={values.delivery.pincode}
                 onChangeText={text => {
                   handlePinchange(text);
-                  if (fieldErrors.Pincode) {
-                    setFieldErrors(prev => ({ ...prev, Pincode: '' }));
+                  if (fieldErrors.pincode) {
+                    setFieldErrors(prev => ({ ...prev, pincode: '' }));
                   }
                 }}
                 keyboardType="numeric"
                 maxLength={6}
-                error={!!fieldErrors.Pincode}
+                error={!!fieldErrors.pincode}
               />
-              {fieldErrors.Pincode && (
+              {fieldErrors.pincode && (
                 <Text style={{ color: 'red', fontSize: 12 }}>
-                  {fieldErrors.Pincode}
+                  {fieldErrors.pincode}
                 </Text>
               )}
             </View>
@@ -454,7 +483,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
                 data={stateData?.data || []}
                 displayKey="state"
                 save="state"
-                value={values.state}
+                value={values.delivery.state}
                 setSelected={value => {
                   handleState(value);
                   if (fieldErrors.state) {
@@ -462,7 +491,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
                   }
                 }}
                 placeholder="Select State"
-                onClear={() => setFieldValue('state', '')}
+                onClear={() => setFieldValue('delivery.state', '')}
                 inputStyles={tw`border-gray-200`}
                 style={
                   fieldErrors.state && { borderColor: 'red', borderWidth: 1 }
@@ -484,11 +513,11 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
                 data={availableDistricts}
                 displayKey="region"
                 save="region"
-                value={values.District}
-                setSelected={val => setFieldValue('District', val)}
+                value={values.delivery.district}
+                setSelected={val => setFieldValue('delivery.district', val)}
                 placeholder="Select District"
-                onClear={() => setFieldValue('District', '')}
-                disabled={!values.state}
+                onClear={() => setFieldValue('delivery.district', '')}
+                disabled={!values.delivery.state}
                 inputStyles={tw`border-gray-200`}
               />
             </View>
@@ -498,18 +527,18 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
               <TextInput
                 style={styles.input}
                 placeholder="Enter Taluka"
-                value={values.Taluka}
-                error={!!fieldErrors.Taluka}
+                value={values.delivery.taluka}
+                error={!!fieldErrors.taluka}
                 onChangeText={text => {
-                  setFieldValue('Taluka', text);
-                  if (fieldErrors.Taluka) {
-                    setFieldErrors(prev => ({ ...prev, Taluka: '' }));
+                  setFieldValue('delivery.taluka', text);
+                  if (fieldErrors.taluka) {
+                    setFieldErrors(prev => ({ ...prev, taluka: '' }));
                   }
                 }}
               />
-              {fieldErrors.Taluka && (
+              {fieldErrors.taluka && (
                 <Text style={{ color: 'red', fontSize: 12 }}>
-                  {fieldErrors.Taluka}
+                  {fieldErrors.taluka}
                 </Text>
               )}
             </View>
@@ -518,7 +547,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
         {/* Address Details */}
         <View style={tw` bg-white p-4 rounded-2xl    border-gray-100`}>
           <View style={tw`gap-3`}>
-            {/* Destination_1 Field */}
+            {/* plotOrBuilding Field */}
             <View style={tw`flex-1`}>
               <Text style={styles.label}>
                 Plot No/ Unit No/ Building / Flat / Company
@@ -527,51 +556,51 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
                 style={styles.input}
                 placeholder="Enter plot/unit number"
                 textTransform="capitalize"
-                value={values.Destination_1}
-                error={!!fieldErrors.Destination_1}
+                value={values.delivery.plotOrBuilding}
+                error={!!fieldErrors.plotOrBuilding}
                 onChangeText={text => {
-                  setFieldValue('Destination_1', text);
+                  setFieldValue('delivery.plotOrBuilding', text);
 
                   // ✅ clear error when user starts typing
-                  if (fieldErrors.Destination_1) {
+                  if (fieldErrors.plotOrBuilding) {
                     setFieldErrors(prev => ({
                       ...prev,
-                      Destination_1: '',
+                      plotOrBuilding: '',
                     }));
                   }
                 }}
               />
-              {fieldErrors.Destination_1 && (
+              {fieldErrors.plotOrBuilding && (
                 <Text style={{ color: 'red', fontSize: 12 }}>
-                  {fieldErrors.Destination_1}
+                  {fieldErrors.plotOrBuilding}
                 </Text>
               )}
             </View>
 
-            {/* Destination_2 Field */}
+            {/* streetArea Field */}
             <View style={tw`flex-1`}>
               <Text style={styles.label}>Area/Street/Sector/Village</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Enter area details"
                 textTransform="capitalize"
-                value={values.Destination_2}
-                error={!!fieldErrors.Destination_2}
+                value={values.delivery.streetArea}
+                error={!!fieldErrors.streetArea}
                 onChangeText={text => {
-                  setFieldValue('Destination_2', text);
+                  setFieldValue('delivery.streetArea', text);
 
                   // ✅ clear error when user starts typing
-                  if (fieldErrors.Destination_2) {
+                  if (fieldErrors.streetArea) {
                     setFieldErrors(prev => ({
                       ...prev,
-                      Destination_2: '',
+                      streetArea: '',
                     }));
                   }
                 }}
               />
-              {fieldErrors.Destination_2 && (
+              {fieldErrors.streetArea && (
                 <Text style={{ color: 'red', fontSize: 12 }}>
-                  {fieldErrors.Destination_2}
+                  {fieldErrors.streetArea}
                 </Text>
               )}
             </View>
@@ -581,29 +610,22 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
         <View
           style={tw`mb-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100`}
         >
-          {/* <View style={tw`flex-row items-center mb-4`}>
-                <View style={tw`w-2 h-6 bg-red-500 mr-3 rounded-full`} />
-                <Text style={tw`text-lg font-bold text-gray-800`}>
-                  Google Location
-                </Text>
-              </View> */}
-
           <SelectList
             data={destinationPlaces?.suggestions}
             displayKey="value"
-            value={values.destination?.address}
+            value={values.delivery.destination?.address}
             save="object"
             setSelected={handleDestinationSelect}
-            placeholder="Search delivery location..."
+            placeholder="Google Address"
             search={true}
             onSearchChange={destinationPlaces.handleInputChange}
             searchValue={destinationPlaces.inputValue}
             onClear={() => {
-              setFieldValue('destination', {
+              setFieldValue('delivery.destination', {
                 address: '',
                 components: {
                   dist: '',
-                  Pincode: '',
+                  pincode: '',
                   place: '',
                   state: '',
                   tal: '',
@@ -631,7 +653,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
               }
               text="Map"
               onPress={() => {
-                setFieldName('destination');
+                setFieldName('delivery');
                 setActiveDestinationButton('map');
                 setShowMap(true);
               }}
@@ -642,30 +664,6 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
               }
               style={tw`border border-purple-600 `}
             />
-            {/* <ActionButton
-                  icon={
-                    <FontAwesome
-                      name="history"
-                      size={18}
-                      color={
-                        activeDestinationButton === 'history'
-                          ? '#fff'
-                          : tw.color('gray-600')
-                      }
-                    />
-                  }
-                  text="History"
-                  onPress={() => {
-                    setActiveDestinationButton('history');
-                    setShowHistoryModal(true);
-                  }}
-                  color={
-                    activeDestinationButton === 'history'
-                      ? tw.color('gray-600') || ''
-                      : 'transparent'
-                  }
-                  style={tw`border border-gray-600`}
-                /> */}
           </View>
         </View>
 

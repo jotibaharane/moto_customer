@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 
-export const socket = io('http://neotechnet.com:9000', {
+export const socket = io('https://motohelpindia.com', {
   transports: ['websocket'], // Force WebSocket transport
   reconnection: true, // Auto-reconnect
 });

@@ -42,7 +42,7 @@ export default function AddressSearch({
   return (
     <View style={{ padding: 5 }}>
       <SelectList
-        label="Registered Address (Google)"
+        label="Google Address"
         placeholder="Search Address"
         value={inputValue}
         displayKey="value"

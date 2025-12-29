@@ -7,18 +7,36 @@ import {
   Text,
   StyleSheet,
 } from 'react-native';
-import BottomSheetModal from '@modal/BottomSheetModal'; // your modal
+import BottomSheetModal from '@modal/BottomSheetModal';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-export default function LoadpostDropdown({ allData, selected, onSelect }) {
+type LoadPostItem = {
+  loadPostId: string | number;
+  pickupCity?: string;
+  dropCity?: string;
+  pickupName?: string;
+  vehicleNo?: string; // ✅ vehicle number
+};
+
+export default function LoadpostDropdown({
+  allData = [],
+  selected,
+  onSelect,
+}: {
+  allData: LoadPostItem[];
+  selected?: string | number;
+  onSelect: (id: string | number) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
 
   const filtered = allData.filter(item =>
-    `${item.loadPostId} ${item.pickupCity} ${item.dropCity} ${item.pickupName}`
+    `${item.loadPostId} ${item.vehicleNo ?? ''} ${item.pickupName ?? ''}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
+
+  const selectedItem = allData.find(item => item.loadPostId === selected);
 
   return (
     <>
@@ -27,14 +45,9 @@ export default function LoadpostDropdown({ allData, selected, onSelect }) {
         style={styles.selectorButton}
         onPress={() => setOpen(true)}
       >
-        <Text style={styles.selectorText}>
-          {selected
-            ? (() => {
-                const sel = allData.find(i => i.loadPostId === selected);
-                return sel
-                  ? `🏷️ ${sel.loadPostId} | 📍 ${sel.pickupCity} → ${sel.dropCity} | 👤 ${sel.pickupName}`
-                  : 'Select Driver Details';
-              })()
+        <Text style={styles.selectorText} numberOfLines={1}>
+          {selectedItem
+            ? `🏷️ ${selectedItem.loadPostId} | 🚚 ${selectedItem.vehicleNo} | 👤 ${selectedItem.pickupName}`
             : 'Select Driver Details'}
         </Text>
         <Icon name="chevron-down" size={22} color="#444" />
@@ -44,21 +57,21 @@ export default function LoadpostDropdown({ allData, selected, onSelect }) {
       <BottomSheetModal
         visible={open}
         onClose={() => setOpen(false)}
-        width="90%"
+        width="100%"
       >
         <View>
-          {/* SEARCH INPUT */}
+          {/* SEARCH */}
           <View style={styles.searchBox}>
             <Icon name="magnify" size={22} color="#666" />
             <TextInput
-              placeholder="Search driver, city, load ID..."
+              placeholder="Search load ID, vehicle no, driver..."
               value={search}
               onChangeText={setSearch}
               style={styles.searchInput}
             />
           </View>
 
-          {/* SCROLLABLE DROPDOWN LIST */}
+          {/* LIST */}
           <ScrollView style={{ maxHeight: 350 }}>
             {filtered.map((item, index) => (
               <TouchableOpacity
@@ -70,8 +83,8 @@ export default function LoadpostDropdown({ allData, selected, onSelect }) {
                 }}
               >
                 <Text style={styles.itemLabel}>
-                  🏷️ {item.loadPostId} &nbsp;|&nbsp; 📍 {item.pickupCity} →{' '}
-                  {item.dropCity} &nbsp;|&nbsp; 👤 {item.pickupName}
+                  🏷️ {item.loadPostId} | 🚚 {item.vehicleNo} | 👤{' '}
+                  {item.pickupName}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -95,8 +108,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectorText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#333',
+    flex: 1,
+    marginRight: 8,
   },
   searchBox: {
     flexDirection: 'row',
@@ -118,23 +133,8 @@ const styles = StyleSheet.create({
     borderColor: '#eee',
     backgroundColor: 'white',
   },
-  itemRowInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  subRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
   itemLabel: {
     fontSize: 15,
     color: '#222',
-  },
-  subLabel: {
-    fontSize: 13,
-    color: '#444',
-    marginLeft: 6,
   },
 });

@@ -24,14 +24,14 @@ const ConfirmationStep: React.FC = () => {
 
   const { data: BodyTypeData } = useGetBodyTypeQuery(
     {
-      vehicleType: values.VehicleType,
-      weightRange: values.Weight,
+      vehicleType: values.vehicle.vehicleType,
+      weightRange: values.vehicle.weightRange,
     },
-    { skip: !values.VehicleType || !values.Weight },
+    { skip: !values.vehicle.vehicleType || !values.vehicle.weightRange },
   );
   const { data: packageTypeData } = useGetPackageTypeQuery(
-    { cargotype: values?.CargoContent },
-    { skip: !values?.CargoContent },
+    { cargotype: values.load.cargoContent },
+    { skip: !values.load.cargoContent },
   );
   const { data: cargoContentData } = useGetCargoContentQuery();
 
@@ -39,23 +39,23 @@ const ConfirmationStep: React.FC = () => {
 
   useEffect(() => {
     const getDistance = async () => {
-      if (values?.origin && values?.destination) {
+      if (values.pickup.origin && values.delivery.destination) {
         const result = await calculateDistance(
           {
-            lat: values?.origin?.coordinates?.lat,
-            lng: values?.origin?.coordinates?.lng,
+            lat: values.pickup.origin.coordinates.lat,
+            lng: values.pickup.origin.coordinates.lng,
           },
           {
-            lat: values?.destination?.coordinates?.lat,
-            lng: values?.destination?.coordinates?.lng,
+            lat: values.delivery.destination.coordinates.lat,
+            lng: values.delivery.destination.coordinates.lng,
           },
         );
         console.log(
           result,
-          values.origin?.coordinates?.lat,
-          values.origin?.coordinates?.lng,
-          values.destination?.coordinates?.lat,
-          values?.destination?.coordinates?.lng,
+          values.pickup.origin.coordinates.lat,
+          values.pickup.origin.coordinates.lng,
+          values.delivery.destination.coordinates.lat,
+          values.delivery.destination.coordinates.lng,
         );
         setDistanceInfo(result);
       } else {
@@ -70,22 +70,21 @@ const ConfirmationStep: React.FC = () => {
       duration: 600,
       useNativeDriver: true,
     }).start();
-  }, [values?.origin, values?.destination]);
+  }, [values.pickup.origin, values.delivery.destination]);
 
-  const selectedBodyType = values.BodyType
-    ? BodyTypeData?.data?.find(b => b.BodyType === values.BodyType)
+  const selectedBodyType = values.load.bodyType
+    ? BodyTypeData?.data?.find(b => b.BodyType === values.load.bodyType)
     : null;
-  const selectedCargoContent = values.CargoContent
-    ? cargoContentData?.data.find(c => c.cargo_type === values.CargoContent)
-    : null;
-  const selectedPackageType = values.CargoPackageType
-    ? packageTypeData?.data?.find(
-        p => p.packaging_type === values.CargoPackageType,
+  const selectedCargoContent = values.load.cargoContent
+    ? cargoContentData?.data.find(
+        c => c.cargo_type === values.load.cargoContent,
       )
     : null;
-
-  const Pickupname =
-    values.PickupType == 'self' || 'Registered' ? 'abhishek' : null;
+  const selectedPackageType = values.load.packageType
+    ? packageTypeData?.data?.find(
+        p => p.packaging_type === values.load.packageType,
+      )
+    : null;
 
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -97,30 +96,6 @@ const ConfirmationStep: React.FC = () => {
     <Animated.ScrollView style={[tw`flex-1 bg-gray-50 p-1`]}>
       {/* Main Shipment Card */}
       <View style={[tw`bg-white mb-4  `, styles.card]}>
-        {/* Card Header - ID, Date, Status */}
-        {/* <View style={tw`bg-blue-50 px-6 py-4 border-b border-gray-200`}>
-          <View style={tw`flex-row justify-between items-center`}>
-            <View>
-              <Text style={tw`text-gray-500 text-xs font-medium`}>
-                SHIPMENT ID
-              </Text>
-              <Text style={tw`text-gray-900 text-lg font-bold`}>
-                #SH{Date.now().toString().slice(-6)}
-              </Text>
-            </View>
-            <View style={tw`items-end`}>
-              <Text style={tw`text-gray-500 text-xs font-medium`}>
-                {currentDate}
-              </Text>
-              <View style={tw`bg-green-100 px-2 py-1 rounded-full mt-1`}>
-                <Text style={tw`text-green-700 text-xs font-semibold`}>
-                  CONFIRMED
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View> */}
-
         {/* Location Section */}
         <View style={tw`p-6`}>
           {/* From Section */}
@@ -132,22 +107,22 @@ const ConfirmationStep: React.FC = () => {
 
             <View style={tw`ml-6`}>
               <Text style={tw`text-gray-900 font-semibold text-lg mb-1`}>
-                {values.ContactPerson}
-                {values.ContactNumber && (
+                {values.pickup.contactName}
+                {values.pickup.contactNumber && (
                   <Text style={tw`text-gray-600 text-base`}>
                     {' '}
-                    • {values.ContactNumber}
+                    • {values.pickup.contactNumber}
                   </Text>
                 )}
               </Text>
 
               <View style={tw`mb-2`}>
                 <Text style={tw`text-gray-700 text-sm mb-1`}>
-                  {values.Origin_1}
-                  {values.Origin_2 && `, ${values.Origin_2}`}
+                  {values.pickup.plotOrBuilding}
+                  {values.pickup.streetArea && `, ${values.pickup.streetArea}`}
                 </Text>
                 <Text style={tw`text-gray-500 text-xs`}>
-                  {values.origin?.address}
+                  {values.pickup.origin?.address}
                 </Text>
               </View>
             </View>
@@ -178,32 +153,38 @@ const ConfirmationStep: React.FC = () => {
 
             <View style={tw`ml-6`}>
               <Text style={tw`text-gray-900 font-semibold text-lg mb-1`}>
-                {values.ConsigneeName}
-                {values.ConsigneeContactNumber && (
+                {values.delivery.consigneeName}
+                {values.delivery.contactNumber && (
                   <Text style={tw`text-gray-600 text-base`}>
                     {' '}
-                    • {values.ConsigneeContactNumber}
+                    • {values.delivery.contactNumber}
                   </Text>
                 )}
               </Text>
 
               <View style={tw`mb-2`}>
                 <Text style={tw`text-gray-700 text-sm mb-1`}>
-                  {values.Destination_1}
-                  {values.Destination_2 && `, ${values.Destination_2}`}
+                  {values.delivery.plotOrBuilding}
+                  {values.delivery.streetArea &&
+                    `, ${values.delivery.streetArea}`}
                 </Text>
                 <Text style={tw`text-gray-500 text-xs`}>
-                  {values.destination?.address}
-                  {(values.District ||
-                    values.Taluka ||
-                    values.state ||
-                    values.Pincode) && (
+                  {values.delivery.destination?.address}
+                  {(values.delivery.district ||
+                    values.delivery.taluka ||
+                    values.delivery.state ||
+                    values.delivery.pincode) && (
                     <Text>
                       {', '}
-                      {[values.District, values.Taluka, values.state]
+                      {[
+                        values.delivery.district,
+                        values.delivery.taluka,
+                        values.delivery.state,
+                      ]
                         .filter(Boolean)
                         .join(', ')}
-                      {values.Pincode && ` - ${values.Pincode}`}
+                      {values.delivery.pincode &&
+                        ` - ${values.delivery.pincode}`}
                     </Text>
                   )}
                 </Text>
@@ -248,7 +229,7 @@ const ConfirmationStep: React.FC = () => {
                       style={tw`mr-2`}
                     />
                     <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.VehicleType}
+                      {values.vehicle.vehicleType}
                     </Text>
                   </View>
                 </View>
@@ -265,7 +246,7 @@ const ConfirmationStep: React.FC = () => {
                       style={tw`mr-2`}
                     />
                     <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.Weight}
+                      {values.vehicle.weightRange}
                     </Text>
                   </View>
                 </View>
@@ -284,23 +265,23 @@ const ConfirmationStep: React.FC = () => {
                       style={tw`mr-2`}
                     />
                     <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.BodyType}
+                      {values.load.bodyType}
                     </Text>
                   </View>
                 </View>
                 <View style={tw`flex-1`}>
                   <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
-                    WEIGHT RANGE
+                    APPROX. WEIGHT
                   </Text>
                   <View style={tw`flex-row items-center`}>
                     <MaterialIcons
-                      name="local-shipping"
+                      name="scale"
                       size={14}
                       color="#6b7280"
                       style={tw`mr-2`}
                     />
                     <Text style={tw`text-gray-800 font-semibold`}>
-                      {values?.Approximate_weight}
+                      {values.vehicle.approximateWeightKg} kg
                     </Text>
                   </View>
                 </View>
@@ -339,8 +320,25 @@ const ConfirmationStep: React.FC = () => {
 
             <View style={tw`flex-1`}>
               <Text style={tw`text-gray-800 font-bold text-base mb-3`}>
-                Cargo Details
+                Load Details
               </Text>
+
+              <View style={tw`mb-3`}>
+                <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
+                  CARGO TYPE
+                </Text>
+                <View style={tw`flex-row items-center`}>
+                  <MaterialIcons
+                    name="category"
+                    size={14}
+                    color="#6b7280"
+                    style={tw`mr-2`}
+                  />
+                  <Text style={tw`text-gray-800 font-semibold`}>
+                    {values.load.cargoType}
+                  </Text>
+                </View>
+              </View>
 
               <View style={tw`mb-3`}>
                 <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
@@ -354,12 +352,12 @@ const ConfirmationStep: React.FC = () => {
                     style={tw`mr-2`}
                   />
                   <Text style={tw`text-gray-800 font-semibold`}>
-                    {values.CargoContent}
+                    {values.load.cargoContent}
                   </Text>
                 </View>
               </View>
 
-              {values.CargoPackageType && (
+              {values.load.packageType && (
                 <View style={tw`mb-3`}>
                   <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
                     PACKAGING TYPE
@@ -372,13 +370,13 @@ const ConfirmationStep: React.FC = () => {
                       style={tw`mr-2`}
                     />
                     <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.CargoPackageType}
+                      {values.load.packageType}
                     </Text>
                   </View>
                 </View>
               )}
 
-              {values.DhalaLength && (
+              {values.load.dhalaLength && (
                 <View>
                   <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
                     DHALA LENGTH
@@ -391,7 +389,7 @@ const ConfirmationStep: React.FC = () => {
                       style={tw`mr-2`}
                     />
                     <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.DhalaLength} meters
+                      {values.load.dhalaLength} meters
                     </Text>
                   </View>
                 </View>
@@ -408,7 +406,10 @@ const ConfirmationStep: React.FC = () => {
                 AVAILABLE TIME
               </Text>
               <Text style={tw`text-gray-800 font-semibold text-sm`}>
-                {values.ExpectedAvailableTime || 'Flexible'}
+                {values.load.expectedVehicleAvailability || 'Flexible'}
+              </Text>
+              <Text style={tw`text-gray-600 text-xs`}>
+                {values.schedule.date} at {values.schedule.time}
               </Text>
             </View>
             <View style={tw`items-end`}>
@@ -437,7 +438,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
-    // elevation: 5,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },

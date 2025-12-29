@@ -13,7 +13,9 @@ import DropMarker from '../icon/DropMarker';
 import OriginMarker from '../icon/OriginMarker';
 import Truck from '../icon/Truck';
 import { MAP_STYLE } from './helper';
+import { AnimatedRegion, MarkerAnimated } from 'react-native-maps';
 
+import { socket } from '@utils/socketUtils';
 interface Coordinate {
   latitude: number;
   longitude: number;
@@ -80,6 +82,72 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
   const mapRef = useRef<MapView | null>(null);
   const lastFitCoordinatesRef = useRef<Coordinate[]>([]);
   const lastDriverUpdateRef = useRef<number>(0);
+  const driverAnimatedPosition = useRef(
+    new AnimatedRegion({
+      latitude: selectedDriver?.latitude ?? origin?.latitude ?? 0,
+      longitude: selectedDriver?.longitude ?? origin?.longitude ?? 0,
+      latitudeDelta: 0,
+      longitudeDelta: 0,
+    }),
+  ).current;
+
+  //========socket for driver nearby alert========
+  useEffect(() => {
+    socket.onAny((event, ...args) => {
+      console.log('📡 SOCKET EVENT:', event, args);
+    });
+
+    return () => {
+      socket.offAny();
+    };
+  }, []);
+  useEffect(() => {
+    if (!CustomerID) return;
+
+    const handleDriverLocation = (data: any) => {
+      // ✅ NOW YOU WILL GET DATA
+      console.log('Driver location data:', data);
+    };
+
+    const onConnect = () => {
+      socket.off('driverlocation', handleDriverLocation);
+      socket.on('driverlocation', handleDriverLocation);
+
+      socket.emit('CustomerDetails', { customerId: CustomerID });
+    };
+
+    socket.on('connect', onConnect);
+
+    if (socket.connected) {
+      onConnect();
+    }
+
+    return () => {
+      socket.off('connect', onConnect);
+      socket.off('driverlocation', handleDriverLocation);
+    };
+  }, [CustomerID]);
+  //=================
+  useEffect(() => {
+    if (
+      liveDriverLocation?.latitude == null ||
+      liveDriverLocation?.longitude == null
+    )
+      return;
+
+    driverAnimatedPosition
+      .timing({
+        toValue: {
+          latitude: liveDriverLocation.latitude,
+          longitude: liveDriverLocation.longitude,
+          latitudeDelta: 0,
+          longitudeDelta: 0,
+        },
+        duration: 1000,
+        useNativeDriver: false,
+      })
+      .start();
+  }, [liveDriverLocation]);
   const reverseGeocode = async (lat: number, lng: number) => {
     try {
       const response = await fetch(
@@ -104,16 +172,14 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
     }
   };
   useEffect(() => {
+    // ✅ DO NOT override origin if it already exists (LoadPost location)
+    if (origin?.latitude && origin?.longitude) return;
+
     const requestLocationPermission = async () => {
       try {
         if (Platform.OS === 'android') {
           const granted = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            {
-              title: 'Location Permission',
-              message: 'We need your location to show nearby drivers.',
-              buttonPositive: 'OK',
-            },
           );
           if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
         }
@@ -122,35 +188,16 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
           enableHighAccuracy: true,
           timeout: 10000,
         });
-        console.log(location, 'this is current position');
-        // 🌐 Calculate map deltas for ~20 km radius view
-        const RADIUS_KM = 20;
-        const latitudeDelta = (RADIUS_KM * 2) / 111; // ~40 km diameter vertically
-        const longitudeDelta =
-          latitudeDelta / Math.cos((location.latitude * Math.PI) / 180);
 
-        const currentRegion = {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta,
-          longitudeDelta,
-        };
-
-        // Animate to current location
-        if (mapRef.current) {
-          mapRef.current.animateToRegion(currentRegion, 1000);
-        }
         const geoData = await reverseGeocode(
           location.latitude,
           location.longitude,
         );
 
-        console.log(geoData, 'this is from data');
-        // Save to Redux as origin
         dispatch(
           setOrigin({
-            latitude: location?.latitude,
-            longitude: location?.longitude,
+            latitude: location.latitude,
+            longitude: location.longitude,
             address: geoData?.address,
           }),
         );
@@ -160,7 +207,66 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
     };
 
     requestLocationPermission();
-  }, [dispatch]);
+  }, [dispatch, origin]);
+
+  // useEffect(() => {
+  //   const requestLocationPermission = async () => {
+  //     try {
+  //       if (Platform.OS === 'android') {
+  //         const granted = await PermissionsAndroid.request(
+  //           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  //           {
+  //             title: 'Location Permission',
+  //             message: 'We need your location to show nearby drivers.',
+  //             buttonPositive: 'OK',
+  //           },
+  //         );
+  //         if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+  //       }
+
+  //       const location = await GetLocation.getCurrentPosition({
+  //         enableHighAccuracy: true,
+  //         timeout: 10000,
+  //       });
+  //       console.log(location, 'this is current position');
+  //       // 🌐 Calculate map deltas for ~20 km radius view
+  //       const RADIUS_KM = 20;
+  //       const latitudeDelta = (RADIUS_KM * 2) / 111; // ~40 km diameter vertically
+  //       const longitudeDelta =
+  //         latitudeDelta / Math.cos((location.latitude * Math.PI) / 180);
+
+  //       const currentRegion = {
+  //         latitude: location.latitude,
+  //         longitude: location.longitude,
+  //         latitudeDelta,
+  //         longitudeDelta,
+  //       };
+
+  //       // Animate to current location
+  //       if (mapRef.current) {
+  //         mapRef.current.animateToRegion(currentRegion, 1000);
+  //       }
+  //       const geoData = await reverseGeocode(
+  //         location.latitude,
+  //         location.longitude,
+  //       );
+
+  //       console.log(geoData, 'this is from data');
+  //       // Save to Redux as origin
+  //       dispatch(
+  //         setOrigin({
+  //           latitude: location?.latitude,
+  //           longitude: location?.longitude,
+  //           address: geoData?.address,
+  //         }),
+  //       );
+  //     } catch (error) {
+  //       console.warn('Error fetching location:', error);
+  //     }
+  //   };
+
+  //   requestLocationPermission();
+  // }, [dispatch]);
 
   // Clear map when currentMap changes to prevent stale markers
   useEffect(() => {
@@ -179,12 +285,20 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
   const { data: driverLocations } = useGetNearbyDriversQuery(
     { CustomerID, LoadPostID: postId },
     {
-      // pollingInterval: shouldPoll ? 2000 : 0,
       skip: !shouldPoll,
       refetchOnFocus: true,
       refetchOnReconnect: true,
+      // pollingInterval: shouldPoll ? 5000 : 0, // ⭐ auto update drivers every 5s
     },
   );
+
+  useEffect(() => {
+    if (!driverLocations || !Array.isArray(driverLocations)) return;
+
+    const valid = driverLocations.filter(d => d?.latitude && d?.longitude);
+
+    dispatch(addOrUpdateDriver(valid));
+  }, [driverLocations]);
 
   const getMapCoordinates = useCallback((): Coordinate[] => {
     const coords: Coordinate[] = [];
@@ -226,19 +340,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
 
     return coords;
   }, [currentMap, origin, destination, drivers, selectedDriver]);
-  useEffect(() => {
-    if (liveDriverLocation && mapRef.current) {
-      mapRef.current.animateToRegion(
-        {
-          latitude: liveDriverLocation.latitude,
-          longitude: liveDriverLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        },
-        500,
-      );
-    }
-  }, [liveDriverLocation]);
+
   const fitMapToCoordinates = useCallback(
     throttle((coordinates: Coordinate[]) => {
       if (mapRef.current && coordinates.length > 0) {
@@ -363,35 +465,47 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
   }, [destination, currentMap]);
 
   const renderSelectedDriverMarker = useMemo(() => {
-    if (
-      !selectedDriver?.latitude ||
-      !(currentMap === 'Process' || currentMap === 'Active')
-    )
+    if (currentMap !== 'Process' && currentMap !== 'Active') return null;
+
+    if (selectedDriver?.latitude == null || selectedDriver?.longitude == null)
       return null;
-    console.log('Rendering selected driver marker', {
-      selectedDriver,
-      currentMap,
-    });
+
     return (
-      <Marker
-        key={`selected-driver-${selectedDriver.id}-${currentMap}`}
-        coordinate={{
-          latitude: liveDriverLocation?.latitude || selectedDriver?.latitude,
-          longitude: liveDriverLocation?.longitude || selectedDriver?.longitude,
-        }}
-        rotation={selectedDriver?.rotation || 0}
-        title={selectedDriver.driver}
-        description={`License: ${selectedDriver.licensePlate}`}
+      <MarkerAnimated
+        coordinate={driverAnimatedPosition}
         anchor={{ x: 0.5, y: 0.5 }}
-        zIndex={900}
+        flat
+        zIndex={999}
         tracksViewChanges={false}
       >
-        <View style={{ transform: [{ rotate: `${180}deg` }] }}>
-          <Truck height={100} width={100} />
+        <View
+          style={{
+            transform: [
+              {
+                rotate: `${selectedDriver.rotation || 0}deg`,
+              },
+            ],
+          }}
+        >
+          <Truck height={90} width={90} />
         </View>
-      </Marker>
+      </MarkerAnimated>
     );
-  }, [selectedDriver, currentMap]);
+  }, [currentMap, selectedDriver]);
+
+  useEffect(() => {
+    if (!liveDriverLocation || !mapRef.current) return;
+
+    mapRef.current.animateCamera({
+      center: {
+        latitude: liveDriverLocation.latitude,
+        longitude: liveDriverLocation.longitude,
+      },
+      zoom: 16,
+      pitch: 45,
+      heading: selectedDriver?.rotation || 0,
+    });
+  }, [liveDriverLocation]);
 
   const renderNearbyDrivers = useMemo(() => {
     if (currentMap !== 'Load') return null;

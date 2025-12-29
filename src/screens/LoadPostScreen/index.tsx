@@ -14,11 +14,18 @@ import {
 } from '@store/slices/mapSlice';
 import { routeName } from '@utils/navigationHelpers';
 import { Formik } from 'formik';
-import React, { useState } from 'react';
-import { StatusBar, StyleSheet, View, Dimensions } from 'react-native';
+import React, { useState, useRef } from 'react';
+import {
+  StatusBar,
+  StyleSheet,
+  View,
+  Modal,
+  Text,
+  TouchableOpacity,
+  TextInput,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import ConfirmationStep from './components/ConfirmationStep';
 import FirstStep from './components/FirstStep';
@@ -29,75 +36,34 @@ import { emptyShipmentData, STEPS } from './constant';
 import { FormStep } from './type';
 import { getStepSchema } from './validation';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-
 const LoadPostForm: React.FC = () => {
-  const { CustomerID } = useSelector(
-    (state: RootState) => state.auth.customerDetails,
-  ) || { CustomerID: '' };
-
+  const CustomerID =
+    useSelector((state: RootState) => state.auth.customerDetails?.CustomerID) ??
+    '';
+  console.log('CustomerID', CustomerID);
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const navigation = useNavigation<any>();
   const [postCustomerRequirement] = usePostCustomerRequirementMutation();
+
   const [currentStep, setCurrentStep] = useState<FormStep>('Location');
   const [completedSteps, setCompletedSteps] = useState<FormStep[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  // 🔥 MPIN Modal State
+  const [mpinModal, setMpinModal] = useState(false);
+  const [mpin, setMpin] = useState('');
+  const formikSubmitRef = useRef<any>(null);
 
-  // Navigate to next step
-  const handleNext = async (
-    validateForm: any,
-    setTouched: any,
-    values: any,
-  ) => {
-    const stepSchema = getStepSchema(currentStep);
+  // ----------------------- STEP NAVIGATION -----------------------
+  const handleNext = () => {
+    const currentIndex = STEPS.indexOf(currentStep);
 
-    try {
-      await stepSchema.validate(values, { abortEarly: false });
+    if (currentIndex < STEPS.length - 1) {
+      const nextStep = STEPS[currentIndex + 1];
+      setCurrentStep(nextStep);
 
-      const currentIndex = STEPS.indexOf(currentStep);
-      if (currentIndex < STEPS.length - 1) {
-        const nextStep = STEPS[currentIndex + 1];
-        setCurrentStep(nextStep);
-
-        if (!completedSteps.includes(currentStep)) {
-          setCompletedSteps([...completedSteps, currentStep]);
-        }
-      }
-    } catch (err: any) {
-      console.log('🛑 Validation Error in Step =>', currentStep);
-
-      if (err.inner && err.inner.length > 0) {
-        // 🔥 Log all errors (your current behavior)
-        err.inner.forEach((e: any, i: number) => {
-          console.log(
-            `❌ Error ${i + 1}:`,
-            `Field: ${e.path}`,
-            `Message: ${e.message}`,
-          );
-        });
-
-        // ⚠️ Show toast for the FIRST error
-        Toast.show({
-          type: 'error',
-          text1: 'Validation Error',
-          text2: err.inner[0].message,
-        });
-
-        // Mark all invalid fields as touched
-        const touchedFields: any = {};
-        err.inner.forEach((e: any) => {
-          if (e.path) touchedFields[e.path] = true;
-        });
-        setTouched(touchedFields, true);
-      } else {
-        // Single error fallback
-        console.log('❌ Validation Error:', err.message);
-
-        Toast.show({
-          type: 'error',
-          text1: 'Validation Error',
-          text2: err.message,
-        });
+      if (!completedSteps.includes(currentStep)) {
+        setCompletedSteps([...completedSteps, currentStep]);
       }
     }
   };
@@ -120,9 +86,25 @@ const LoadPostForm: React.FC = () => {
     }
   };
 
+  // ----------------------- API Submission (unchanged) -----------------------
   const handleSubmit = async (values: ShipmentData, { resetForm }: any) => {
     try {
-      const response = await postCustomerRequirement({ ...values, CustomerID });
+      console.log({ values });
+
+      // ✅ Prepare the payload in the new nested format
+      const payload: ShipmentData = {
+        ...values,
+        customerId: CustomerID, // Ensure customerId is set
+        schedule: {
+          date: values.schedule.date || '',
+          time: values.schedule.time || '',
+        },
+      };
+
+      console.log('Sending payload:', JSON.stringify(payload, null, 2));
+
+      const response = await postCustomerRequirement(payload);
+      console.log({ response });
 
       if (response?.data?.status === '00') {
         Toast.show({ type: 'success', text1: response?.data?.message });
@@ -132,22 +114,32 @@ const LoadPostForm: React.FC = () => {
         dispatch(setPostId(response?.data?.[0]?.LoadPostID));
 
         // Set origin & destination in map
-        dispatch(
-          setOrigin({
-            latitude: values?.origin?.coordinates?.lat,
-            longitude: values?.origin?.coordinates?.lng,
-          }),
-        );
-        dispatch(setOriginAddress(values?.origin?.components?.place));
-        dispatch(setDestinationAddress(values?.destination?.components?.place));
-        dispatch(
-          setDestination({
-            latitude: values?.destination?.coordinates?.lat,
-            longitude: values?.destination?.coordinates?.lng,
-          }),
-        );
+        if (values.pickup.origin?.coordinates) {
+          dispatch(
+            setOrigin({
+              latitude: values.pickup.origin.coordinates.lat,
+              longitude: values.pickup.origin.coordinates.lng,
+            }),
+          );
+          dispatch(
+            setOriginAddress(values.pickup.origin.components.place || ''),
+          );
+        }
 
-        // Reset form and step
+        if (values.delivery.destination?.coordinates) {
+          dispatch(
+            setDestinationAddress(
+              values.delivery.destination.components.place || '',
+            ),
+          );
+          dispatch(
+            setDestination({
+              latitude: values.delivery.destination.coordinates.lat,
+              longitude: values.delivery.destination.coordinates.lng,
+            }),
+          );
+        }
+
         setCurrentStep('Location');
         resetForm();
         setCompletedSteps([]);
@@ -161,7 +153,20 @@ const LoadPostForm: React.FC = () => {
       }
     } catch (error: any) {
       Toast.show({ type: 'error', text1: error?.message });
+      console.error('Submission error:', error);
     }
+  };
+  // ----------------------- MPIN Validation -----------------------
+  const validateMPIN = () => {
+    if (mpin !== '123456') {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid MPIN',
+        text2: 'Please enter correct MPIN',
+      });
+      return false;
+    }
+    return true;
   };
 
   return (
@@ -177,37 +182,34 @@ const LoadPostForm: React.FC = () => {
       ]}
     >
       <StatusBar barStyle="dark-content" />
-
       <Formik
         initialValues={emptyShipmentData}
-        onSubmit={handleSubmit}
-        validateOnMount={false}
-        validateOnChange={true}
-        validateOnBlur={true}
-        enableReinitialize={true}
+        onSubmit={(values, actions) => {
+          formikSubmitRef.current = async () => {
+            setSubmitting(true);
+            await handleSubmit(values, actions);
+            setSubmitting(false);
+          };
+          setMpinModal(true);
+        }}
       >
         {({
           handleSubmit,
-          values,
-          errors,
-          touched,
           validateForm,
           setTouched,
           isValid,
           isSubmitting,
+          values,
         }) => (
           <View style={styles.innerContainer}>
-            {/* Step Progress */}
             <FormProgress
               currentStep={currentStep}
               steps={STEPS}
               completedSteps={completedSteps}
             />
 
-            {/* Step Content */}
             {renderStep()}
 
-            {/* Navigation Buttons */}
             <FormNavigation
               currentStep={currentStep}
               totalSteps={STEPS.length}
@@ -215,8 +217,66 @@ const LoadPostForm: React.FC = () => {
               onNext={() => handleNext(validateForm, setTouched, values)}
               onSubmit={handleSubmit}
               isValid={isValid}
-              isSubmitting={isSubmitting}
+              isSubmitting={submitting} // ✅ FIX
             />
+
+            {/* ----------------------------- MPIN MODAL ----------------------------- */}
+            <Modal transparent animationType="fade" visible={mpinModal}>
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalBox}>
+                  <Text style={styles.modalTitle}>Enter MPIN</Text>
+
+                  {/* ●●●●●● CIRCLES */}
+                  <View style={styles.circleContainer}>
+                    {[0, 1, 2, 3, 4, 5].map(i => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.circle,
+                          { backgroundColor: mpin[i] ? '#000' : '#d1d1d1' },
+                        ]}
+                      />
+                    ))}
+                  </View>
+
+                  {/* Hidden Input */}
+                  <TextInput
+                    value={mpin}
+                    onChangeText={setMpin}
+                    maxLength={6}
+                    keyboardType="numeric"
+                    style={styles.hiddenInput}
+                    autoFocus
+                  />
+
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={[styles.btn, { backgroundColor: '#d32f2f' }]}
+                      onPress={() => {
+                        setMpin('');
+                        setSubmitting(false); // ✅ stop loader
+                        setMpinModal(false);
+                      }}
+                    >
+                      <Text style={styles.btnText}>Cancel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.btn, { backgroundColor: '#1e40af' }]}
+                      onPress={() => {
+                        if (!validateMPIN()) return;
+
+                        setMpinModal(false);
+                        formikSubmitRef.current && formikSubmitRef.current();
+                      }}
+                    >
+                      <Text style={styles.btnText}>Confirm</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+            {/* -------------------------------------------------------------------- */}
           </View>
         )}
       </Formik>
@@ -227,6 +287,62 @@ const LoadPostForm: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
   innerContainer: { flex: 1 },
+
+  // 🔥 Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    width: '82%',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 22,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 20,
+  },
+
+  // MPIN Circles
+  circleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '70%',
+    marginBottom: 20,
+  },
+  circle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+
+  hiddenInput: {
+    height: 0,
+    width: 0,
+    opacity: 0,
+  },
+
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '75%',
+    marginTop: 15,
+  },
+  btn: {
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    borderRadius: 8,
+  },
+  btnText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });
 
 export default LoadPostForm;

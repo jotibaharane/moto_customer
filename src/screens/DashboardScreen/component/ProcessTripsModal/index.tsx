@@ -33,48 +33,77 @@ import { useRefreshOnFocus } from '@hooks/onFocusevent';
 interface CustomerProcess {
   LoadPostID: string;
   CustomerID: string;
-  Origin: string;
-  Destination: string;
+
+  // Pickup Details
+  PickupContactPerson: string;
+  PickupCompanyName: string;
+  PickupContactNumber: string;
+  PickupPlotBuilding: string;
+  PickupStreetArea: string;
+  PickupAddress: string;
+
+  // Delivery Details
+  DeliveryContactPerson: string;
+  DeliveryCompanyName: string;
+  DeliveryContactNumber: string;
+  DeliveryPlotBuilding: string;
+  DeliveryStreetArea: string;
+  DeliveryAddress: string;
+
+  // Vehicle & Cargo
   VehicleType: string;
   Weight: string;
-  DhalaLength: string;
+  Approximate_weight: number;
+  cargo_type: string;
   BodyType: string;
   CargoContent: string;
   CargoPackageType: string;
+
+  // Schedule & Flags
   ExpectedAvailableTime: string;
-  PostInsertDate: string;
-  PostUpdateDate: string | null;
-  Origin_Lat: number;
-  Origin_Lng: number;
-  Origin_City: string;
-  Origin_District: string;
-  Origin_Taluka: string;
-  Origin_State: string;
-  Origin_Pincode: string;
-  Destination_Lat: number;
-  Destination_Lng: number;
-  Destination_City: string;
-  Destination_District: string;
-  Destination_Taluka: string;
-  Destination_State: string;
-  Destination_Pincode: string;
-  AddressInsertDate: string;
-  AddressUpdateDate: string | null;
+  ScheduleDate: string | null;
+  ScheduleTime: string | null;
+  isVolumetric: boolean;
+  DhalaLength: number | null;
+  cost: number;
+  master_status: string;
+
+  // Verification
+  verification_code: string;
+  verify_flag: boolean;
+
+  // Dates
+  LoadPost_InsertDate: string | null;
+  LoadPost_UpdateDate: string | null;
+  Address_InsertDate: string | null;
+  Address_UpdateDate: string | null;
+
+  // Pickup Location
+  PickupCity: string;
+  PickupDistrict: string;
+  PickupTaluka: string;
+  PickupState: string;
+  PickupPincode: string;
+  PickupLat: number;
+  PickupLng: number;
+
+  // Delivery Location
+  DeliveryCity: string;
+  DeliveryDistrict: string;
+  DeliveryTaluka: string;
+  DeliveryState: string;
+  DeliveryPincode: string;
+  DeliveryLat: number;
+  DeliveryLng: number;
+
+  // Status & Relations
   CustomerPostID: string;
-  cpsCustomerID: string;
   VendorID: string | null;
   DriverID: string | null;
   CustomerStatus: string;
   VendorStatus: string | null;
   DriverStatus: string | null;
-  tripStatus: string;
-  DriverLat: number | null;
-  DriverLng: number | null;
-  dllDriverID: string | null;
-  MobileNo: string;
-  verify_flag: string;
-  verification_code: string;
-  trip_status: string;
+  LP_Status: string;
 }
 
 interface ProcessTripsModalRef {
@@ -91,8 +120,13 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
     data: processTrips,
     isLoading,
     refetch,
-    isFetching,
-  } = useGetProcessTripsQuery({ CustomerID });
+  } = useGetProcessTripsQuery(
+    { CustomerID },
+    {
+      skip: !CustomerID, // Skip until CustomerID is available
+      refetchOnMountOrArgChange: true, // optional
+    },
+  );
 
   // useRefreshOnFocus(() => getProcesTrips({ CustomerID }), true);
   console.log({ processTrips });
@@ -122,12 +156,13 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
     dispatch(setPostId(item?.LoadPostID));
     dispatch(
       setOrigin({
-        latitude: item?.Origin_Lat,
-        longitude: item?.Origin_Lng,
+        latitude: item?.PickupLat,
+        longitude: item?.PickupLng,
       }),
     );
-    dispatch(setOriginAddress(item?.Origin));
-    dispatch(setDestinationAddress(item?.Destination));
+    dispatch(setOriginAddress(item?.PickupAddress));
+    dispatch(setDestinationAddress(item?.DeliveryAddress));
+
     if (item.DriverLat && item.DriverLng) {
       dispatch(
         selectDriver({
@@ -144,8 +179,8 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
     }
     dispatch(
       setDestination({
-        latitude: item?.Destination_Lat,
-        longitude: item?.Destination_Lng,
+        latitude: item?.DeliveryLat,
+        longitude: item?.DeliveryLng,
       }),
     );
     handleModalClose();
@@ -163,16 +198,16 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
           <Text style={processTripStyles.cardId}>ID: {item.LoadPostID}</Text>
         </View>
         <View>
-          <Text> {formatDate(item?.PostInsertDate || '')}</Text>
+          <Text> {formatDate(item?.LoadPost_InsertDate || '')}</Text>
         </View>
         <View
           style={[
             processTripStyles.statusBadge,
-            { backgroundColor: getStatusColor(item.tripStatus) },
+            { backgroundColor: getStatusColor(item?.LP_Status) },
           ]}
         >
           <Text style={processTripStyles.statusText}>
-            {item.tripStatus?.toUpperCase() || 'UNKNOWN'}
+            {item?.LP_Status?.toUpperCase() || 'UNKNOWN'}
           </Text>
         </View>
       </View>
@@ -193,10 +228,10 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
               <Text style={processTripStyles.locationLabel}>From</Text>
             </View>
             <Text style={processTripStyles.locationText} numberOfLines={2}>
-              {item.Origin}
+              {item.PickupAddress}
             </Text>
             <Text style={processTripStyles.locationSubtext}>
-              {item.Origin_State} • {item.Origin_Pincode}
+              {item.PickupState} • {item.PickupPincode}
             </Text>
           </View>
 
@@ -207,10 +242,10 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
               <Text style={processTripStyles.locationLabel}>To</Text>
             </View>
             <Text style={processTripStyles.locationText} numberOfLines={2}>
-              {item.Destination}
+              {item.DeliveryAddress}
             </Text>
             <Text style={processTripStyles.locationSubtext}>
-              {item.Destination_State} • {item.Destination_Pincode}
+              {item.DeliveryState} • {item.DeliveryPincode}
             </Text>
           </View>
         </View>
@@ -260,7 +295,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
       </View>
 
       {/* Verification Code Section */}
-      {item.verify_flag === 'N' && item.verification_code && (
+      {item?.verify_flag === 'N' && item.verification_code && (
         <View style={processTripStyles.verificationContainer}>
           <View style={processTripStyles.verificationHeader}>
             <Icon source="shield-alert" size={16} color="#FF9800" />
@@ -349,6 +384,9 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
       animationDuration={400}
       swipeThreshold={50}
       disableSwipe
+      onOpen={() => {
+        if (CustomerID) refetch(); // Ensure latest data
+      }}
     >
       <View style={processTripStyles.container}>{renderListView()}</View>
     </BottomModal>

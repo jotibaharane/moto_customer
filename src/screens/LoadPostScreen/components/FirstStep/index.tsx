@@ -1,7 +1,7 @@
 import { ShipmentData } from '@api/api.type';
 import {
   useGetAproximateWeightQuery,
-  useGetTruckTypeMutation,
+  useGetTruckTypemutationMutation,
 } from '@api/hooks_api';
 import { useNavigation } from '@react-navigation/native';
 import tw from '@utils/tw';
@@ -41,10 +41,11 @@ const FirstStep: React.FC = () => {
 
   console.log(values, errors, touched);
 
-  const [getTruck, { data: truckTypesData }] = useGetTruckTypeMutation();
+  const [getTruck, { data: truckTypesData }] =
+    useGetTruckTypemutationMutation();
   const { data: ApproximateWeight } = useGetAproximateWeightQuery(
-    { vehicleType: values?.VehicleType },
-    { skip: !values?.VehicleType },
+    { vehicleType: values?.vehicle?.vehicleType },
+    { skip: !values?.vehicle?.vehicleType },
   );
 
   useLayoutEffect(() => {
@@ -60,13 +61,14 @@ const FirstStep: React.FC = () => {
       description: truck.WeightRange,
       color: '#EF476F',
     })) || [];
+  console.log(truckTypes, 'trucktype in first');
 
   const selectedTruckType = useMemo(
     () =>
       truckTypesData?.data.find(
-        truck => truck.VehicleType === values.VehicleType,
+        truck => truck.VehicleType === values.vehicle.vehicleType,
       ),
-    [truckTypesData, values.VehicleType],
+    [truckTypesData, values.vehicle.vehicleType],
   );
 
   // Weight type
@@ -81,9 +83,9 @@ const FirstStep: React.FC = () => {
   const selectedWeightType: any = useMemo(
     () =>
       ApproximateWeight?.data.find(
-        weight => weight.WeightRange === values.Weight,
+        weight => weight.WeightRange === values.vehicle.weightRange,
       ),
-    [ApproximateWeight, values.Weight],
+    [ApproximateWeight, values.vehicle.weightRange],
   );
 
   const handleOpenVehicleModal = useCallback(
@@ -104,107 +106,23 @@ const FirstStep: React.FC = () => {
     [],
   );
 
-  const CompactAddressDisplay = ({
-    type,
-    address,
-    line1,
-    line2,
-    contactPerson,
-    contactNumber,
-    consigneeName,
-    registeredAddress,
-    pincode,
-    state,
-    district,
-    taluka,
-  }: {
-    type: 'pickup' | 'delivery';
-    address?: string;
-    line1?: string;
-    line2?: string;
-    contactPerson?: string;
-    contactNumber?: string;
-    consigneeName?: string;
-    registeredAddress?: string;
-    pincode?: string;
-    state?: string;
-    district?: string;
-    taluka?: string;
-  }) => {
-    const primaryColor = type === 'pickup' ? 'blue-500' : 'red-500';
-    const iconName = type === 'pickup' ? 'add-location' : 'location-on';
-
-    if (!address) {
-      return (
-        <View style={tw`flex-row items-center`}>
-          <Icon name={iconName} size={16} color={tw.color(primaryColor)} />
-          <Text style={tw`ml-2 text-${primaryColor} text-sm`}>
-            {type === 'pickup'
-              ? 'Add Pickup Location'
-              : 'Add Delivery Location'}
-          </Text>
-        </View>
-      );
-    }
-
-    return (
-      <View style={tw`flex-row justify-between items-start`}>
-        <View style={tw`flex-1 mr-2`}>
-          {(contactPerson || contactNumber) && (
-            <Text
-              style={tw`text-sm text-gray-800 font-medium`}
-              numberOfLines={1}
-            >
-              {contactPerson && ` ${contactPerson}`}
-              {contactPerson && contactNumber && ' • '}
-              {contactNumber}
-            </Text>
-          )}
-          {(line1 || line2) && (
-            <Text
-              style={tw`text-sm text-gray-800 font-medium`}
-              numberOfLines={2}
-            >
-              {[line1, line2].filter(Boolean).join(', ')}
-            </Text>
-          )}
-
-          <Text style={tw`text-sm text-gray-800 font-medium`} numberOfLines={3}>
-            {registeredAddress} {address}
-          </Text>
-          {consigneeName && (
-            <Text style={tw`text-xs text-gray-500 mt-1`} numberOfLines={1}>
-              Consignee: {consigneeName}
-            </Text>
-          )}
-          {(pincode || state || district || taluka) && (
-            <Text style={tw`text-xs text-gray-500 mt-1`} numberOfLines={2}>
-              {[pincode && `Pincode: ${pincode}`, state, district, taluka]
-                .filter(Boolean)
-                .join(', ')}
-            </Text>
-          )}
-        </View>
-        <Icon name="edit" size={16} color={tw.color('gray-500')} />
-      </View>
-    );
-  };
-
   // Determine border colors based on errors + touched
   const pickupBorderColor =
-    touched.origin && errors.origin ? '#ef4444' : '#d1d5db';
+    touched.pickup?.origin && errors.pickup?.origin ? '#ef4444' : '#d1d5db';
   const deliveryBorderColor =
-    touched.destination && errors.destination ? '#ef4444' : '#d1d5db';
-  const vehicleBorderColor =
-    touched.VehicleType && errors.VehicleType
+    touched.delivery?.destination && errors.delivery?.destination
       ? '#ef4444'
-      : values.VehicleType
+      : '#d1d5db';
+  const vehicleBorderColor =
+    touched.vehicle?.vehicleType && errors.vehicle?.vehicleType
+      ? '#ef4444'
+      : values.vehicle.vehicleType
       ? '#EF476F'
       : '#d1d5db';
   const weightBorderColor =
-    touched.Weight && errors.Weight
+    touched.vehicle?.weightRange && errors.vehicle?.weightRange
       ? '#ef4444'
-      : values.Weight
+      : values.vehicle.weightRange
       ? '#3B82F6'
       : '#d1d5db';
 
@@ -241,18 +159,88 @@ const FirstStep: React.FC = () => {
             onPress={handleOpenPickupModal}
             activeOpacity={0.7}
           >
-            <CompactAddressDisplay
-              type="pickup"
-              address={values.origin?.address}
-              line1={values.Origin_1}
-              line2={values.Origin_2}
-              contactPerson={values.ContactPerson}
-              contactNumber={values.ContactNumber}
-            />
+            {values.pickup.origin?.address ? (
+              <View style={tw`flex-row justify-between items-start`}>
+                <View style={tw`flex-1 mr-2`}>
+                  {(values.pickup.contactName ||
+                    values.pickup.contactNumber) && (
+                    <Text
+                      style={tw`text-sm text-gray-800 font-medium`}
+                      numberOfLines={1}
+                    >
+                      {values.pickup.contactName &&
+                        `${values.pickup.contactName}`}
+                      {values.pickup.contactName &&
+                        values.pickup.contactNumber &&
+                        ' • '}
+                      {values.pickup.contactNumber}
+                    </Text>
+                  )}
+                  {(values.pickup.plotOrBuilding ||
+                    values.pickup.streetArea) && (
+                    <Text
+                      style={tw`text-sm text-gray-800 font-medium`}
+                      numberOfLines={2}
+                    >
+                      {[values.pickup.plotOrBuilding, values.pickup.streetArea]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </Text>
+                  )}
+                  <Text
+                    style={tw`text-sm text-gray-800 font-medium`}
+                    numberOfLines={3}
+                  >
+                    {values.pickup.origin.address}
+                  </Text>
+                  {values.pickup.companyName && (
+                    <Text
+                      style={tw`text-xs text-gray-500 mt-1`}
+                      numberOfLines={1}
+                    >
+                      Company: {values.pickup.companyName}
+                    </Text>
+                  )}
+                  {(values.pickup.pincode ||
+                    values.pickup.state ||
+                    values.pickup.district ||
+                    values.pickup.taluka) && (
+                    <Text
+                      style={tw`text-xs text-gray-500 mt-1`}
+                      numberOfLines={2}
+                    >
+                      {[
+                        values.pickup.pincode &&
+                          `Pincode: ${values.pickup.pincode}`,
+                        values.pickup.state,
+                        values.pickup.district,
+                        values.pickup.taluka,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </Text>
+                  )}
+                </View>
+                <Icon name="edit" size={16} color={tw.color('gray-500')} />
+              </View>
+            ) : (
+              <View style={tw`flex-row items-center`}>
+                <Icon
+                  name="add-location"
+                  size={16}
+                  color={tw.color('blue-500')}
+                />
+                <Text style={tw`ml-2 text-blue-500 text-sm`}>
+                  Add Pickup Location
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
 
-          {errors.origin && touched.origin && (
-            <Text style={styles.errorText}>{errors.origin as string}</Text>
+          {errors.pickup?.origin && touched.pickup?.origin && (
+            <Text style={styles.errorText}>
+              {errors.pickup.origin as string}
+            </Text>
           )}
         </View>
 
@@ -275,23 +263,25 @@ const FirstStep: React.FC = () => {
             onPress={handleOpenDropModal}
             activeOpacity={0.7}
           >
-            {values.destination?.address ? (
+            {values.delivery.destination?.address ? (
               <View style={tw`flex-row rounded-lg`}>
                 <View style={tw` flex-1`}>
                   <Text style={tw`text-sm text-gray-800 font-medium`}>
-                    {values.ConsigneeName || 'Consignee'}{' '}
-                    {values.ConsigneeContactNumber || 'Consignee'}
+                    {values.delivery.consigneeName || 'Consignee'}{' '}
+                    {values.delivery.contactNumber || 'Consignee'}
                   </Text>
 
                   <Text style={tw`text-sm text-gray-800 font-small`}>
-                    {values.Destination_1}, {values.Destination_2}
+                    {values.delivery.plotOrBuilding},{' '}
+                    {values.delivery.streetArea}
                   </Text>
                   <Text style={tw`text-sm text-gray-600 `}>
-                    {values.destination.address}
+                    {values.delivery.destination.address}
                   </Text>
 
                   <Text style={tw`text-sm text-gray-800 font-medium`}>
-                    {values.District}, {values.state} - {values.Pincode}
+                    {values.delivery.district}, {values.delivery.state} -{' '}
+                    {values.delivery.pincode}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={handleOpenDropModal}>
@@ -310,22 +300,12 @@ const FirstStep: React.FC = () => {
                 </Text>
               </View>
             )}
-
-            {/* <CompactAddressDisplay
-              type="delivery"
-              consigneeName={values.ConsigneeName}
-              address={values.destination?.address}
-              line1={values.Destination_1}
-              line2={values.Destination_2}
-              pincode={values.Pincode}
-              state={values.state}
-              district={values.District}
-              taluka={values.Taluka}
-            /> */}
           </TouchableOpacity>
 
-          {errors.destination && touched.destination && (
-            <Text style={styles.errorText}>{errors.destination as string}</Text>
+          {errors.delivery?.destination && touched.delivery?.destination && (
+            <Text style={styles.errorText}>
+              {errors.delivery.destination as string}
+            </Text>
           )}
         </View>
 
@@ -345,13 +325,15 @@ const FirstStep: React.FC = () => {
               tw`p-3 border-2 border-dashed rounded-lg`,
               {
                 borderColor: vehicleBorderColor,
-                backgroundColor: values.VehicleType ? '#EF476F20' : '#f9fafb',
+                backgroundColor: values.vehicle.vehicleType
+                  ? '#EF476F20'
+                  : '#f9fafb',
               },
             ]}
             onPress={handleOpenVehicleModal}
             activeOpacity={0.7}
           >
-            {values?.VehicleType ? (
+            {values.vehicle.vehicleType ? (
               <View style={tw`flex-row items-center gap-2`}>
                 <Image
                   source={
@@ -393,8 +375,10 @@ const FirstStep: React.FC = () => {
             )}
           </TouchableOpacity>
 
-          {errors.VehicleType && touched.VehicleType && (
-            <Text style={styles.errorText}>{errors.VehicleType as string}</Text>
+          {errors.vehicle?.vehicleType && touched.vehicle?.vehicleType && (
+            <Text style={styles.errorText}>
+              {errors.vehicle.vehicleType as string}
+            </Text>
           )}
         </View>
 
@@ -414,14 +398,16 @@ const FirstStep: React.FC = () => {
               tw`p-3 border-2 border-dashed rounded-lg`,
               {
                 borderColor: weightBorderColor,
-                backgroundColor: values.Weight ? '#3B82F620' : '#f9fafb',
+                backgroundColor: values.vehicle.weightRange
+                  ? '#3B82F620'
+                  : '#f9fafb',
               },
             ]}
             onPress={handleOpenWeightModal}
-            disabled={!values?.VehicleType}
+            disabled={!values.vehicle.vehicleType}
             activeOpacity={0.7}
           >
-            {values?.Weight ? (
+            {values.vehicle.weightRange ? (
               <View style={tw`flex-row items-center gap-3`}>
                 <Image
                   source={
@@ -449,7 +435,7 @@ const FirstStep: React.FC = () => {
                   <Icon name="fitness-center" size={16} color="#6B7280" />
                 </View>
                 <Text style={tw`text-gray-500 text-sm flex-1`}>
-                  {values?.VehicleType
+                  {values.vehicle.vehicleType
                     ? 'Select Weight Range'
                     : 'Select vehicle type first'}
                 </Text>
@@ -457,7 +443,7 @@ const FirstStep: React.FC = () => {
                   name="keyboard-arrow-down"
                   size={20}
                   color={
-                    values?.VehicleType
+                    values.vehicle.vehicleType
                       ? tw.color('gray-500')
                       : tw.color('gray-300')
                   }
@@ -466,8 +452,10 @@ const FirstStep: React.FC = () => {
             )}
           </TouchableOpacity>
 
-          {errors.Weight && touched.Weight && (
-            <Text style={styles.errorText}>{errors.Weight as string}</Text>
+          {errors.vehicle?.weightRange && touched.vehicle?.weightRange && (
+            <Text style={styles.errorText}>
+              {errors.vehicle.weightRange as string}
+            </Text>
           )}
         </View>
 
@@ -487,21 +475,24 @@ const FirstStep: React.FC = () => {
               <TextInput
                 style={[
                   tw`border border-gray-300 rounded-lg p-3 text-gray-800 text-base`,
-                  touched.Approximate_weight &&
-                    errors.Approximate_weight &&
+                  touched.vehicle?.approximateWeightKg &&
+                    errors.vehicle?.approximateWeightKg &&
                     tw`border-red-500`,
                 ]}
-                value={values.Approximate_weight}
-                onChangeText={text => setFieldValue('Approximate_weight', text)}
+                value={values.vehicle.approximateWeightKg}
+                onChangeText={text =>
+                  setFieldValue('vehicle.approximateWeightKg', text)
+                }
                 placeholder="Enter exact weight in kilograms"
                 keyboardType="numeric"
                 placeholderTextColor="#9CA3AF"
               />
-              {errors.Approximate_weight && touched.Approximate_weight && (
-                <Text style={styles.errorText}>
-                  {errors.Approximate_weight}
-                </Text>
-              )}
+              {errors.vehicle?.approximateWeightKg &&
+                touched.vehicle?.approximateWeightKg && (
+                  <Text style={styles.errorText}>
+                    {errors.vehicle.approximateWeightKg}
+                  </Text>
+                )}
             </View>
             <View style={tw`ml-3 bg-gray-100 px-3 py-3 rounded-lg`}>
               <Text style={tw`text-gray-600 font-medium`}>kg</Text>
@@ -517,10 +508,10 @@ const FirstStep: React.FC = () => {
         ref={vehicleModalRef}
         title="Select Vehicle Type"
         options={truckTypes}
-        selectedValue={values.VehicleType}
+        selectedValue={values.vehicle.vehicleType}
         onSelect={(vehicleType: any) => {
-          setFieldValue('VehicleType', vehicleType);
-          setFieldValue('Weight', '');
+          setFieldValue('vehicle.vehicleType', vehicleType);
+          setFieldValue('vehicle.weightRange', '');
         }}
         numColumns={2}
       />
@@ -529,8 +520,8 @@ const FirstStep: React.FC = () => {
         ref={weightModalRef}
         title="Select Weight Range"
         options={weightTypes}
-        selectedValue={values.Weight}
-        onSelect={(weight: any) => setFieldValue('Weight', weight)}
+        selectedValue={values.vehicle.weightRange}
+        onSelect={(weight: any) => setFieldValue('vehicle.weightRange', weight)}
         numColumns={2}
       />
     </KeyboardAvoidingView>
@@ -548,7 +539,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 80, // ensures last input isn’t hidden
+    paddingBottom: Platform.OS === 'ios' ? 40 : 80,
   },
   errorText: {
     color: '#ef4444',
