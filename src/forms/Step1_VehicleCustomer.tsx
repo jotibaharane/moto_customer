@@ -1,5 +1,5 @@
 // Step1_VehicleCustomer.tsx
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
   Card,
@@ -27,36 +27,6 @@ interface LocationModalProps {
   values: any;
   setFieldValue: (field: string, value: any) => void;
 }
-
-// ========== HELPER FUNCTIONS ==========
-const formatAddress = (address1?: string, address2?: string): string => {
-  if (address1 && address2) return `${address1}, ${address2}`;
-  return address1 || address2 || 'Address not specified';
-};
-
-const getFullAddressText = (values: any, prefix: 'pickup' | 'drop') => {
-  const parts: string[] = [];
-
-  if (values[`${prefix}Address1`]) parts.push(values[`${prefix}Address1`]);
-  if (values[`${prefix}Address2`]) parts.push(values[`${prefix}Address2`]);
-
-  if (values[`${prefix}Google`]) {
-    parts.push('-------------------------------------------------------------');
-    parts.push(values[`${prefix}Google`]);
-  }
-
-  const cityDistrict = [values[`${prefix}City`], values[`${prefix}District`]]
-    .filter(Boolean)
-    .join(', ');
-  if (cityDistrict) parts.push(cityDistrict);
-
-  const statePincode = [values[`${prefix}State`], values[`${prefix}Pincode`]]
-    .filter(Boolean)
-    .join(', ');
-  if (statePincode) parts.push(statePincode);
-
-  return parts.join('\n');
-};
 
 // ========== REUSABLE COMPONENTS ==========
 const LocationCard: React.FC<{
@@ -86,81 +56,110 @@ const LocationCard: React.FC<{
       <Divider style={styles.divider} />
 
       <View style={styles.cardContent}>
+        {/* Name - label and value in same row */}
         <View style={styles.fieldRow}>
-          <View style={styles.fieldContainer}>
-            <Text variant="labelSmall" style={styles.fieldLabel}>
-              NAME
-            </Text>
-            <Text variant="bodySmall" style={styles.fieldValue}>
-              {values[`${prefix}Name`] || '—'}
-            </Text>
-          </View>
-          <View style={styles.fieldContainer}>
-            <Text variant="labelSmall" style={styles.fieldLabel}>
-              PHONE
-            </Text>
-            <Text variant="bodySmall" style={styles.fieldValue}>
-              {values[`${prefix}Phone`] || '—'}
-            </Text>
-          </View>
+          <Text variant="labelSmall" style={styles.fieldLabel}>
+            NAME
+          </Text>
+          <Text variant="bodyMedium" style={styles.fieldValue}>
+            {values[`${prefix}Name`] || '—'}
+          </Text>
         </View>
 
-        <View style={styles.fieldContainer}>
+        {/* Phone - label and value in same row */}
+        <View style={styles.fieldRow}>
+          <Text variant="labelSmall" style={styles.fieldLabel}>
+            PHONE
+          </Text>
+          <Text variant="bodyMedium" style={styles.fieldValue}>
+            {values[`${prefix}Phone`] || '—'}
+          </Text>
+        </View>
+
+        {/* GST - label and value in same row */}
+        <View style={styles.fieldRow}>
           <Text variant="labelSmall" style={styles.fieldLabel}>
             GST NO
           </Text>
-          <Text variant="bodySmall" style={styles.fieldValue}>
+          <Text variant="bodyMedium" style={styles.fieldValue}>
             {values[`${prefix}Gst`] || 'Not specified'}
           </Text>
         </View>
 
-        <View style={styles.fieldContainer}>
+        {/* Address Line 1 - label and value in same row */}
+        <View style={styles.fieldRow}>
           <Text variant="labelSmall" style={styles.fieldLabel}>
             ADDRESS
           </Text>
-          <Text variant="bodySmall" style={styles.fieldValue}>
-            {formatAddress(
-              values[`${prefix}Address1`],
-              values[`${prefix}Address2`],
-            ) || '—'}
+          <Text variant="bodyMedium" style={styles.fieldValue}>
+            {values[`${prefix}Address1`] || '—'}
           </Text>
-          {values[`${prefix}Google`] && (
-            <View style={styles.fieldContainer}>
-              <Text variant="bodySmall" style={styles.googleValue}>
-                {values[`${prefix}Google`]}
-              </Text>
-            </View>
-          )}
         </View>
 
+        {/* Address Line 2 - only show if exists */}
+        {values[`${prefix}Address2`] && (
+          <View style={styles.fieldRow}>
+            <Text variant="labelSmall" style={styles.fieldLabel}>
+              ADDRESS 2
+            </Text>
+            <Text variant="bodyMedium" style={styles.fieldValue}>
+              {values[`${prefix}Address2`]}
+            </Text>
+          </View>
+        )}
+
+        {/* Google Address - only show if exists */}
+        {values[`${prefix}Google`] && (
+          <View style={styles.fieldRow}>
+            <Text variant="labelSmall" style={styles.fieldLabel}>
+              GOOGLE
+            </Text>
+            <Text variant="bodySmall" style={styles.googleValue}>
+              {values[`${prefix}Google`]}
+            </Text>
+          </View>
+        )}
+
+        {/* City - label and value in same row */}
         <View style={styles.fieldRow}>
-          <View style={styles.fieldContainer}>
-            <Text variant="labelSmall" style={styles.fieldLabel}>
-              CITY
-            </Text>
-            <Text variant="bodySmall" style={styles.fieldValue}>
-              {values[`${prefix}City`] || '—'}
-            </Text>
-          </View>
-          <View style={styles.fieldContainer}>
-            <Text variant="labelSmall" style={styles.fieldLabel}>
-              STATE
-            </Text>
-            <Text variant="bodySmall" style={styles.fieldValue}>
-              {values[`${prefix}State`] || '—'}
-            </Text>
-          </View>
+          <Text variant="labelSmall" style={styles.fieldLabel}>
+            CITY
+          </Text>
+          <Text variant="bodyMedium" style={styles.fieldValue}>
+            {values[`${prefix}City`] || '—'}
+          </Text>
         </View>
 
-        <View style={styles.fieldRow}>
-          <View style={styles.fieldContainer}>
+        {/* District - only show if exists */}
+        {values[`${prefix}District`] && (
+          <View style={styles.fieldRow}>
             <Text variant="labelSmall" style={styles.fieldLabel}>
-              PINCODE
+              DISTRICT
             </Text>
-            <Text variant="bodySmall" style={styles.fieldValue}>
-              {values[`${prefix}Pincode`] || '—'}
+            <Text variant="bodyMedium" style={styles.fieldValue}>
+              {values[`${prefix}District`]}
             </Text>
           </View>
+        )}
+
+        {/* State - label and value in same row */}
+        <View style={styles.fieldRow}>
+          <Text variant="labelSmall" style={styles.fieldLabel}>
+            STATE
+          </Text>
+          <Text variant="bodyMedium" style={styles.fieldValue}>
+            {values[`${prefix}State`] || '—'}
+          </Text>
+        </View>
+
+        {/* Pincode - label and value in same row */}
+        <View style={styles.fieldRow}>
+          <Text variant="labelSmall" style={styles.fieldLabel}>
+            PINCODE
+          </Text>
+          <Text variant="bodyMedium" style={styles.fieldValue}>
+            {values[`${prefix}Pincode`] || '—'}
+          </Text>
         </View>
       </View>
     </Card>
@@ -203,6 +202,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
             <Divider style={styles.modalDivider} />
 
             <ScrollView style={styles.modalContent}>
+              {/* GST Number */}
               <TextInput
                 label="GST Number"
                 value={values[`${prefix}Gst`] || ''}
@@ -211,6 +211,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                 style={styles.input}
               />
 
+              {/* Name */}
               <TextInput
                 label={
                   type === 'pickup'
@@ -223,39 +224,80 @@ const LocationModal: React.FC<LocationModalProps> = ({
                 style={styles.input}
               />
 
+              {/* Phone */}
               <TextInput
-                label="Full Address"
-                value={getFullAddressText(values, prefix)}
+                label="Phone Number"
+                value={values[`${prefix}Phone`] || ''}
+                onChangeText={t => setFieldValue(`${prefix}Phone`, t)}
+                mode="outlined"
+                keyboardType="phone-pad"
+                style={styles.input}
+              />
+
+              {/* Address Line 1 */}
+              <TextInput
+                label="Address Line 1"
+                value={values[`${prefix}Address1`] || ''}
+                onChangeText={t => setFieldValue(`${prefix}Address1`, t)}
+                mode="outlined"
+                style={styles.input}
+              />
+
+              {/* Address Line 2 */}
+              <TextInput
+                label="Address Line 2"
+                value={values[`${prefix}Address2`] || ''}
+                onChangeText={t => setFieldValue(`${prefix}Address2`, t)}
+                mode="outlined"
+                style={styles.input}
+              />
+
+              {/* Google Address */}
+              <TextInput
+                label="Google Address"
+                value={values[`${prefix}Google`] || ''}
+                onChangeText={t => setFieldValue(`${prefix}Google`, t)}
                 mode="outlined"
                 multiline
-                numberOfLines={6}
-                editable={true}
-                style={styles.fullAddressInput}
+                numberOfLines={3}
+                style={styles.input}
               />
 
+              {/* City */}
               <TextInput
-                label="Pincode"
-                keyboardType="numeric"
-                value={values[`${prefix}Pincode`]}
-                onChangeText={t => setFieldValue(`${prefix}Pincode`, t)}
-                mode="outlined"
-                style={styles.halfInput}
-              />
-
-              <TextInput
-                label={type === 'pickup' ? 'Origin' : 'Destination'}
+                label={type === 'pickup' ? 'Origin City' : 'Destination City'}
                 value={values[`${prefix}City`] || ''}
                 onChangeText={t => setFieldValue(`${prefix}City`, t)}
                 mode="outlined"
                 style={styles.input}
               />
 
+              {/* District */}
+              <TextInput
+                label="District"
+                value={values[`${prefix}District`] || ''}
+                onChangeText={t => setFieldValue(`${prefix}District`, t)}
+                mode="outlined"
+                style={styles.input}
+              />
+
+              {/* State */}
               <TextInput
                 label="State"
-                value={values[`${prefix}State`]}
+                value={values[`${prefix}State`] || ''}
                 onChangeText={t => setFieldValue(`${prefix}State`, t)}
                 mode="outlined"
-                style={styles.halfInput}
+                style={styles.input}
+              />
+
+              {/* Pincode */}
+              <TextInput
+                label="Pincode"
+                keyboardType="numeric"
+                value={values[`${prefix}Pincode`] || ''}
+                onChangeText={t => setFieldValue(`${prefix}Pincode`, t)}
+                mode="outlined"
+                style={styles.input}
               />
 
               <View style={styles.modalActions}>
@@ -362,7 +404,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 0,
+    padding: 16,
     paddingTop: 0,
   },
   modalContainer: {
@@ -399,16 +441,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#f8fafc',
   },
-  fullAddressInput: {
-    backgroundColor: '#f8fafc',
-    fontSize: 14,
-    lineHeight: 20,
-  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    marginVertical: 0,
-    marginHorizontal: 0,
+    marginBottom: 16,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -420,58 +456,57 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#1e293b',
   },
   editButton: {
     margin: 0,
   },
   cardContent: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingVertical: 12,
   },
   divider: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#e2e8f0',
     height: 1,
   },
   fieldRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  fieldContainer: {
-    flex: 1,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   fieldLabel: {
-    color: '#000000ff',
+    color: '#64748b', // Light gray for labels
     fontWeight: '500',
-    marginBottom: 2,
     fontSize: 12,
     letterSpacing: 0.5,
+    flex: 1,
   },
   fieldValue: {
-    color: '#212121',
-    fontSize: 12,
-    lineHeight: 16,
+    color: '#000000ff', // Dark color for values
+    fontSize: 14,
+    fontWeight: '400',
+    flex: 2,
+    textAlign: 'right',
   },
   googleValue: {
-    color: '#1d1d1dff',
-    fontSize: 11,
-    lineHeight: 14,
+    color: '#475569', // Slightly lighter for google address
+    fontSize: 12,
+    fontStyle: 'italic',
+    flex: 2,
+    textAlign: 'right',
   },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  halfInput: {
-    flex: 1,
-    fontSize: 13,
+    width: '100%',
   },
   modalActions: {
     flexDirection: 'row',
@@ -484,11 +519,11 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     borderColor: '#ddd',
-    borderRadius: 2,
+    borderRadius: 4,
   },
   saveButton: {
-    backgroundColor: '#1a73e8',
-    borderRadius: 2,
+    backgroundColor: '#3b82f6',
+    borderRadius: 4,
   },
   placeholderContainer: {
     padding: 24,

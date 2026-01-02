@@ -25,6 +25,84 @@ import { Icon } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
 import { useRefreshOnFocus } from '@hooks/useRefreshOnFocus';
+// ===== MULTIPLE DUMMY LOAD POSTS =====
+const DUMMY_CUSTOMER_POSTS: CustomerLoadPost[] = [
+  {
+    LoadPostID: 'LP-DUMMY-001',
+    PickupLat: 28.6139,
+    PickupLng: 77.209,
+    PickupAddress: 'Connaught Place, New Delhi',
+    PickupState: 'Delhi',
+    PickupPincode: '110001',
+
+    DeliveryLat: 28.4595,
+    DeliveryLng: 77.0266,
+    DeliveryAddress: 'DLF Cyber City, Gurugram',
+    DeliveryState: 'Haryana',
+    DeliveryPincode: '122002',
+
+    VehicleType: 'Container',
+    BodyType: 'Closed',
+    Weight: '10 MT',
+    Approximate_weight: '9.5 MT',
+
+    CargoContent: 'Electronics',
+    CargoPackageType: 'Box',
+
+    LP_Status: 'Pending',
+    LoadPost_InsertDate: new Date().toISOString(),
+  },
+  {
+    LoadPostID: 'LP-DUMMY-002',
+    PickupLat: 19.076,
+    PickupLng: 72.8777,
+    PickupAddress: 'Andheri East, Mumbai',
+    PickupState: 'Maharashtra',
+    PickupPincode: '400069',
+
+    DeliveryLat: 18.5204,
+    DeliveryLng: 73.8567,
+    DeliveryAddress: 'Hinjewadi Phase 1, Pune',
+    DeliveryState: 'Maharashtra',
+    DeliveryPincode: '411057',
+
+    VehicleType: 'Trailer',
+    BodyType: 'Open',
+    Weight: '18 MT',
+    Approximate_weight: '17 MT',
+
+    CargoContent: 'Steel Rods',
+    CargoPackageType: 'Loose',
+
+    LP_Status: 'Assigned',
+    LoadPost_InsertDate: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    LoadPostID: 'LP-DUMMY-003',
+    PickupLat: 12.9716,
+    PickupLng: 77.5946,
+    PickupAddress: 'Whitefield, Bengaluru',
+    PickupState: 'Karnataka',
+    PickupPincode: '560066',
+
+    DeliveryLat: 13.0827,
+    DeliveryLng: 80.2707,
+    DeliveryAddress: 'Guindy Industrial Estate, Chennai',
+    DeliveryState: 'Tamil Nadu',
+    DeliveryPincode: '600032',
+
+    VehicleType: 'Truck',
+    BodyType: 'Closed',
+    Weight: '12 MT',
+    Approximate_weight: '11.8 MT',
+
+    CargoContent: 'Machinery Parts',
+    CargoPackageType: 'Crate',
+
+    LP_Status: 'Pending',
+    LoadPost_InsertDate: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+];
 
 const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
   const CustomerID = useSelector(
@@ -45,7 +123,10 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
       keepUnusedDataFor: 0,
     },
   );
-
+  const postsData: CustomerLoadPost[] =
+    customerPosts?.data && customerPosts.data.length > 0
+      ? customerPosts.data
+      : DUMMY_CUSTOMER_POSTS;
   console.log(customerPosts, 'this is from loadpost');
 
   const [refreshing, setRefreshing] = useState(false);
@@ -207,12 +288,9 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
       <View style={styles.listHeader}>
         <View style={styles.titleContainer}>
           <Text style={styles.listTitle}>My Load Posts</Text>
-          {customerPosts?.data && customerPosts.data.length > 0 && (
-            <Text style={styles.postCount}>
-              {customerPosts.data.length} post
-              {customerPosts.data.length !== 1 ? 's' : ''}
-            </Text>
-          )}
+          <Text style={styles.postCount}>
+            {postsData.length} post{postsData.length !== 1 ? 's' : ''}
+          </Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -235,7 +313,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
           <ActivityIndicator size="large" color="#5e6bff" />
           <Text style={styles.loadingText}>Loading posts...</Text>
         </View>
-      ) : customerPosts?.data?.length === 0 ? (
+      ) : postsData.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyContent}>
             <Icon source="package-variant" size={64} color="#E0E0E0" />
@@ -247,7 +325,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
         </View>
       ) : (
         <FlatList
-          data={customerPosts?.data || []}
+          data={postsData}
           renderItem={renderPostItem}
           keyExtractor={item => item.LoadPostID}
           contentContainerStyle={styles.listContent}

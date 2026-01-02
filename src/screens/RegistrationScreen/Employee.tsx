@@ -173,24 +173,6 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = memo(
           </Text>
 
           {/* Designation */}
-          <View style={modalStyles.fieldContainer}>
-            <SelectList
-              label="Designation *"
-              data={designationList}
-              setSelected={val => updateField('designation', val)}
-              value={formData.designation}
-              placeholder="Select Designation"
-              save="key"
-              search={false}
-              boxStyles={modalStyles.selectBox}
-              dropdownStyles={modalStyles.dropdown}
-            />
-            {errors.designation && (
-              <HelperText type="error" visible={!!errors.designation}>
-                {errors.designation}
-              </HelperText>
-            )}
-          </View>
 
           {/* Department */}
           <View style={modalStyles.fieldContainer}>
@@ -211,7 +193,24 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = memo(
               </HelperText>
             )}
           </View>
-
+          <View style={modalStyles.fieldContainer}>
+            <SelectList
+              label="Designation *"
+              data={designationList}
+              setSelected={val => updateField('designation', val)}
+              value={formData.designation}
+              placeholder="Select Designation"
+              save="key"
+              search={false}
+              boxStyles={modalStyles.selectBox}
+              dropdownStyles={modalStyles.dropdown}
+            />
+            {errors.designation && (
+              <HelperText type="error" visible={!!errors.designation}>
+                {errors.designation}
+              </HelperText>
+            )}
+          </View>
           {/* Full Name */}
           <View style={modalStyles.fieldContainer}>
             <TextInput

@@ -459,7 +459,7 @@ export default function MultiStepFormTabs() {
       >
         {formik => {
           // Update formik values when load post is selected
-          React.useEffect(() => {
+          useEffect(() => {
             if (selectedLoadPost && dropdownItems.length > 0) {
               const selectedItem = dropdownItems.find(
                 item => item.loadPostId === selectedLoadPost,
@@ -472,7 +472,7 @@ export default function MultiStepFormTabs() {
           }, [selectedLoadPost, dropdownItems]);
 
           // Check step completion on values change
-          React.useEffect(() => {
+          useEffect(() => {
             checkStepCompletion(formik.values);
           }, [formik.values]);
 

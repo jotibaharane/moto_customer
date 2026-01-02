@@ -65,20 +65,25 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
     origin,
     destination,
     drivers,
-    selectedDriver,
+    // selectedDriver,
     currentMap,
     region,
     postId,
   } = useSelector((state: RootState) => state.map);
-  console.log({
+  console.log('data from maps', {
     origin,
     destination,
     drivers,
-    selectedDriver,
+    // selectedDriver,
     currentMap,
     region,
     postId,
   });
+  let selectedDriver = {
+    latitude: 19.212295,
+    longitude: 72.977166,
+    rotation: 0,
+  };
   const mapRef = useRef<MapView | null>(null);
   const lastFitCoordinatesRef = useRef<Coordinate[]>([]);
   const lastDriverUpdateRef = useRef<number>(0);
