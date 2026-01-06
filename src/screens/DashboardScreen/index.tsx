@@ -10,29 +10,27 @@ import {
   setOriginAddress,
   setPostId,
 } from '@store/slices/mapSlice';
-import React, { useEffect, useLayoutEffect, useState, useRef } from 'react';
+import { routeName } from '@utils/navigationHelpers';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Animated,
+  FlatList,
   Image,
+  Modal,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Modal,
-  FlatList,
-  Animated,
-  ActivityIndicator,
 } from 'react-native';
 import { Icon } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
+import DriverArrivalModal from './component/DriverArrivalModal';
 import { FloatingActionButton } from './component/FloatingButtons';
 import MapComponent from './component/MapComponent';
-import { routeName } from '@utils/navigationHelpers';
-import MapView, { Marker } from 'react-native-maps';
-import { socket } from '@utils/socketUtils';
-import DriverArrivalModal from './component/DriverArrivalModal';
 
 const ORIGIN_MARKER_IMG = require('@assets/icons/origin-marker.png');
 
@@ -593,45 +591,45 @@ const Dashboard: React.FC = () => {
   //   }
   // };
 
-  useEffect(() => {
-    if (!CustomerID || !selectedLoad || !origin) return;
+  // useEffect(() => {
+  //   if (!CustomerID || !selectedLoad || !origin) return;
 
-    socket.off('driverNearbyAlert');
+  //   socket.off('driverNearbyAlert');
 
-    socket.on('driverNearbyAlert', data => {
-      // 🔐 Ignore other loads
-      if (data?.LoadPostID !== selectedLoad.LoadPostID) return;
+  //   socket.on('driverNearbyAlert', data => {
+  //     // 🔐 Ignore other loads
+  //     if (data?.LoadPostID !== selectedLoad.LoadPostID) return;
 
-      if (!data?.driver?.Lat || !data?.driver?.Lng) return;
+  //     if (!data?.driver?.Lat || !data?.driver?.Lng) return;
 
-      const driverLoc = {
-        latitude: data.driver.Lat,
-        longitude: data.driver.Lng,
-      };
+  //     const driverLoc = {
+  //       latitude: data.driver.Lat,
+  //       longitude: data.driver.Lng,
+  //     };
 
-      setDriverLocation(driverLoc);
-      setDriverAlertData(data);
+  //     setDriverLocation(driverLoc);
+  //     setDriverAlertData(data);
 
-      const distance = getDistanceInMeters(origin, driverLoc);
+  //     const distance = getDistanceInMeters(origin, driverLoc);
 
-      if (distance <= ARRIVAL_DISTANCE && !arrivalTriggered.current) {
-        arrivalTriggered.current = true;
+  //     if (distance <= ARRIVAL_DISTANCE && !arrivalTriggered.current) {
+  //       arrivalTriggered.current = true;
 
-        setDriverDetails(data.driver);
-        setShowDriverArrivedDialog(true);
-      }
-    });
+  //       setDriverDetails(data.driver);
+  //       setShowDriverArrivedDialog(true);
+  //     }
+  //   });
 
-    socket.emit('CustomerDetails', {
-      customerId: CustomerID,
-      loadPostId: selectedLoad.LoadPostID,
-    });
+  //   socket.emit('CustomerDetails', {
+  //     customerId: CustomerID,
+  //     loadPostId: selectedLoad.LoadPostID,
+  //   });
 
-    return () => {
-      socket.off('driverNearbyAlert');
-      arrivalTriggered.current = false;
-    };
-  }, [CustomerID, selectedLoad, origin]);
+  //   return () => {
+  //     socket.off('driverNearbyAlert');
+  //     arrivalTriggered.current = false;
+  //   };
+  // }, [CustomerID, selectedLoad, origin]);
 
   // Animation effect
   useEffect(() => {

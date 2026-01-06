@@ -11,5 +11,6 @@ export const emitDriverLocation = (payload: any) => {
 export const emitCreateCustomerLoad = (payload: any) => {
   const socket = getSocket();
   if (!socket.connected) return;
+  console.log('LOAD POST PAYLOAD', { payload });
   socket.emit(SOCKET_EVENTS.CREATECUSTOMERLOAD, payload);
 };
