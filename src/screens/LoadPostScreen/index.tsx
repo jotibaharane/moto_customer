@@ -35,6 +35,7 @@ import SecondStep from './components/SecondStep';
 import { emptyShipmentData, STEPS } from './constant';
 import { FormStep } from './type';
 import { getStepSchema } from './validation';
+import { emitCreateCustomerLoad } from '../../sockets';
 
 const LoadPostForm: React.FC = () => {
   const CustomerID =
@@ -104,6 +105,12 @@ const LoadPostForm: React.FC = () => {
       console.log('Sending payload:', JSON.stringify(payload, null, 2));
 
       const response = await postCustomerRequirement(payload);
+      emitCreateCustomerLoad({
+        CustomerID: CustomerID,
+        PickupLat: values?.pickup?.origin?.coordinates?.lat,
+        PickupLng: values?.pickup?.origin?.coordinates?.lng,
+        VehicleType: values?.vehicle?.vehicleType,
+      });
       console.log({ response });
 
       if (response?.data?.status === '00') {

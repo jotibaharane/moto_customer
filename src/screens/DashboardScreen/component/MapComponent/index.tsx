@@ -11,11 +11,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import GetLocation from 'react-native-get-location';
 import DropMarker from '../icon/DropMarker';
 import OriginMarker from '../icon/OriginMarker';
+import Parcel from '../icon/Parcel';
 import Truck from '../icon/Truck';
 import { MAP_STYLE } from './helper';
 import { AnimatedRegion, MarkerAnimated } from 'react-native-maps';
 
-import { socket } from '@utils/socketUtils';
 interface Coordinate {
   latitude: number;
   longitude: number;
@@ -60,6 +60,11 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
   const CustomerID = useSelector(
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
+  const [selectedDriver, setSelectedDriver] = React.useState({
+    latitude: 19.1453,
+    longitude: 72.936,
+    rotation: 0,
+  });
   const dispatch = useDispatch();
   const {
     origin,
@@ -79,11 +84,13 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
     region,
     postId,
   });
-  let selectedDriver = {
-    latitude: 19.212295,
-    longitude: 72.977166,
-    rotation: 0,
-  };
+  // let selectedDriver = {
+  //   latitude: (19.212295 * Math.floor(Math.random() * 10)) / 10,
+  //   longitude: (72.977166 * Math.floor(Math.random() * 10)) / 10,
+  //   rotation: 0,
+  // };
+
+  console.log('this is selected', selectedDriver);
   const mapRef = useRef<MapView | null>(null);
   const lastFitCoordinatesRef = useRef<Coordinate[]>([]);
   const lastDriverUpdateRef = useRef<number>(0);
@@ -96,42 +103,77 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
     }),
   ).current;
 
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     setSelectedDriver(prev => {
+  //       const latOffset = 0.002; // ~200 meters
+  //       const lngOffset = 0.002;
+
+  //       const newLat = prev.latitude + latOffset;
+  //       const newLng = prev.longitude + lngOffset;
+
+  //       // Animate marker smoothly
+  //       driverAnimatedPosition
+  //         .timing({
+  //           toValue: {
+  //             latitude: newLat,
+  //             longitude: newLng,
+  //             latitudeDelta: 0,
+  //             longitudeDelta: 0,
+  //           },
+  //           duration: 1000,
+  //           useNativeDriver: false,
+  //         })
+  //         .start();
+
+  //       return {
+  //         ...prev,
+  //         latitude: newLat,
+  //         longitude: newLng,
+  //       };
+  //     });
+  //   }, 2000); // every 2 seconds
+
+  //   return () => clearInterval(interval);
+  // }, []);
+
+  console.log({ selectedDriver });
   //========socket for driver nearby alert========
-  useEffect(() => {
-    socket.onAny((event, ...args) => {
-      console.log('📡 SOCKET EVENT:', event, args);
-    });
+  // useEffect(() => {
+  //   socket.onAny((event, ...args) => {
+  //     console.log('📡 SOCKET EVENT:', event, args);
+  //   });
 
-    return () => {
-      socket.offAny();
-    };
-  }, []);
-  useEffect(() => {
-    if (!CustomerID) return;
+  //   return () => {
+  //     socket.offAny();
+  //   };
+  // }, []);
+  // useEffect(() => {
+  //   if (!CustomerID) return;
 
-    const handleDriverLocation = (data: any) => {
-      // ✅ NOW YOU WILL GET DATA
-      console.log('Driver location data:', data);
-    };
+  //   const handleDriverLocation = (data: any) => {
+  //     // ✅ NOW YOU WILL GET DATA
+  //     console.log('Driver location data:', data);
+  //   };
 
-    const onConnect = () => {
-      socket.off('driverlocation', handleDriverLocation);
-      socket.on('driverlocation', handleDriverLocation);
+  //   const onConnect = () => {
+  //     socket.off('driverlocation', handleDriverLocation);
+  //     socket.on('driverlocation', handleDriverLocation);
 
-      socket.emit('CustomerDetails', { customerId: CustomerID });
-    };
+  //     socket.emit('CustomerDetails', { customerId: CustomerID });
+  //   };
 
-    socket.on('connect', onConnect);
+  //   socket.on('connect', onConnect);
 
-    if (socket.connected) {
-      onConnect();
-    }
+  //   if (socket.connected) {
+  //     onConnect();
+  //   }
 
-    return () => {
-      socket.off('connect', onConnect);
-      socket.off('driverlocation', handleDriverLocation);
-    };
-  }, [CustomerID]);
+  //   return () => {
+  //     socket.off('connect', onConnect);
+  //     socket.off('driverlocation', handleDriverLocation);
+  //   };
+  // }, [CustomerID]);
   //=================
   useEffect(() => {
     if (
@@ -176,7 +218,9 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
       return null;
     }
   };
+
   useEffect(() => {
+    if (postId) return;
     // ✅ DO NOT override origin if it already exists (LoadPost location)
     if (origin?.latitude && origin?.longitude) return;
 
@@ -199,13 +243,13 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
           location.longitude,
         );
 
-        dispatch(
-          setOrigin({
-            latitude: location.latitude,
-            longitude: location.longitude,
-            address: geoData?.address,
-          }),
-        );
+        // dispatch(
+        //   setOrigin({
+        //     latitude: location.latitude,
+        //     longitude: location.longitude,
+        //     address: geoData?.address,
+        //   }),
+        // );
       } catch (error) {
         console.warn('Error fetching location:', error);
       }
@@ -275,6 +319,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
 
   // Clear map when currentMap changes to prevent stale markers
   useEffect(() => {
+    if (postId) return;
     lastFitCoordinatesRef.current = [];
     if (mapRef.current) {
       mapRef.current.animateToRegion(region, 350);
@@ -308,14 +353,19 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
   const getMapCoordinates = useCallback((): Coordinate[] => {
     const coords: Coordinate[] = [];
 
-    if (origin?.latitude && origin.longitude) {
-      coords.push({ latitude: origin.latitude, longitude: origin.longitude });
+    // Origin
+    if (origin?.latitude && origin?.longitude) {
+      coords.push({
+        latitude: origin.latitude,
+        longitude: origin.longitude,
+      });
     }
 
+    // Destination (Active)
     if (
       currentMap === 'Active' &&
       destination?.latitude &&
-      destination.longitude
+      destination?.longitude
     ) {
       coords.push({
         latitude: destination.latitude,
@@ -323,7 +373,20 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
       });
     }
 
-    if (currentMap === 'Load') {
+    // Selected Driver (Process / Active)
+    if (
+      (currentMap === 'Process' || currentMap === 'Active') &&
+      selectedDriver?.latitude &&
+      selectedDriver?.longitude
+    ) {
+      coords.push({
+        latitude: selectedDriver.latitude,
+        longitude: selectedDriver.longitude,
+      });
+    }
+
+    // Nearby Drivers (Load)
+    if (currentMap === 'Load' && drivers.length > 0) {
       drivers.forEach(driver => {
         if (driver.latitude && driver.longitude) {
           coords.push({
@@ -331,15 +394,6 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
             longitude: driver.longitude,
           });
         }
-      });
-    } else if (
-      (currentMap === 'Active' || currentMap === 'Process') &&
-      selectedDriver?.latitude &&
-      selectedDriver.longitude
-    ) {
-      coords.push({
-        latitude: selectedDriver.latitude,
-        longitude: selectedDriver.longitude,
       });
     }
 
@@ -387,10 +441,15 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
             longitudeDelta,
           };
 
-          mapRef.current.animateToRegion(regionToAnimate, 1000);
-          lastFitCoordinatesRef.current = coordinates;
-
-          lastFitCoordinatesRef.current = coordinates;
+          mapRef.current.fitToCoordinates(coordinates, {
+            edgePadding: {
+              top: 120,
+              right: 120,
+              bottom: 120,
+              left: 120,
+            },
+            animated: true,
+          });
         }
       } else if (mapRef.current && coordinates.length === 0) {
         mapRef.current.animateToRegion(region, 1000);
@@ -444,7 +503,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
         tracksViewChanges={false}
       >
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <OriginMarker size={45} />
+          {/* <OriginMarker size={45} /> */}
+          <Parcel width={50} height={50} />
         </View>
       </Marker>
     );
@@ -497,20 +557,6 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
       </MarkerAnimated>
     );
   }, [currentMap, selectedDriver]);
-
-  useEffect(() => {
-    if (!liveDriverLocation || !mapRef.current) return;
-
-    mapRef.current.animateCamera({
-      center: {
-        latitude: liveDriverLocation.latitude,
-        longitude: liveDriverLocation.longitude,
-      },
-      zoom: 16,
-      pitch: 45,
-      heading: selectedDriver?.rotation || 0,
-    });
-  }, [liveDriverLocation]);
 
   const renderNearbyDrivers = useMemo(() => {
     if (currentMap !== 'Load') return null;
@@ -613,9 +659,11 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
       customMapStyle={MAP_STYLE}
       showsUserLocation={true}
       showsMyLocationButton={true}
-      showsCompass={false}
-      pitchEnabled={false}
+      showsCompass={true}
+      pitchEnabled={true}
       initialRegion={region}
+      latittudeDelta={0.005}
+      longitudeDelta={0.005}
     >
       {renderMapContent}
     </MapView>

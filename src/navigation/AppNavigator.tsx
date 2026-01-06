@@ -13,11 +13,33 @@ import EditCustomerScreen from '@screens/RegistrationScreen/ProfileEditscreen';
 import Employee from '@screens/RegistrationScreen/Employee';
 import Component from 'react-native-paper/lib/typescript/components/List/ListItem';
 import Individual from '@screens/VerificationScreens/Individual';
+import { useSelector } from 'react-redux';
+import { RootState } from '@store/index';
+import { useEffect } from 'react';
+import {
+  disconnectSocket,
+  initSocket,
+  registerSocketListeners,
+} from '../sockets';
 // import MultiStepForm from 'src/forms/Multistepform/MultiStepForm';
 
-const RootStack = createNativeStackNavigator<RootStackParamList>();
+const RootStack = createNativeStackNavigator<any>();
 
 const AppNavigator = () => {
+  const CustomerID = useSelector(
+    (state: RootState) => state?.auth?.customerDetails?.CustomerID,
+  );
+  console.log({ CustomerID });
+  useEffect(() => {
+    if (!CustomerID) return;
+
+    initSocket(CustomerID);
+    registerSocketListeners();
+
+    return () => {
+      disconnectSocket();
+    };
+  }, [CustomerID]);
   return (
     <NavigationContainer>
       <RootStack.Navigator
@@ -61,7 +83,7 @@ const AppNavigator = () => {
         <RootStack.Screen
           name={routeName.NOTIFICATION}
           component={Notification}
-        ></RootStack.Screen>
+        />
         <RootStack.Screen name={routeName.ADD_EMPLOYEE} component={Employee} />
         <RootStack.Screen name={routeName.INDIVIDUAL} component={Individual} />
       </RootStack.Navigator>

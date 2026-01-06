@@ -265,6 +265,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
       refetchOnMountOrArgChange: true, // optional
     },
   );
+
   const tripsData: CustomerProcess[] =
     Array.isArray(processTrips?.data) && processTrips.data.length > 0
       ? processTrips.data
@@ -289,6 +290,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
   const handleModalClose = () => {
     bottomModalRef.current?.close();
   };
+
   useLayoutEffect(() => {
     // const interval = setInterval(() => {
     dispatch(
