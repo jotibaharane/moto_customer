@@ -31,8 +31,8 @@ import { FloatingActionButton } from './component/FloatingButtons';
 import MapComponent from './component/MapComponent';
 import { routeName } from '@utils/navigationHelpers';
 import MapView, { Marker } from 'react-native-maps';
-import { socket } from '@utils/socketUtils';
 import DriverArrivalModal from './component/DriverArrivalModal';
+import LoadingStatusModalUI from './component/LoadpostImage/LoadingStatusModalUI';
 
 const ORIGIN_MARKER_IMG = require('@assets/icons/origin-marker.png');
 
@@ -524,30 +524,13 @@ const Dashboard: React.FC = () => {
   const ARRIVAL_DISTANCE = 100; // meters
   const arrivalTriggered = useRef(false);
   const { originAddress } = useSelector((state: RootState) => state.map);
+  const [showLoadingModal, setShowLoadingModal] = useState<boolean>(true);
 
   // Default driver location (Mumbai)
   const [driverLocation, setDriverLocation] = useState({
     latitude: 19.076,
     longitude: 72.8777,
   });
-  const getDistanceInMeters = (
-    a: { latitude: number; longitude: number },
-    b: { latitude: number; longitude: number },
-  ) => {
-    const toRad = (v: number) => (v * Math.PI) / 180;
-    const R = 6371000;
-
-    const dLat = toRad(a.latitude - b.latitude);
-    const dLng = toRad(a.longitude - b.longitude);
-
-    const x =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(b.latitude)) *
-        Math.cos(toRad(a.latitude)) *
-        Math.sin(dLng / 2) ** 2;
-
-    return 2 * R * Math.asin(Math.sqrt(x));
-  };
 
   // Combine real data with dummy data
   useEffect(() => {
@@ -593,45 +576,45 @@ const Dashboard: React.FC = () => {
   //   }
   // };
 
-  useEffect(() => {
-    if (!CustomerID || !selectedLoad || !origin) return;
+  // useEffect(() => {
+  //   if (!CustomerID || !selectedLoad || !origin) return;
 
-    socket.off('driverNearbyAlert');
+  //   socket.off('driverNearbyAlert');
 
-    socket.on('driverNearbyAlert', data => {
-      // 🔐 Ignore other loads
-      if (data?.LoadPostID !== selectedLoad.LoadPostID) return;
+  //   socket.on('driverNearbyAlert', data => {
+  //     // 🔐 Ignore other loads
+  //     if (data?.LoadPostID !== selectedLoad.LoadPostID) return;
 
-      if (!data?.driver?.Lat || !data?.driver?.Lng) return;
+  //     if (!data?.driver?.Lat || !data?.driver?.Lng) return;
 
-      const driverLoc = {
-        latitude: data.driver.Lat,
-        longitude: data.driver.Lng,
-      };
+  //     const driverLoc = {
+  //       latitude: data.driver.Lat,
+  //       longitude: data.driver.Lng,
+  //     };
 
-      setDriverLocation(driverLoc);
-      setDriverAlertData(data);
+  //     setDriverLocation(driverLoc);
+  //     setDriverAlertData(data);
 
-      const distance = getDistanceInMeters(origin, driverLoc);
+  //     const distance = getDistanceInMeters(origin, driverLoc);
 
-      if (distance <= ARRIVAL_DISTANCE && !arrivalTriggered.current) {
-        arrivalTriggered.current = true;
+  //     if (distance <= ARRIVAL_DISTANCE && !arrivalTriggered.current) {
+  //       arrivalTriggered.current = true;
 
-        setDriverDetails(data.driver);
-        setShowDriverArrivedDialog(true);
-      }
-    });
+  //       setDriverDetails(data.driver);
+  //       setShowDriverArrivedDialog(true);
+  //     }
+  //   });
 
-    socket.emit('CustomerDetails', {
-      customerId: CustomerID,
-      loadPostId: selectedLoad.LoadPostID,
-    });
+  //   socket.emit('CustomerDetails', {
+  //     customerId: CustomerID,
+  //     loadPostId: selectedLoad.LoadPostID,
+  //   });
 
-    return () => {
-      socket.off('driverNearbyAlert');
-      arrivalTriggered.current = false;
-    };
-  }, [CustomerID, selectedLoad, origin]);
+  //   return () => {
+  //     socket.off('driverNearbyAlert');
+  //     arrivalTriggered.current = false;
+  //   };
+  // }, [CustomerID, selectedLoad, origin]);
 
   // Animation effect
   useEffect(() => {
@@ -847,6 +830,10 @@ const Dashboard: React.FC = () => {
         driverAlertData={driverAlertData}
         otpVerified={otpVerified}
         tripStarted={tripStarted}
+      />
+      <LoadingStatusModalUI
+        visible={showLoadingModal}
+        setVisible={setShowLoadingModal}
       />
       {/* 🔹 Driver Arrived Modal */}
     </SafeAreaView>

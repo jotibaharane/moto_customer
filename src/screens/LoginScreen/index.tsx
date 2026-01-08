@@ -189,7 +189,7 @@ const OtpLoginScreen = () => {
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.companyName}>MOTO HELP</Text>
+          <Text style={styles.companyName}>ABC COMPANY</Text>
           <Text style={styles.tagline}>Your Roadside Assistance Partner</Text>
         </View>
 

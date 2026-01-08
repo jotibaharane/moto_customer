@@ -10,7 +10,7 @@ export const registerSocketListeners = () => {
   registered = true;
   const socket = getSocket();
   socket.on(SOCKET_EVENTS.DRIVER_LOCATION, status => {
-    console.log('🟢 Driver LIVE LP Status:', status);
+    console.log('🟢 Driver LIVE  Status:', status);
     // store.dispatch(setTripStatus(status?.driverData?.[0]?.Driver_LPStatus));
   });
 };

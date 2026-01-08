@@ -29,6 +29,10 @@ export interface InvoiceItem {
   grossWeight: string;
   value: string;
   image: string | null;
+  materialType: string;
+  packageType: string;
+  poNo: string;
+  poDate: string;
 }
 
 export interface ChallanItem {
@@ -40,36 +44,25 @@ export interface ChallanItem {
   netWeight: string;
   value: string;
   image: string | null;
-}
-
-export interface AirwayBillItem {
-  id: string;
-  refNo: string;
-  qty: string;
-  current: string;
-  value: string;
-  image: string | null;
+  materialType: string;
+  packageType: string;
 }
 
 export interface BillOfEntryItem {
   id: string;
-  refNo: string;
-  qty: string;
-  current: string;
+  billOfEntryNo: string;
+  billOfEntryDate: string;
+  shipperName: string;
+  country: string;
+  currency: string;
   value: string;
   image: string | null;
+  materialType: string;
+  packageType: string;
 }
 
-export type DocumentItem =
-  | InvoiceItem
-  | ChallanItem
-  | AirwayBillItem
-  | BillOfEntryItem;
-export type DocumentType =
-  | 'invoice'
-  | 'challan'
-  | 'airwaybill'
-  | 'bill-of-entry';
+export type DocumentItem = InvoiceItem | ChallanItem | BillOfEntryItem;
+export type DocumentType = 'invoice' | 'challan' | 'bill-of-entry';
 
 interface DocumentItemModalProps {
   visible: boolean;
@@ -79,7 +72,10 @@ interface DocumentItemModalProps {
   tempItems: DocumentItem[];
   setTempItems: (items: DocumentItem[]) => void;
   onSubmit: () => void;
-  onDeleteGroup?: () => void; // New prop for deleting the entire group
+  onDeleteGroup?: () => void;
+  loadpostid: string;
+  vehicleno: string;
+  driverName: string;
 }
 
 const UNIT_OPTIONS = [
@@ -88,11 +84,27 @@ const UNIT_OPTIONS = [
   { id: 'litre', label: 'LITRE', value: 'litre' },
 ];
 
-const CURRENT_OPTIONS = [
+const PACKAGE_TYPE_OPTIONS = [
+  { id: 'carton', label: 'Carton', value: 'carton' },
+  { id: 'box', label: 'Box', value: 'box' },
+  { id: 'pallet', label: 'Pallet', value: 'pallet' },
+  { id: 'bag', label: 'Bag', value: 'bag' },
+  { id: 'drum', label: 'Drum', value: 'drum' },
+];
+
+const CURRENCY_OPTIONS = [
   { id: 'usd', label: 'USD', value: 'USD' },
   { id: 'eur', label: 'EUR', value: 'EUR' },
   { id: 'gbp', label: 'GBP', value: 'GBP' },
   { id: 'inr', label: 'INR', value: 'INR' },
+];
+
+const COUNTRY_OPTIONS = [
+  { id: 'india', label: 'India', value: 'India' },
+  { id: 'usa', label: 'USA', value: 'USA' },
+  { id: 'uk', label: 'UK', value: 'UK' },
+  { id: 'germany', label: 'Germany', value: 'Germany' },
+  { id: 'china', label: 'China', value: 'China' },
 ];
 
 // ---------------------------------------------
@@ -107,6 +119,9 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
   setTempItems,
   onSubmit,
   onDeleteGroup,
+  loadpostid,
+  vehicleno,
+  driverName,
 }) => {
   const [showImagePicker, setShowImagePicker] = useState<boolean>(false);
   const [currentTempItem, setCurrentTempItem] = useState<DocumentItem | null>(
@@ -114,7 +129,9 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
   );
 
   const unitModalRef = useRef<BottomModalRef>(null);
-  const currentModalRef = useRef<BottomModalRef>(null);
+  const packageModalRef = useRef<BottomModalRef>(null);
+  const currencyModalRef = useRef<BottomModalRef>(null);
+  const countryModalRef = useRef<BottomModalRef>(null);
 
   // Initialize currentTempItem when modal opens
   useEffect(() => {
@@ -139,6 +156,10 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           grossWeight: '',
           value: '',
           image: null,
+          materialType: '',
+          packageType: '',
+          poNo: '',
+          poDate: '',
         };
       case 'challan':
         return {
@@ -150,16 +171,21 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           netWeight: '',
           value: '',
           image: null,
+          materialType: '',
+          packageType: '',
         };
-      case 'airwaybill':
       case 'bill-of-entry':
         return {
           id: baseId,
-          refNo: '',
-          qty: '',
-          current: 'INR',
+          billOfEntryNo: '',
+          billOfEntryDate: '',
+          shipperName: '',
+          country: 'India',
+          currency: 'INR',
           value: '',
           image: null,
+          materialType: '',
+          packageType: '',
         };
     }
   };
@@ -235,10 +261,9 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           errorMessage = 'Please enter net weight!';
         }
         break;
-      case 'airwaybill':
       case 'bill-of-entry':
-        const docItem = currentTempItem as AirwayBillItem;
-        if (!docItem.refNo || !docItem.value || !docItem.qty) {
+        const boeItem = currentTempItem as BillOfEntryItem;
+        if (!boeItem.billOfEntryNo || !boeItem.value || !boeItem.shipperName) {
           isValid = false;
           errorMessage = 'Please fill all required fields!';
         }
@@ -306,8 +331,6 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
         return 'Invoice';
       case 'challan':
         return 'Challan';
-      case 'airwaybill':
-        return 'Airway Bill';
       case 'bill-of-entry':
         return 'Bill of Entry';
     }
@@ -336,10 +359,8 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           'Value',
           'Action',
         ];
-      case 'airwaybill':
-        return ['Ref No', 'Quantity', 'Current', 'Value', 'Action'];
       case 'bill-of-entry':
-        return ['Ref No', 'Quantity', 'Current', 'Value', 'Action'];
+        return ['BOE No', 'Value', 'Currency', 'Action'];
     }
   };
 
@@ -348,6 +369,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
     switch (documentType) {
       case 'invoice':
         const invoiceItem = item as InvoiceItem;
+        if (cellIndex === 0) return invoiceItem.invoiceNo;
         if (cellIndex === 1) {
           return invoiceItem.unit === 'pcs'
             ? `${invoiceItem.quantity} pcs`
@@ -355,10 +377,10 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
         }
         if (cellIndex === 2)
           return `₹${Number(invoiceItem.value || 0).toLocaleString()}`;
-        if (cellIndex === 0) return invoiceItem.invoiceNo;
         return '';
       case 'challan':
         const challanItem = item as ChallanItem;
+        if (cellIndex === 0) return challanItem.challanNo;
         if (cellIndex === 1) {
           return challanItem.unit === 'pcs'
             ? `${challanItem.quantity} pcs`
@@ -366,18 +388,15 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
         }
         if (cellIndex === 2)
           return `₹${Number(challanItem.value || 0).toLocaleString()}`;
-        if (cellIndex === 0) return challanItem.challanNo;
         return '';
-      case 'airwaybill':
       case 'bill-of-entry':
-        const docItem = item as AirwayBillItem;
-        if (cellIndex === 0) return docItem.refNo;
-        if (cellIndex === 1) return docItem.qty;
-        if (cellIndex === 2) return docItem.current;
-        if (cellIndex === 3)
-          return `${docItem.current} ${Number(
-            docItem.value || 0,
+        const boeItem = item as BillOfEntryItem;
+        if (cellIndex === 0) return boeItem.billOfEntryNo;
+        if (cellIndex === 1)
+          return `${boeItem.currency} ${Number(
+            boeItem.value || 0,
           ).toLocaleString()}`;
+        if (cellIndex === 2) return boeItem.currency;
         return '';
     }
   };
@@ -466,7 +485,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
               <View style={styles.formColumn}>
                 {invoiceItem?.unit === 'pcs' ? (
                   <TextInput
-                    label="Quantity"
+                    label="Unit Quantity"
                     value={invoiceItem?.quantity || ''}
                     onChangeText={t => handleItemChange('quantity', t)}
                     mode="outlined"
@@ -490,6 +509,36 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                     }
                   />
                 )}
+              </View>
+            </View>
+
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="Material Type"
+                  value={invoiceItem?.materialType || ''}
+                  onChangeText={t => handleItemChange('materialType', t)}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+              <View style={styles.formColumn}>
+                <TextInput
+                  label="Package Type"
+                  value={invoiceItem?.packageType || ''}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  editable={false}
+                  pointerEvents="none"
+                  right={
+                    <TextInput.Icon
+                      icon="menu-down"
+                      onPress={() => packageModalRef.current?.open()}
+                    />
+                  }
+                />
               </View>
             </View>
 
@@ -523,7 +572,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             )}
             {invoiceItem?.unit === 'pcs' && (
               <View style={styles.formRow}>
-                <View style={styles.fullWidthColumn}>
+                <View style={[styles.formColumn, styles.formColumnGap]}>
                   <TextInput
                     label="Invoice Value"
                     value={invoiceItem?.value || ''}
@@ -535,8 +584,29 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                     left={<TextInput.Affix text="₹" />}
                   />
                 </View>
+                <View style={styles.formColumn}></View>
               </View>
             )}
+
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="PO Number"
+                  value={invoiceItem?.poNo || ''}
+                  onChangeText={t => handleItemChange('poNo', t)}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+              <View style={styles.formColumn}>
+                <DateInput
+                  label="PO Date"
+                  value={invoiceItem?.poDate || ''}
+                  onChange={date => handleItemChange('poDate', date)}
+                />
+              </View>
+            </View>
           </>
         );
 
@@ -568,7 +638,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
               <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
                   label="Unit"
-                  value={challanItem?.unit.toUpperCase() || 'PCS'}
+                  value={challanItem?.unit?.toUpperCase() || 'PCS'}
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
@@ -613,6 +683,36 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             </View>
 
             <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="Material Type"
+                  value={challanItem?.materialType || ''}
+                  onChangeText={t => handleItemChange('materialType', t)}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+              <View style={styles.formColumn}>
+                <TextInput
+                  label="Package Type"
+                  value={challanItem?.packageType || ''}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  editable={false}
+                  pointerEvents="none"
+                  right={
+                    <TextInput.Icon
+                      icon="menu-down"
+                      onPress={() => packageModalRef.current?.open()}
+                    />
+                  }
+                />
+              </View>
+            </View>
+
+            <View style={styles.formRow}>
               <View style={styles.fullWidthColumn}>
                 <TextInput
                   label="Value"
@@ -629,20 +729,26 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           </>
         );
 
-      case 'airwaybill':
       case 'bill-of-entry':
-        const docItem = currentTempItem as AirwayBillItem;
+        const boeItem = currentTempItem as BillOfEntryItem;
         return (
           <>
             <View style={styles.formRow}>
-              <View style={styles.fullWidthColumn}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
-                  label="Reference Number"
-                  value={docItem?.refNo || ''}
-                  onChangeText={t => handleItemChange('refNo', t)}
+                  label="Bill of Entry No"
+                  value={boeItem?.billOfEntryNo || ''}
+                  onChangeText={t => handleItemChange('billOfEntryNo', t)}
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
+                />
+              </View>
+              <View style={styles.formColumn}>
+                <DateInput
+                  label="Bill of Entry Date"
+                  value={boeItem?.billOfEntryDate || ''}
+                  onChange={date => handleItemChange('billOfEntryDate', date)}
                 />
               </View>
             </View>
@@ -650,19 +756,18 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             <View style={styles.formRow}>
               <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
-                  label="Quantity"
-                  value={docItem?.qty || ''}
-                  onChangeText={t => handleItemChange('qty', t)}
+                  label="Shipper Name"
+                  value={boeItem?.shipperName || ''}
+                  onChangeText={t => handleItemChange('shipperName', t)}
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
-                  keyboardType="numeric"
                 />
               </View>
               <View style={styles.formColumn}>
                 <TextInput
-                  label="Currency"
-                  value={docItem?.current || 'INR'}
+                  label="Country"
+                  value={boeItem?.country || 'India'}
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
@@ -671,7 +776,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   right={
                     <TextInput.Icon
                       icon="menu-down"
-                      onPress={() => currentModalRef.current?.open()}
+                      onPress={() => countryModalRef.current?.open()}
                     />
                   }
                 />
@@ -679,16 +784,63 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             </View>
 
             <View style={styles.formRow}>
-              <View style={styles.fullWidthColumn}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="Currency"
+                  value={boeItem?.currency || 'INR'}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  editable={false}
+                  pointerEvents="none"
+                  right={
+                    <TextInput.Icon
+                      icon="menu-down"
+                      onPress={() => currencyModalRef.current?.open()}
+                    />
+                  }
+                />
+              </View>
+              <View style={styles.formColumn}>
                 <TextInput
                   label="Value"
-                  value={docItem?.value || ''}
+                  value={boeItem?.value || ''}
                   onChangeText={t => handleItemChange('value', t)}
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
                   keyboardType="numeric"
-                  left={<TextInput.Affix text={docItem?.current || '₹'} />}
+                  left={<TextInput.Affix text={boeItem?.currency || '$'} />}
+                />
+              </View>
+            </View>
+
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="Material Type"
+                  value={boeItem?.materialType || ''}
+                  onChangeText={t => handleItemChange('materialType', t)}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+              <View style={styles.formColumn}>
+                <TextInput
+                  label="Package Type"
+                  value={boeItem?.packageType || ''}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  editable={false}
+                  pointerEvents="none"
+                  right={
+                    <TextInput.Icon
+                      icon="menu-down"
+                      onPress={() => packageModalRef.current?.open()}
+                    />
+                  }
                 />
               </View>
             </View>
@@ -706,6 +858,36 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
         onRequestClose={onClose}
       >
         <View style={styles.modalContainer}>
+          {/* Professional Header with Loadpost Details */}
+          <View style={styles.infoHeader}>
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Icon name="identifier" size={16} color="#6B7280" />
+                <Text style={styles.infoLabel}>Loadpost ID:</Text>
+                <Text style={styles.infoValue}>{loadpostid}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Icon name="truck" size={16} color="#6B7280" />
+                <Text style={styles.infoLabel}>Vehicle No:</Text>
+                <Text style={styles.infoValue}>{vehicleno}</Text>
+              </View>
+            </View>
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Icon name="account" size={16} color="#6B7280" />
+                <Text style={styles.infoLabel}>Driver:</Text>
+                <Text style={styles.infoValue}>{driverName}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Icon name="calendar" size={16} color="#6B7280" />
+                <Text style={styles.infoLabel}>Date:</Text>
+                <Text style={styles.infoValue}>
+                  {new Date().toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+          </View>
+
           <View style={styles.modalHeader}>
             <TouchableOpacity style={styles.modalCloseButton} onPress={onClose}>
               <Icon name="close" size={20} color="#374151" />
@@ -804,10 +986,9 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                       </Text>
                       <Text style={styles.tableSummaryText}>
                         Total:{' '}
-                        {documentType === 'airwaybill' ||
-                        documentType === 'bill-of-entry'
+                        {documentType === 'bill-of-entry'
                           ? `${
-                              (tempItems[0] as AirwayBillItem)?.current || ''
+                              (tempItems[0] as BillOfEntryItem)?.currency || ''
                             } `
                           : '₹'}
                         {calculateTotal().toLocaleString()}
@@ -817,20 +998,22 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                 </View>
 
                 {/* Table Header */}
-                <View style={styles.tableHeader}>
-                  {getTableHeaders().map((header, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.tableHeaderCellWrapper,
-                        index === getTableHeaders().length - 1 &&
-                          styles.actionColumn,
-                      ]}
-                    >
-                      <Text style={styles.tableHeaderCell}>{header}</Text>
-                    </View>
-                  ))}
-                </View>
+                {tempItems.length > 0 && (
+                  <View style={styles.tableHeader}>
+                    {getTableHeaders().map((header, index) => (
+                      <View
+                        key={index}
+                        style={[
+                          styles.tableHeaderCellWrapper,
+                          index === getTableHeaders().length - 1 &&
+                            styles.actionColumn,
+                        ]}
+                      >
+                        <Text style={styles.tableHeaderCell}>{header}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
 
                 {/* Table Rows */}
                 {tempItems.map((item, index) => (
@@ -877,8 +1060,6 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                       name={
                         documentType === 'challan'
                           ? 'truck-outline'
-                          : documentType === 'airwaybill'
-                          ? 'airplane-outline'
                           : documentType === 'bill-of-entry'
                           ? 'ship-wheel'
                           : 'file-document-outline'
@@ -902,9 +1083,10 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   <View style={styles.tableTotal}>
                     <Text style={styles.tableTotalLabel}>Total Value:</Text>
                     <Text style={styles.tableTotalValue}>
-                      {documentType === 'airwaybill' ||
-                      documentType === 'bill-of-entry'
-                        ? `${(tempItems[0] as AirwayBillItem)?.current || ''} `
+                      {documentType === 'bill-of-entry'
+                        ? `${
+                            (tempItems[0] as BillOfEntryItem)?.currency || ''
+                          } `
                         : '₹'}
                       {calculateTotal().toLocaleString()}
                     </Text>
@@ -981,10 +1163,51 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
         </BottomModal>
       )}
 
-      {/* Bottom Modal for Current Selection (Airwaybill/Bill of Entry) */}
-      {(documentType === 'airwaybill' || documentType === 'bill-of-entry') && (
+      {/* Bottom Modal for Package Type Selection */}
+      <BottomModal
+        ref={packageModalRef}
+        customHeight={300}
+        backdropOpacity={0.6}
+        preventSwipeClose={true}
+      >
+        <View style={styles.modalContentWrapper}>
+          <Text style={styles.bottomModalTitle}>Select Package Type</Text>
+          <View style={styles.bottomModalOptionsContainer}>
+            {PACKAGE_TYPE_OPTIONS.map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.bottomModalOption,
+                  (currentTempItem as any)?.packageType === item.value &&
+                    styles.bottomModalOptionSelected,
+                ]}
+                onPress={() => {
+                  handleItemChange('packageType', item.value);
+                  packageModalRef.current?.close();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.bottomModalOptionText,
+                    (currentTempItem as any)?.packageType === item.value &&
+                      styles.bottomModalOptionTextSelected,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+                {(currentTempItem as any)?.packageType === item.value && (
+                  <Icon name="check" size={18} color="#3B82F6" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </BottomModal>
+
+      {/* Bottom Modal for Currency Selection (Bill of Entry) */}
+      {documentType === 'bill-of-entry' && (
         <BottomModal
-          ref={currentModalRef}
+          ref={currencyModalRef}
           customHeight={260}
           backdropOpacity={0.6}
           preventSwipeClose={true}
@@ -992,29 +1215,73 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           <View style={styles.modalContentWrapper}>
             <Text style={styles.bottomModalTitle}>Select Currency</Text>
             <View style={styles.bottomModalOptionsContainer}>
-              {CURRENT_OPTIONS.map(item => (
+              {CURRENCY_OPTIONS.map(item => (
                 <TouchableOpacity
                   key={item.id}
                   style={[
                     styles.bottomModalOption,
-                    (currentTempItem as AirwayBillItem)?.current ===
+                    (currentTempItem as BillOfEntryItem)?.currency ===
                       item.value && styles.bottomModalOptionSelected,
                   ]}
                   onPress={() => {
-                    handleItemChange('current', item.value);
-                    currentModalRef.current?.close();
+                    handleItemChange('currency', item.value);
+                    currencyModalRef.current?.close();
                   }}
                 >
                   <Text
                     style={[
                       styles.bottomModalOptionText,
-                      (currentTempItem as AirwayBillItem)?.current ===
+                      (currentTempItem as BillOfEntryItem)?.currency ===
                         item.value && styles.bottomModalOptionTextSelected,
                     ]}
                   >
                     {item.label}
                   </Text>
-                  {(currentTempItem as AirwayBillItem)?.current ===
+                  {(currentTempItem as BillOfEntryItem)?.currency ===
+                    item.value && (
+                    <Icon name="check" size={18} color="#3B82F6" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </BottomModal>
+      )}
+
+      {/* Bottom Modal for Country Selection (Bill of Entry) */}
+      {documentType === 'bill-of-entry' && (
+        <BottomModal
+          ref={countryModalRef}
+          customHeight={300}
+          backdropOpacity={0.6}
+          preventSwipeClose={true}
+        >
+          <View style={styles.modalContentWrapper}>
+            <Text style={styles.bottomModalTitle}>Select Country</Text>
+            <View style={styles.bottomModalOptionsContainer}>
+              {COUNTRY_OPTIONS.map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.bottomModalOption,
+                    (currentTempItem as BillOfEntryItem)?.country ===
+                      item.value && styles.bottomModalOptionSelected,
+                  ]}
+                  onPress={() => {
+                    handleItemChange('country', item.value);
+                    countryModalRef.current?.close();
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.bottomModalOptionText,
+                      (currentTempItem as BillOfEntryItem)?.country ===
+                        item.value && styles.bottomModalOptionTextSelected,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  {(currentTempItem as BillOfEntryItem)?.country ===
                     item.value && (
                     <Icon name="check" size={18} color="#3B82F6" />
                   )}
@@ -1035,6 +1302,36 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  // Professional Info Header
+  infoHeader: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginLeft: 6,
+    marginRight: 4,
+    fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: 13,
+    color: '#111827',
+    fontWeight: '600',
   },
   modalHeader: {
     flexDirection: 'row',

@@ -10,10 +10,10 @@ import {
 import { TextInput } from 'react-native-paper';
 import { useFormikContext } from 'formik';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import BottomModal, { BottomModalRef } from '@components/BottomModal'; // Your custom modal
+import BottomModal, { BottomModalRef } from '@components/BottomModal';
 
 // ---------------------------------------------
-// TYPES (Updated)
+// TYPES
 // ---------------------------------------------
 interface InvoiceItem {
   id: string;
@@ -109,53 +109,223 @@ interface FormValues {
 }
 
 // ---------------------------------------------
-// HELPER FUNCTIONS
+// NEW: CHARGE SELECTOR COMPONENT (Updated)
 // ---------------------------------------------
-const calculateTotalPackages = (packages: string): string => {
-  return packages || '0';
+interface ChargeSelectorProps {
+  selectedCharges: ChargeItem[];
+  onChargesChange: (charges: ChargeItem[]) => void;
+}
+
+const ChargeSelector: React.FC<ChargeSelectorProps> = ({
+  selectedCharges,
+  onChargesChange,
+}) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [availableCharges, setAvailableCharges] = useState([
+    { type: 'Loading', label: 'Loading' },
+    { type: 'Unloading', label: 'Unloading' },
+    { type: 'LR Charges', label: 'LR Charges' },
+    { type: 'Detention Charges', label: 'Detention Charges' },
+    { type: 'Weight Charges', label: 'Weight Charges' },
+    { type: 'FOV', label: 'FOV' },
+    { type: 'Other1', label: 'Other1' },
+    { type: 'Other2', label: 'Other2' },
+  ]);
+
+  // Filter out already selected charges
+  const getAvailableOptions = () => {
+    const selectedTypes = selectedCharges.map(charge => charge.type);
+    return availableCharges.filter(
+      charge => !selectedTypes.includes(charge.type),
+    );
+  };
+
+  const handleAddCharge = (chargeType: string) => {
+    const charge = availableCharges.find(c => c.type === chargeType);
+    if (charge) {
+      const newCharge: ChargeItem = {
+        type: charge.type as any,
+        amount: '',
+        label: charge.label,
+      };
+      const updatedCharges = [...selectedCharges, newCharge];
+      onChargesChange(updatedCharges);
+    }
+    setShowDropdown(false);
+  };
+
+  const handleRemoveCharge = (index: number) => {
+    const updatedCharges = selectedCharges.filter((_, i) => i !== index);
+    onChargesChange(updatedCharges);
+  };
+
+  const handleAmountChange = (index: number, amount: string) => {
+    const updatedCharges = [...selectedCharges];
+    updatedCharges[index].amount = amount;
+    onChargesChange(updatedCharges);
+  };
+
+  const handleLabelChange = (index: number, label: string) => {
+    const updatedCharges = [...selectedCharges];
+    updatedCharges[index].label = label;
+    onChargesChange(updatedCharges);
+  };
+
+  return (
+    <View style={chargeSelectorStyles.container}>
+      {/* Selected Charges List */}
+      {selectedCharges.map((charge, index) => (
+        <View
+          key={`${charge.type}-${index}`}
+          style={chargeSelectorStyles.chargeRow}
+        >
+          <View style={chargeSelectorStyles.chargeInputContainer}>
+            <TextInput
+              label="Type"
+              mode="outlined"
+              value={charge.label}
+              onChangeText={text => handleLabelChange(index, text)}
+              style={chargeSelectorStyles.labelInput}
+              outlineColor="#E0E0E0"
+              activeOutlineColor="#1976D2"
+              dense={true}
+              theme={{ roundness: 4 }}
+            />
+            <TextInput
+              label="Amount"
+              mode="outlined"
+              value={charge.amount}
+              onChangeText={text => handleAmountChange(index, text)}
+              style={chargeSelectorStyles.amountInput}
+              keyboardType="numeric"
+              outlineColor="#E0E0E0"
+              activeOutlineColor="#1976D2"
+              dense={true}
+              theme={{ roundness: 4 }}
+              left={<TextInput.Affix text="₹" />}
+              placeholder="0.00"
+            />
+          </View>
+          <TouchableOpacity
+            style={chargeSelectorStyles.removeButton}
+            onPress={() => handleRemoveCharge(index)}
+          >
+            <Icon name="close" size={16} color="#D32F2F" />
+          </TouchableOpacity>
+        </View>
+      ))}
+
+      {/* Add More Button and Dropdown */}
+      {getAvailableOptions().length > 0 && (
+        <View>
+          <TouchableOpacity
+            style={chargeSelectorStyles.addButton}
+            onPress={() => setShowDropdown(!showDropdown)}
+          >
+            <Icon name="add" size={16} color="#1976D2" />
+            <Text style={chargeSelectorStyles.addButtonText}>Add Charge</Text>
+            <Icon
+              name={showDropdown ? 'arrow-drop-up' : 'arrow-drop-down'}
+              size={20}
+              color="#666"
+            />
+          </TouchableOpacity>
+
+          {showDropdown && (
+            <View style={chargeSelectorStyles.dropdown}>
+              <ScrollView style={{ maxHeight: 150 }}>
+                {getAvailableOptions().map(charge => (
+                  <TouchableOpacity
+                    key={charge.type}
+                    style={chargeSelectorStyles.dropdownItem}
+                    onPress={() => handleAddCharge(charge.type)}
+                  >
+                    <Text style={chargeSelectorStyles.dropdownText}>
+                      {charge.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
 };
 
-const calculateTotalNetQuantity = (
-  invoices: InvoiceGroup[],
-  challans: ChallanGroup[],
-): string => {
-  let totalNetWeight = 0;
-
-  invoices.forEach(invoiceGroup => {
-    invoiceGroup.items.forEach(item => {
-      if (item.unit === 'kg' || item.unit === 'litre') {
-        totalNetWeight += parseFloat(item.netWeight || '0');
-      }
-    });
-  });
-
-  challans.forEach(challanGroup => {
-    challanGroup.items.forEach(item => {
-      if (item.unit === 'kg' || item.unit === 'litre') {
-        totalNetWeight += parseFloat(item.netWeight || '0');
-      }
-    });
-  });
-
-  return totalNetWeight.toFixed(2);
-};
-
-const calculateTotalGrossWeight = (invoices: InvoiceGroup[]): string => {
-  let totalGrossWeight = 0;
-
-  invoices.forEach(invoiceGroup => {
-    invoiceGroup.items.forEach(item => {
-      if (item.unit === 'kg' || item.unit === 'litre') {
-        totalGrossWeight += parseFloat(item.grossWeight || '0');
-      }
-    });
-  });
-
-  return totalGrossWeight.toFixed(2);
-};
+const chargeSelectorStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#FFFFFF',
+  },
+  chargeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 6,
+  },
+  chargeInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  labelInput: {
+    flex: 2,
+    backgroundColor: '#FFFFFF',
+    height: 40,
+  },
+  amountInput: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    height: 40,
+  },
+  removeButton: {
+    padding: 6,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 6,
+    borderStyle: 'dashed',
+    marginTop: 4,
+  },
+  addButtonText: {
+    fontSize: 12,
+    color: '#1976D2',
+    fontWeight: '500',
+  },
+  dropdown: {
+    marginTop: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  dropdownItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  dropdownText: {
+    fontSize: 12,
+    color: '#333',
+  },
+});
 
 // ---------------------------------------------
-// FREIGHT TO MODAL COMPONENT
+// FREIGHT TO MODAL COMPONENT (unchanged)
 // ---------------------------------------------
 interface FreightToModalProps {
   visible: boolean;
@@ -210,7 +380,6 @@ const FreightToModal: React.FC<FreightToModalProps> = ({
           <Text style={centerModal.title}>Other Party Details</Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* GST + Validate */}
             <View style={centerModal.gstRow}>
               <TextInput
                 label="GST No"
@@ -220,6 +389,8 @@ const FreightToModal: React.FC<FreightToModalProps> = ({
                   setFormData({ ...formData, gstNo: t.toUpperCase() })
                 }
                 style={centerModal.gstInput}
+                dense={true}
+                theme={{ roundness: 4 }}
               />
 
               <TouchableOpacity
@@ -240,6 +411,8 @@ const FreightToModal: React.FC<FreightToModalProps> = ({
               value={formData?.name}
               onChangeText={t => setFormData({ ...formData, name: t })}
               style={centerModal.input}
+              dense={true}
+              theme={{ roundness: 4 }}
             />
 
             <TextInput
@@ -249,6 +422,8 @@ const FreightToModal: React.FC<FreightToModalProps> = ({
               value={formData?.contactNo}
               onChangeText={t => setFormData({ ...formData, contactNo: t })}
               style={centerModal.input}
+              dense={true}
+              theme={{ roundness: 4 }}
             />
 
             <TextInput
@@ -257,6 +432,8 @@ const FreightToModal: React.FC<FreightToModalProps> = ({
               value={formData?.address1}
               onChangeText={t => setFormData({ ...formData, address1: t })}
               style={centerModal.input}
+              dense={true}
+              theme={{ roundness: 4 }}
             />
 
             <TextInput
@@ -265,6 +442,8 @@ const FreightToModal: React.FC<FreightToModalProps> = ({
               value={formData?.address2}
               onChangeText={t => setFormData({ ...formData, address2: t })}
               style={centerModal.input}
+              dense={true}
+              theme={{ roundness: 4 }}
             />
 
             <View style={centerModal.row}>
@@ -275,6 +454,8 @@ const FreightToModal: React.FC<FreightToModalProps> = ({
                 value={formData?.pincode}
                 onChangeText={t => setFormData({ ...formData, pincode: t })}
                 style={[centerModal.input, centerModal.half]}
+                dense={true}
+                theme={{ roundness: 4 }}
               />
 
               <TextInput
@@ -283,6 +464,8 @@ const FreightToModal: React.FC<FreightToModalProps> = ({
                 value={formData?.city}
                 onChangeText={t => setFormData({ ...formData, city: t })}
                 style={[centerModal.input, centerModal.half]}
+                dense={true}
+                theme={{ roundness: 4 }}
               />
             </View>
 
@@ -292,10 +475,11 @@ const FreightToModal: React.FC<FreightToModalProps> = ({
               value={formData?.state}
               onChangeText={t => setFormData({ ...formData, state: t })}
               style={centerModal.input}
+              dense={true}
+              theme={{ roundness: 4 }}
             />
           </ScrollView>
 
-          {/* Footer */}
           <View style={centerModal.footer}>
             <TouchableOpacity style={centerModal.cancel} onPress={onClose}>
               <Text style={centerModal.cancelText}>Cancel</Text>
@@ -363,6 +547,8 @@ const GSTModal: React.FC<GSTModalProps> = ({
           keyboardType="numeric"
           outlineColor="#E0E0E0"
           activeOutlineColor="#1976D2"
+          dense={true}
+          theme={{ roundness: 4 }}
           left={<TextInput.Affix text="₹" />}
         />
 
@@ -375,6 +561,8 @@ const GSTModal: React.FC<GSTModalProps> = ({
           keyboardType="numeric"
           outlineColor="#E0E0E0"
           activeOutlineColor="#1976D2"
+          dense={true}
+          theme={{ roundness: 4 }}
           left={<TextInput.Affix text="₹" />}
         />
 
@@ -387,6 +575,8 @@ const GSTModal: React.FC<GSTModalProps> = ({
           keyboardType="numeric"
           outlineColor="#E0E0E0"
           activeOutlineColor="#1976D2"
+          dense={true}
+          theme={{ roundness: 4 }}
           left={<TextInput.Affix text="₹" />}
         />
       </View>
@@ -403,7 +593,7 @@ const GSTModal: React.FC<GSTModalProps> = ({
   );
 
   return (
-    <BottomModal ref={modalRef} onClose={onClose} customHeight={400}>
+    <BottomModal ref={modalRef} onClose={onClose} customHeight={350}>
       <ModalContent />
     </BottomModal>
   );
@@ -463,7 +653,7 @@ const FreightToDropdownModal: React.FC<FreightToDropdownModalProps> = ({
               {option}
             </Text>
             {selectedValue === option && (
-              <Icon name="check" size={20} color="#1976D2" />
+              <Icon name="check" size={18} color="#1976D2" />
             )}
           </TouchableOpacity>
         ))}
@@ -472,122 +662,14 @@ const FreightToDropdownModal: React.FC<FreightToDropdownModalProps> = ({
   );
 
   return (
-    <BottomModal ref={modalRef} onClose={onClose} customHeight={250}>
-      <ModalContent />
-    </BottomModal>
-  );
-};
-
-// Charges Dropdown Modal
-interface ChargesDropdownModalProps {
-  visible: boolean;
-  onClose: () => void;
-  selectedCharges: string[];
-  onSelect: (charges: string[]) => void;
-}
-
-const ChargesDropdownModal: React.FC<ChargesDropdownModalProps> = ({
-  visible,
-  onClose,
-  selectedCharges,
-  onSelect,
-}) => {
-  const modalRef = useRef<BottomModalRef>(null);
-  const [tempSelectedCharges, setTempSelectedCharges] =
-    useState<string[]>(selectedCharges);
-
-  useEffect(() => {
-    if (visible) {
-      setTempSelectedCharges(selectedCharges);
-      modalRef.current?.open();
-    } else {
-      modalRef.current?.close();
-    }
-  }, [visible, selectedCharges]);
-
-  const chargeOptions = [
-    'Loading',
-    'Unloading',
-    'LR Charges',
-    'Detention Charges',
-    'Weight Charges',
-    'FOV',
-    'Other1',
-    'Other2',
-  ];
-
-  const toggleCharge = (charge: string) => {
-    if (tempSelectedCharges.includes(charge)) {
-      setTempSelectedCharges(tempSelectedCharges.filter(c => c !== charge));
-    } else {
-      setTempSelectedCharges([...tempSelectedCharges, charge]);
-    }
-  };
-
-  const handleSave = () => {
-    onSelect(tempSelectedCharges);
-    onClose();
-  };
-
-  const ModalContent = () => (
-    <View style={dropdownModalStyles.container}>
-      <View style={dropdownModalStyles.header}>
-        <Text style={dropdownModalStyles.title}>Select Additional Charges</Text>
-      </View>
-
-      <View style={dropdownModalStyles.optionsContainer}>
-        {chargeOptions.map(charge => (
-          <TouchableOpacity
-            key={charge}
-            style={[
-              dropdownModalStyles.option,
-              tempSelectedCharges.includes(charge) &&
-                dropdownModalStyles.optionSelected,
-            ]}
-            onPress={() => toggleCharge(charge)}
-          >
-            <Text
-              style={[
-                dropdownModalStyles.optionText,
-                tempSelectedCharges.includes(charge) &&
-                  dropdownModalStyles.optionTextSelected,
-              ]}
-            >
-              {charge}
-            </Text>
-            {tempSelectedCharges.includes(charge) && (
-              <Icon name="check" size={20} color="#1976D2" />
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={dropdownModalStyles.footer}>
-        <TouchableOpacity
-          style={dropdownModalStyles.cancelButton}
-          onPress={onClose}
-        >
-          <Text style={dropdownModalStyles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={dropdownModalStyles.saveButton}
-          onPress={handleSave}
-        >
-          <Text style={dropdownModalStyles.saveButtonText}>Apply</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  return (
-    <BottomModal ref={modalRef} onClose={onClose} customHeight={450}>
+    <BottomModal ref={modalRef} onClose={onClose} customHeight={200}>
       <ModalContent />
     </BottomModal>
   );
 };
 
 // ---------------------------------------------
-// MAIN COMPONENT
+// MAIN COMPONENT (Updated with compact layout)
 // ---------------------------------------------
 export default function Step3_FreightDetails() {
   const { values, setFieldValue } = useFormikContext<FormValues>();
@@ -596,27 +678,15 @@ export default function Step3_FreightDetails() {
   const [freightToModalVisible, setFreightToModalVisible] = useState(false);
   const [freightToDetailsModalVisible, setFreightToDetailsModalVisible] =
     useState(false);
-  const [chargesModalVisible, setChargesModalVisible] = useState(false);
   const [gstModalVisible, setGstModalVisible] = useState(false);
-
-  const [selectedCharges, setSelectedCharges] = useState<string[]>([]);
 
   // Initialize freight details if not present
   useEffect(() => {
     if (!values.freightDetails) {
-      const calculatedPackages = calculateTotalPackages(values.Packages);
-      const calculatedNetQuantity = calculateTotalNetQuantity(
-        values.invoices || [],
-        values.challans || [],
-      );
-      const calculatedGrossWeight = calculateTotalGrossWeight(
-        values.invoices || [],
-      );
-
       setFieldValue('freightDetails', {
-        noOfPackages: calculatedPackages,
-        netQuantity: calculatedNetQuantity,
-        grossWeight: calculatedGrossWeight,
+        noOfPackages: values.Packages || '0',
+        netQuantity: '0',
+        grossWeight: '0',
         freightTo: {
           type: 'Consigner',
           gstNo: '',
@@ -639,32 +709,8 @@ export default function Step3_FreightDetails() {
         advance: '',
         balance: '0',
       });
-    } else {
-      // Initialize selected charges from existing data
-      const existingCharges = values.freightDetails.charges || [];
-      setSelectedCharges(existingCharges.map(c => c.type));
     }
   }, []);
-
-  useEffect(() => {
-    if (!values.freightDetails) return;
-
-    const calculatedPackages = calculateTotalPackages(values.Packages);
-    const calculatedNetQuantity = calculateTotalNetQuantity(
-      values.invoices || [],
-      values.challans || [],
-    );
-    const calculatedGrossWeight = calculateTotalGrossWeight(
-      values.invoices || [],
-    );
-
-    setFieldValue('freightDetails', {
-      ...values.freightDetails,
-      noOfPackages: calculatedPackages,
-      netQuantity: calculatedNetQuantity,
-      grossWeight: calculatedGrossWeight,
-    });
-  }, [values.Packages, values.invoices, values.challans]);
 
   // Handle freight to selection
   const handleFreightToSelect = (value: string) => {
@@ -687,41 +733,9 @@ export default function Step3_FreightDetails() {
     setFieldValue('freightDetails.freightTo', details);
   };
 
-  // Handle charge selection from modal
-  const handleChargesSelect = (charges: string[]) => {
-    setSelectedCharges(charges);
-
-    // Update charges in form data
-    const updatedCharges = charges.map(chargeType => {
-      const existingCharge = values?.freightDetails?.charges?.find(
-        c => c.type === chargeType,
-      );
-      return (
-        existingCharge || {
-          type: chargeType as any,
-          amount: '',
-          label: chargeType,
-        }
-      );
-    });
-
-    setFieldValue('freightDetails.charges', updatedCharges);
-  };
-
-  // Handle charge amount change
-  const handleChargeAmountChange = (chargeType: string, amount: string) => {
-    const updatedCharges = values.freightDetails.charges.map(charge =>
-      charge.type === chargeType ? { ...charge, amount } : charge,
-    );
-    setFieldValue('freightDetails.charges', updatedCharges);
-  };
-
-  // Handle charge label change
-  const handleChargeLabelChange = (chargeType: string, label: string) => {
-    const updatedCharges = values.freightDetails.charges.map(charge =>
-      charge.type === chargeType ? { ...charge, label } : charge,
-    );
-    setFieldValue('freightDetails.charges', updatedCharges);
+  // Handle charges change
+  const handleChargesChange = (charges: ChargeItem[]) => {
+    setFieldValue('freightDetails.charges', charges);
   };
 
   // Calculate subtotal
@@ -775,245 +789,176 @@ export default function Step3_FreightDetails() {
   const grandTotal = calculateGrandTotal();
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Auto-calculated Summary */}
-      <View style={styles.summarySection}>
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryCardHeader}>
-              <Icon name="inventory" size={16} color="#3B82F6" />
-              <Text style={styles.summaryLabel}>No. of Packages</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Single Card Container */}
+      <View style={styles.mainCard}>
+        {/* Auto-calculated Summary */}
+        <View style={styles.summarySection}>
+          <Text style={styles.sectionTitleSmall}>Summary</Text>
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryItem}>
+              <View style={styles.summaryIconContainer}>
+                <Icon name="inventory" size={14} color="#3B82F6" />
+                <Text style={styles.summaryLabel}>Packages</Text>
+              </View>
+              <Text style={styles.summaryValue}>
+                {freightDetails.noOfPackages} pcs
+              </Text>
             </View>
-            <TextInput
-              mode="flat"
-              value={freightDetails.noOfPackages}
-              editable={false}
-              style={styles.summaryInput}
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              theme={{ roundness: 4 }}
-              right={<TextInput.Affix text="pcs" />}
-              contentStyle={styles.summaryInputContent}
-            />
-          </View>
 
-          <View style={styles.divider} />
+            <View style={styles.verticalDivider} />
 
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryCardHeader}>
-              <Icon name="scale" size={16} color="#10B981" />
-              <Text style={styles.summaryLabel}>Net Quantity</Text>
+            <View style={styles.summaryItem}>
+              <View style={styles.summaryIconContainer}>
+                <Icon name="scale" size={14} color="#10B981" />
+                <Text style={styles.summaryLabel}>Net Qty</Text>
+              </View>
+              <Text style={styles.summaryValue}>
+                {freightDetails.netQuantity} kg
+              </Text>
             </View>
-            <TextInput
-              mode="flat"
-              value={freightDetails.netQuantity}
-              editable={false}
-              style={styles.summaryInput}
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              theme={{ roundness: 4 }}
-              right={<TextInput.Affix text="kg" />}
-              contentStyle={styles.summaryInputContent}
-            />
-          </View>
 
-          <View style={styles.divider} />
+            <View style={styles.verticalDivider} />
 
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryCardHeader}>
-              <Icon name="fitness-center" size={16} color="#EF4444" />
-              <Text style={styles.summaryLabel}>Gross Weight</Text>
+            <View style={styles.summaryItem}>
+              <View style={styles.summaryIconContainer}>
+                <Icon name="fitness-center" size={14} color="#EF4444" />
+                <Text style={styles.summaryLabel}>Gross Wt</Text>
+              </View>
+              <Text style={styles.summaryValue}>
+                {freightDetails.grossWeight} kg
+              </Text>
             </View>
-            <TextInput
-              mode="flat"
-              value={freightDetails.grossWeight}
-              editable={false}
-              style={styles.summaryInput}
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              theme={{ roundness: 4 }}
-              right={<TextInput.Affix text="kg" />}
-              contentStyle={styles.summaryInputContent}
-            />
           </View>
         </View>
-      </View>
 
-      {/* Freight To Section */}
-      <View style={styles.section}>
-        {/* <View style={styles.sectionHeader}>
-          <Icon name="location-on" size={20} color="#1976D2" />
-          <Text style={styles.sectionTitle}>Freight To</Text>
-        </View> */}
-
-        <TouchableOpacity
-          style={styles.dropdownButton}
-          onPress={() => setFreightToModalVisible(true)}
-        >
-          <Text
-            style={[
-              styles.dropdownButtonText,
-              !freightDetails.freightTo?.type &&
-                styles.dropdownButtonPlaceholder,
-            ]}
-          >
-            {freightDetails.freightTo?.type || 'Select Freight To'}
-          </Text>
-          <Icon name="arrow-drop-down" size={24} color="#666" />
-        </TouchableOpacity>
-
-        {freightDetails.freightTo?.type === 'Other' && (
+        {/* Freight To Section */}
+        <View style={styles.inputSection}>
+          <Text style={styles.sectionTitleSmall}>Freight To</Text>
           <TouchableOpacity
-            style={styles.otherDetailsButton}
-            onPress={() => setFreightToDetailsModalVisible(true)}
+            style={styles.dropdownButton}
+            onPress={() => setFreightToModalVisible(true)}
           >
-            <Icon name="edit" size={18} color="#1976D2" />
-            <Text style={styles.otherDetailsButtonText}>
-              Enter Other Party Details
+            <Text
+              style={[
+                styles.dropdownButtonText,
+                !freightDetails.freightTo?.type &&
+                  styles.dropdownButtonPlaceholder,
+              ]}
+            >
+              {freightDetails.freightTo?.type || 'Select Freight To'}
             </Text>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
           </TouchableOpacity>
-        )}
-      </View>
 
-      {/* Charges Section */}
-      <View style={styles.section}>
-        {/* <View style={styles.sectionHeader}>
-          <Icon name="attach-money" size={20} color="#1976D2" />
-          <Text style={styles.sectionTitle}>Additional Charges</Text>
-        </View> */}
+          {freightDetails.freightTo?.type === 'Other' && (
+            <TouchableOpacity
+              style={styles.otherDetailsButton}
+              onPress={() => setFreightToDetailsModalVisible(true)}
+            >
+              <Icon name="edit" size={14} color="#1976D2" />
+              <Text style={styles.otherDetailsButtonText}>
+                Enter Other Party Details
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        <TouchableOpacity
-          style={styles.dropdownButton}
-          onPress={() => setChargesModalVisible(true)}
-        >
-          <Text
-            style={[
-              styles.dropdownButtonText,
-              selectedCharges.length === 0 && styles.dropdownButtonPlaceholder,
-            ]}
-          >
-            {selectedCharges.length === 0
-              ? 'Select Additional Charges'
-              : `${selectedCharges.length} charges selected`}
-          </Text>
-          <Icon name="arrow-drop-down" size={24} color="#666" />
-        </TouchableOpacity>
+        {/* Freight Amount Input */}
+        <View style={styles.inputSection}>
+          {/* <Text style={styles.sectionTitleSmall}>Freight Amount</Text> */}
+          <TextInput
+            label=" Freight Amount"
+            mode="outlined"
+            keyboardType="numeric"
+            value={freightDetails.freightAmount}
+            onChangeText={t => setFieldValue('freightDetails.freightAmount', t)}
+            style={styles.input}
+            outlineColor="#E0E0E0"
+            activeOutlineColor="#1976D2"
+            dense={true}
+            theme={{ roundness: 4 }}
+            left={<TextInput.Affix text="₹" />}
+            placeholder="0.00"
+          />
+        </View>
 
-        {/* Selected Charges Inputs */}
-        {selectedCharges.map(chargeType => {
-          const charge = freightDetails?.charges?.find(
-            c => c.type === chargeType,
-          );
-          return (
-            <View key={chargeType} style={styles.chargeInputRow}>
+        {/* Charges Section */}
+        <View style={styles.inputSection}>
+          {/* <Text style={styles.sectionTitleSmall}>Additional Charges</Text> */}
+          <ChargeSelector
+            selectedCharges={freightDetails.charges || []}
+            onChargesChange={handleChargesChange}
+          />
+        </View>
+
+        {/* Totals Section */}
+        <View style={styles.inputSection}>
+          <Text style={styles.sectionTitleSmall}>Total Calculation</Text>
+          <View style={styles.totalsGrid}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Subtotal</Text>
+              <Text style={styles.totalValue}>₹{subtotal.toFixed(2)}</Text>
+            </View>
+
+            <View style={styles.totalRow}>
+              <View style={styles.totalLabelContainer}>
+                <Text style={styles.totalLabel}>GST Amount</Text>
+                <TouchableOpacity
+                  onPress={() => setGstModalVisible(true)}
+                  style={styles.gstEditButton}
+                >
+                  <Icon name="edit" size={14} color="#1976D2" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.totalValue}>
+                ₹{parseFloat(freightDetails.gstAmount || '0').toFixed(2)}
+              </Text>
+            </View>
+
+            <View style={[styles.totalRow, styles.grandTotalRow]}>
+              <Text style={styles.grandTotalLabel}>Grand Total</Text>
+              <Text style={styles.grandTotalValue}>
+                ₹{grandTotal.toFixed(2)}
+              </Text>
+            </View>
+
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Advance</Text>
               <TextInput
-                label={`${chargeType} Label`}
                 mode="outlined"
-                value={charge?.label || chargeType}
-                onChangeText={t => handleChargeLabelChange(chargeType, t)}
-                style={[styles.input, styles.chargeLabelInput]}
-                outlineColor="#E0E0E0"
-                activeOutlineColor="#1976D2"
-              />
-              <TextInput
-                label="Amount"
-                mode="outlined"
-                value={charge?.amount || ''}
-                onChangeText={t => handleChargeAmountChange(chargeType, t)}
-                style={[styles.input, styles.chargeAmountInput]}
+                value={freightDetails.advance}
+                onChangeText={handleAdvanceChange}
+                style={styles.advanceInput}
                 keyboardType="numeric"
                 outlineColor="#E0E0E0"
                 activeOutlineColor="#1976D2"
+                dense={true}
+                theme={{ roundness: 4 }}
                 left={<TextInput.Affix text="₹" />}
               />
             </View>
-          );
-        })}
-      </View>
 
-      {/* Freight Amount Input */}
-      <View style={styles.section}>
-        <TextInput
-          label="Freight Amount"
-          mode="outlined"
-          keyboardType="numeric"
-          value={freightDetails.freightAmount}
-          onChangeText={t => setFieldValue('freightDetails.freightAmount', t)}
-          style={styles.input}
-          outlineColor="#E0E0E0"
-          activeOutlineColor="#1976D2"
-          left={<TextInput.Affix text="₹" />}
-          placeholder="0.00"
-        />
-      </View>
-
-      {/* Totals Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Icon name="calculate" size={20} color="#1976D2" />
-          <Text style={styles.sectionTitle}>Total Calculation</Text>
-        </View>
-
-        <View style={styles.totalsGrid}>
-          {/* Subtotal */}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Subtotal</Text>
-            <Text style={styles.totalValue}>₹{subtotal.toFixed(2)}</Text>
-          </View>
-
-          {/* GST Amount */}
-          <View style={styles.totalRow}>
-            <View style={styles.totalLabelContainer}>
-              <Text style={styles.totalLabel}>GST Amount</Text>
-              <TouchableOpacity
-                onPress={() => setGstModalVisible(true)}
-                style={styles.gstEditButton}
+            <View style={[styles.totalRow, styles.balanceRow]}>
+              <Text style={styles.totalLabel}>Balance Amount</Text>
+              <Text
+                style={[
+                  styles.totalValue,
+                  {
+                    color:
+                      parseFloat(freightDetails.balance || '0') > 0
+                        ? '#D32F2F'
+                        : '#2E7D32',
+                  },
+                ]}
               >
-                <Icon name="edit" size={16} color="#1976D2" />
-              </TouchableOpacity>
+                ₹{parseFloat(freightDetails.balance || '0').toFixed(2)}
+              </Text>
             </View>
-            <Text style={styles.totalValue}>
-              ₹{parseFloat(freightDetails.gstAmount || '0').toFixed(2)}
-            </Text>
-          </View>
-
-          {/* Grand Total */}
-          <View style={[styles.totalRow, styles.grandTotalRow]}>
-            <Text style={styles.grandTotalLabel}>Grand Total</Text>
-            <Text style={styles.grandTotalValue}>₹{grandTotal.toFixed(2)}</Text>
-          </View>
-
-          {/* Advance */}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Advance</Text>
-            <TextInput
-              mode="outlined"
-              value={freightDetails.advance}
-              onChangeText={handleAdvanceChange}
-              style={[styles.input, styles.advanceInput]}
-              keyboardType="numeric"
-              outlineColor="#E0E0E0"
-              activeOutlineColor="#1976D2"
-              left={<TextInput.Affix text="₹" />}
-            />
-          </View>
-
-          {/* Balance */}
-          <View style={[styles.totalRow, styles.balanceRow]}>
-            <Text style={styles.totalLabel}>Balance Amount</Text>
-            <Text
-              style={[
-                styles.totalValue,
-                {
-                  color:
-                    parseFloat(freightDetails.balance || '0') > 0
-                      ? '#D32F2F'
-                      : '#2E7D32',
-                },
-              ]}
-            >
-              ₹{parseFloat(freightDetails.balance || '0').toFixed(2)}
-            </Text>
           </View>
         </View>
       </View>
@@ -1033,13 +978,6 @@ export default function Step3_FreightDetails() {
         onSave={handleSaveFreightTo}
       />
 
-      <ChargesDropdownModal
-        visible={chargesModalVisible}
-        onClose={() => setChargesModalVisible(false)}
-        selectedCharges={selectedCharges}
-        onSelect={handleChargesSelect}
-      />
-
       <GSTModal
         visible={gstModalVisible}
         onClose={() => setGstModalVisible(false)}
@@ -1051,92 +989,95 @@ export default function Step3_FreightDetails() {
 }
 
 // ---------------------------------------------
-// STYLES
+// STYLES (Updated for compact design)
 // ---------------------------------------------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-  summarySection: {
+  contentContainer: {
+    padding: 0,
+  },
+  mainCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    margin: 16,
-    marginBottom: 12,
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#EEEEEE',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    // elevation: 2,
+  },
+  summarySection: {
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  sectionTitleSmall: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   summaryGrid: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: '#FAFAFA',
+    borderRadius: 6,
+    padding: 8,
   },
-  summaryCard: {
+  summaryItem: {
     flex: 1,
+    alignItems: 'center',
   },
-  summaryCardHeader: {
+  summaryIconContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   summaryLabel: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '500',
     color: '#757575',
     marginLeft: 4,
   },
-  summaryInput: {
-    backgroundColor: '#FAFAFA',
-    height: 42,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-  },
-  summaryInputContent: {
-    fontSize: 15,
+  summaryValue: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#212121',
-    textAlign: 'right',
   },
-  divider: {
+  verticalDivider: {
     width: 1,
-    height: 40,
-    backgroundColor: '#EEEEEE',
-    marginHorizontal: 8,
+    height: 24,
+    backgroundColor: '#E0E0E0',
   },
-  section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#EEEEEE',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  inputSection: {
     marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212121',
-    marginLeft: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   dropdownButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E0E0E0',
-    borderRadius: 8,
+    borderRadius: 4,
+    height: 40,
   },
   dropdownButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#212121',
   },
   dropdownButtonPlaceholder: {
@@ -1145,82 +1086,74 @@ const styles = StyleSheet.create({
   otherDetailsButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    padding: 12,
+    marginTop: 8,
+    padding: 8,
     backgroundColor: '#E3F2FD',
-    borderRadius: 6,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: '#BBDEFB',
   },
   otherDetailsButtonText: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#1976D2',
-    marginLeft: 8,
+    marginLeft: 6,
     fontWeight: '500',
-  },
-  chargeInputRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-    marginTop: 8,
-  },
-  chargeLabelInput: {
-    flex: 2,
-  },
-  chargeAmountInput: {
-    flex: 1,
   },
   input: {
     backgroundColor: '#FFFFFF',
+    height: 40,
   },
   totalsGrid: {
-    gap: 12,
+    gap: 8,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#F5F5F5',
   },
   totalLabelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   totalLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   totalValue: {
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: '600',
     color: '#212121',
   },
   gstEditButton: {
-    marginLeft: 8,
+    marginLeft: 6,
+    padding: 2,
   },
   grandTotalRow: {
-    paddingTop: 12,
-    borderTopWidth: 2,
+    paddingTop: 8,
+    borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
     borderBottomWidth: 0,
   },
   grandTotalLabel: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
     color: '#212121',
   },
   grandTotalValue: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1976D2',
   },
   advanceInput: {
-    width: 150,
+    width: 120,
+    height: 36,
+    backgroundColor: '#FFFFFF',
   },
   balanceRow: {
-    paddingTop: 12,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
   },
@@ -1232,22 +1165,23 @@ const modalStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212121',
     textAlign: 'center',
   },
   content: {
-    padding: 20,
+    padding: 16,
   },
   input: {
     backgroundColor: '#FFFFFF',
-    marginBottom: 16,
+    marginBottom: 12,
+    height: 40,
   },
   row: {
     flexDirection: 'row',
@@ -1259,36 +1193,37 @@ const modalStyles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    padding: 20,
+    padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
     gap: 12,
   },
   cancelButton: {
     flex: 1,
-    padding: 12,
+    padding: 10,
     backgroundColor: '#F5F5F5',
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     fontWeight: '500',
   },
   saveButton: {
     flex: 1,
-    padding: 12,
+    padding: 10,
     backgroundColor: '#1976D2',
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
   },
   saveButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'white',
     fontWeight: '500',
   },
 });
+
 const centerModal = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -1300,18 +1235,19 @@ const centerModal = StyleSheet.create({
     width: '92%',
     maxHeight: '85%',
     backgroundColor: '#FFF',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 12,
   },
   input: {
-    marginBottom: 12,
+    marginBottom: 10,
     backgroundColor: '#FFF',
+    height: 40,
   },
   gstRow: {
     flexDirection: 'row',
@@ -1321,20 +1257,22 @@ const centerModal = StyleSheet.create({
   gstInput: {
     flex: 1,
     backgroundColor: '#FFF',
+    height: 40,
   },
   validateBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: '#1976D2',
-    borderRadius: 8,
+    borderRadius: 6,
   },
   validateText: {
     color: '#FFF',
     fontWeight: '500',
+    fontSize: 12,
   },
   errorText: {
     color: '#D32F2F',
-    fontSize: 12,
+    fontSize: 11,
     marginBottom: 8,
     marginLeft: 4,
   },
@@ -1352,25 +1290,27 @@ const centerModal = StyleSheet.create({
   },
   cancel: {
     flex: 1,
-    padding: 12,
+    padding: 10,
     backgroundColor: '#F5F5F5',
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
   },
   save: {
     flex: 1,
-    padding: 12,
+    padding: 10,
     backgroundColor: '#1976D2',
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
   },
   cancelText: {
     color: '#555',
     fontWeight: '500',
+    fontSize: 12,
   },
   saveText: {
     color: '#FFF',
     fontWeight: '500',
+    fontSize: 12,
   },
 });
 
@@ -1380,27 +1320,27 @@ const dropdownModalStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212121',
     textAlign: 'center',
   },
   optionsContainer: {
-    padding: 20,
+    padding: 16,
   },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    marginBottom: 8,
+    padding: 12,
+    marginBottom: 6,
     backgroundColor: '#FAFAFA',
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#EEEEEE',
   },
@@ -1409,7 +1349,7 @@ const dropdownModalStyles = StyleSheet.create({
     borderColor: '#1976D2',
   },
   optionText: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#424242',
   },
   optionTextSelected: {
@@ -1418,32 +1358,32 @@ const dropdownModalStyles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    padding: 20,
+    padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
     gap: 12,
   },
   cancelButton: {
     flex: 1,
-    padding: 12,
+    padding: 10,
     backgroundColor: '#F5F5F5',
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     fontWeight: '500',
   },
   saveButton: {
     flex: 1,
-    padding: 12,
+    padding: 10,
     backgroundColor: '#1976D2',
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
   },
   saveButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'white',
     fontWeight: '500',
   },

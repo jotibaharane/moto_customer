@@ -17,10 +17,9 @@ import DateInput from '@components/custumdate/DateInput';
 import DocumentItemModal, {
   DocumentType,
   DocumentItem,
-  InvoiceItem,
-  ChallanItem,
-  AirwayBillItem,
   BillOfEntryItem,
+  ChallanItem,
+  InvoiceItem,
 } from './DocumentItemModal';
 import CustomRadioButton from '@components/common/CustomRadioButton';
 
@@ -31,8 +30,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // ---------------------------------------------
 export interface InvoiceGroup {
   id: string;
-  poNo: string;
-  poDate: string;
   items: InvoiceItem[];
   totalValue: number;
   totalQuantity: string;
@@ -47,13 +44,6 @@ export interface ChallanGroup {
   unitType: string;
 }
 
-export interface AirwayBillGroup {
-  id: string;
-  items: AirwayBillItem[];
-  totalValue: number;
-  totalQuantity: string;
-}
-
 export interface BillOfEntryGroup {
   id: string;
   items: BillOfEntryItem[];
@@ -62,27 +52,25 @@ export interface BillOfEntryGroup {
 }
 
 interface FormValues {
-  cargoContent: string;
-  packageType: string;
-  Packages: string;
-  poNo: string;
-  poDate: string;
+  // Main form fields
+  cargoContent?: string;
+  packageType?: string;
+  Packages?: string;
+  poNo?: string;
+  poDate?: string;
+
+  // Document groups
   invoices: InvoiceGroup[];
   challans: ChallanGroup[];
-  airwayBills: AirwayBillGroup[];
   billOfEntries: BillOfEntryGroup[];
+
+  // Additional fields for context
+  loadpostid?: string;
+  vehicleno?: string;
+  driverName?: string;
 }
 
-// Package Type Options
-const PACKAGE_TYPE_OPTIONS = [
-  { id: 'carton', label: 'Carton', value: 'carton' },
-  { id: 'box', label: 'Box', value: 'box' },
-  { id: 'pallet', label: 'Pallet', value: 'pallet' },
-  { id: 'bag', label: 'Bag', value: 'bag' },
-  { id: 'drum', label: 'Drum', value: 'drum' },
-];
-
-// Document Type Radio Options
+// Document Type Radio Options (Removed airwaybill)
 const DOCUMENT_TYPES = [
   {
     id: 'invoice',
@@ -90,12 +78,11 @@ const DOCUMENT_TYPES = [
     value: 'invoice',
     icon: 'file-document-outline',
   },
-  { id: 'challan', label: 'Challan', value: 'challan', icon: 'truck-outline' },
   {
-    id: 'airwaybill',
-    label: 'Airway Bill',
-    value: 'airwaybill',
-    icon: 'airplane-outline',
+    id: 'challan',
+    label: 'Challan',
+    value: 'challan',
+    icon: 'truck-outline',
   },
   {
     id: 'bill-of-entry',
@@ -112,11 +99,11 @@ const calculateTotalQuantity = (
   if (items.length === 0) return { total: '0' };
 
   if (items[0] && 'unit' in items[0]) {
-    const firstUnit = (items[0] as InvoiceItem).unit;
+    const firstUnit = (items[0] as any).unit;
     let total = 0;
 
     items.forEach(item => {
-      const typedItem = item as InvoiceItem;
+      const typedItem = item as any;
       if (typedItem.unit === 'pcs') {
         total += parseFloat(typedItem.quantity || '0');
       } else {
@@ -131,7 +118,7 @@ const calculateTotalQuantity = (
   } else {
     let total = 0;
     items.forEach(item => {
-      const typedItem = item as AirwayBillItem;
+      const typedItem = item as any;
       total += parseFloat(typedItem.qty || '0');
     });
 
@@ -198,11 +185,6 @@ export default function Step2_InvoiceDetails() {
           setTempItems(values.challans[index].items);
         }
         break;
-      case 'airwaybill':
-        if (values.airwayBills?.[index]) {
-          setTempItems(values.airwayBills[index].items);
-        }
-        break;
       case 'bill-of-entry':
         if (values.billOfEntries?.[index]) {
           setTempItems(values.billOfEntries[index].items);
@@ -246,16 +228,11 @@ export default function Step2_InvoiceDetails() {
 
     switch (selectedDocumentType) {
       case 'invoice':
-        const invoiceGroup = {
-          ...baseGroup,
-          poNo: values.poNo,
-          poDate: values.poDate,
-        };
         const updatedInvoices = [...(values.invoices || [])];
         if (editingGroupIndex !== null) {
-          updatedInvoices[editingGroupIndex] = invoiceGroup;
+          updatedInvoices[editingGroupIndex] = baseGroup;
         } else {
-          updatedInvoices.push(invoiceGroup);
+          updatedInvoices.push(baseGroup);
         }
         setFieldValue('invoices', updatedInvoices);
         break;
@@ -268,16 +245,6 @@ export default function Step2_InvoiceDetails() {
           updatedChallans.push(baseGroup);
         }
         setFieldValue('challans', updatedChallans);
-        break;
-
-      case 'airwaybill':
-        const updatedAirwayBills = [...(values.airwayBills || [])];
-        if (editingGroupIndex !== null) {
-          updatedAirwayBills[editingGroupIndex] = baseGroup;
-        } else {
-          updatedAirwayBills.push(baseGroup);
-        }
-        setFieldValue('airwayBills', updatedAirwayBills);
         break;
 
       case 'bill-of-entry':
@@ -320,12 +287,6 @@ export default function Step2_InvoiceDetails() {
                 );
                 setFieldValue('challans', updatedChallans);
                 break;
-              case 'airwaybill':
-                const updatedAirwayBills = (values.airwayBills || []).filter(
-                  (_, i) => i !== index,
-                );
-                setFieldValue('airwayBills', updatedAirwayBills);
-                break;
               case 'bill-of-entry':
                 const updatedBillOfEntries = (
                   values.billOfEntries || []
@@ -346,8 +307,6 @@ export default function Step2_InvoiceDetails() {
         return values.invoices[index].id;
       case 'challan':
         return values.challans[index].id;
-      case 'airwaybill':
-        return values.airwayBills[index].id;
       case 'bill-of-entry':
         return values.billOfEntries[index].id;
     }
@@ -360,8 +319,6 @@ export default function Step2_InvoiceDetails() {
         return values.invoices || [];
       case 'challan':
         return values.challans || [];
-      case 'airwaybill':
-        return values.airwayBills || [];
       case 'bill-of-entry':
         return values.billOfEntries || [];
     }
@@ -374,8 +331,6 @@ export default function Step2_InvoiceDetails() {
         return { icon: 'file-document-outline', color: '#10B981' };
       case 'challan':
         return { icon: 'truck-outline', color: '#10B981' };
-      case 'airwaybill':
-        return { icon: 'airplane-outline', color: '#8B5CF6' };
       case 'bill-of-entry':
         return { icon: 'ship-wheel', color: '#F59E0B' };
     }
@@ -385,7 +340,6 @@ export default function Step2_InvoiceDetails() {
   const calculateTotals = () => {
     let totalInvoiceValue = 0;
     let totalChallanValue = 0;
-    let totalAirwayBillValue = 0;
     let totalBillOfEntryValue = 0;
 
     (values.invoices || []).forEach(
@@ -394,9 +348,6 @@ export default function Step2_InvoiceDetails() {
     (values.challans || []).forEach(
       group => (totalChallanValue += group.totalValue),
     );
-    (values.airwayBills || []).forEach(
-      group => (totalAirwayBillValue += group.totalValue),
-    );
     (values.billOfEntries || []).forEach(
       group => (totalBillOfEntryValue += group.totalValue),
     );
@@ -404,70 +355,18 @@ export default function Step2_InvoiceDetails() {
     return {
       totalInvoiceValue,
       totalChallanValue,
-      totalAirwayBillValue,
       totalBillOfEntryValue,
       grandTotalValue:
-        totalInvoiceValue +
-        totalChallanValue +
-        totalAirwayBillValue +
-        totalBillOfEntryValue,
+        totalInvoiceValue + totalChallanValue + totalBillOfEntryValue,
     };
   };
 
   const {
     totalInvoiceValue,
     totalChallanValue,
-    totalAirwayBillValue,
     totalBillOfEntryValue,
     grandTotalValue,
   } = calculateTotals();
-
-  // Render document types in rows of 2
-  const renderDocumentTypeButtons = () => {
-    const rows = [];
-    for (let i = 0; i < DOCUMENT_TYPES.length; i += 2) {
-      const rowItems = DOCUMENT_TYPES.slice(i, i + 2);
-      rows.push(
-        <View key={i} style={styles.documentTypeRow}>
-          {rowItems.map(docType => (
-            <TouchableOpacity
-              key={docType.id}
-              style={[
-                styles.documentTypeButton,
-                selectedDocumentType === docType.value &&
-                  styles.documentTypeButtonSelected,
-              ]}
-              onPress={() =>
-                openAddDocumentModal(docType.value as DocumentType)
-              }
-            >
-              <View style={styles.documentTypeButtonContent}>
-                <Icon
-                  name={docType.icon}
-                  size={24}
-                  color={
-                    selectedDocumentType === docType.value
-                      ? '#3B82F6'
-                      : '#6B7280'
-                  }
-                />
-                <Text
-                  style={[
-                    styles.documentTypeButtonText,
-                    selectedDocumentType === docType.value &&
-                      styles.documentTypeButtonTextSelected,
-                  ]}
-                >
-                  {docType.label}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>,
-      );
-    }
-    return rows;
-  };
 
   return (
     <>
@@ -476,114 +375,16 @@ export default function Step2_InvoiceDetails() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Cargo Details Section */}
-        <View style={styles.section}>
-          <View style={styles.formGroup}>
-            <TextInput
-              label="Cargo Content / Material Remark"
-              value={values.cargoContent}
-              onChangeText={t => setFieldValue('cargoContent', t)}
-              mode="outlined"
-              style={styles.compactInput}
-              outlineStyle={styles.inputOutline}
-              theme={{
-                roundness: 8,
-                colors: {
-                  primary: '#3B82F6',
-                  background: '#FFFFFF',
-                },
-              }}
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <TextInput
-              label="Package Type"
-              value={values.packageType}
-              onChangeText={t => setFieldValue('packageType', t)}
-              mode="outlined"
-              style={styles.compactInput}
-              outlineStyle={styles.inputOutline}
-              theme={{
-                roundness: 8,
-                colors: {
-                  primary: '#3B82F6',
-                  background: '#FFFFFF',
-                },
-              }}
-              right={
-                <TextInput.Icon
-                  icon="menu-down"
-                  onPress={() => packageTypeModalRef.current?.open()}
-                />
-              }
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <TextInput
-              label="Number of Packages"
-              value={values.Packages}
-              onChangeText={t => setFieldValue('Packages', t)}
-              mode="outlined"
-              style={styles.compactInput}
-              outlineStyle={styles.inputOutline}
-              keyboardType="numeric"
-              theme={{
-                roundness: 8,
-                colors: {
-                  primary: '#3B82F6',
-                  background: '#FFFFFF',
-                },
-              }}
-            />
-          </View>
-        </View>
-
-        {/* PO Details */}
-        <View style={styles.section}>
-          <View style={styles.formRow}>
-            <View style={[styles.formColumn, styles.formColumnGap]}>
-              <TextInput
-                label="PO Number"
-                value={values.poNo}
-                onChangeText={t => setFieldValue('poNo', t)}
-                mode="outlined"
-                style={styles.compactInput}
-                outlineStyle={styles.inputOutline}
-                theme={{
-                  roundness: 8,
-                  colors: {
-                    primary: '#3B82F6',
-                    background: '#FFFFFF',
-                  },
-                }}
-              />
-            </View>
-            <View style={styles.formColumn}>
-              <DateInput
-                label="PO Date"
-                value={values.poDate}
-                onChange={date => setFieldValue('poDate', date)}
-                style={styles.compactInput}
-              />
-            </View>
-          </View>
-        </View>
-
         {/* Document Type Selection - Professional 2-column layout */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Add Documents</Text>
-          {/* <Text style={styles.sectionSubtitle}>
-            Select document type to add:
-          </Text> */}
 
           <View style={[styles.documentTypeGrid, { flexDirection: 'column' }]}>
             <View style={{ gap: 12 }}>
               {DOCUMENT_TYPES.map(docType => (
                 <CustomRadioButton
                   key={docType.id}
-                  options={[docType]} // 👈 SINGLE OPTION
+                  options={[docType]}
                   selectedOption={selectedDocumentType}
                   onSelect={(value: DocumentType) => {
                     setSelectedDocumentType(value);
@@ -637,10 +438,9 @@ export default function Step2_InvoiceDetails() {
                               {docType.label} {index + 1}
                             </Text>
                             <Text style={styles.buttonSubText}>
-                              {docType.value === 'airwaybill' ||
-                              docType.value === 'bill-of-entry'
+                              {docType.value === 'bill-of-entry'
                                 ? `${
-                                    group.items[0]?.current || ''
+                                    group.items[0]?.currency || ''
                                   } ${group.totalValue.toLocaleString()}`
                                 : `₹${group.totalValue.toLocaleString()}`}
                             </Text>
@@ -678,45 +478,10 @@ export default function Step2_InvoiceDetails() {
             deleteDocumentGroup(selectedDocumentType, editingGroupIndex);
           }
         }}
+        loadpostid={values.loadpostid || 'LP12345'}
+        vehicleno={values.vehicleno || 'MH12AB1234'}
+        driverName={values.driverName || 'John Doe'}
       />
-
-      {/* Bottom Modal for Package Type Selection */}
-      <BottomModal
-        ref={packageTypeModalRef}
-        customHeight={300}
-        backdropOpacity={0.6}
-        preventSwipeClose={true}
-      >
-        <View style={styles.modalContentWrapper}>
-          <Text style={styles.bottomModalTitle}>Select Package Type</Text>
-          <View style={styles.bottomModalOptionsContainer}>
-            {PACKAGE_TYPE_OPTIONS.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.bottomModalOption,
-                  values.packageType === item.value &&
-                    styles.bottomModalOptionSelected,
-                ]}
-                onPress={() => handleSelectPackageType(item.value)}
-              >
-                <Text
-                  style={[
-                    styles.bottomModalOptionText,
-                    values.packageType === item.value &&
-                      styles.bottomModalOptionTextSelected,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-                {values.packageType === item.value && (
-                  <Icon name="check" size={18} color="#3B82F6" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </BottomModal>
     </>
   );
 }
@@ -741,76 +506,9 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 12,
   },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 16,
-  },
-  formGroup: {
-    marginBottom: 12,
-  },
-  // Compact Input Styles
-  compactInput: {
-    backgroundColor: '#FFFFFF',
-    fontSize: 14,
-    height: 48,
-  },
-  inputOutline: {
-    borderWidth: 1,
-  },
-  // Form Layout
-  formRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 0,
-  },
-  formColumn: {
-    flex: 1,
-  },
-  formColumnGap: {
-    marginRight: 12,
-  },
-  // Document Type Grid Styles (2-column layout)
   documentTypeGrid: {
     gap: 12,
   },
-  documentTypeRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  documentTypeButton: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 90,
-  },
-  documentTypeButtonSelected: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
-    borderWidth: 2,
-  },
-  documentTypeButtonContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  documentTypeButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  documentTypeButtonTextSelected: {
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
-  // Document List Styles
   buttonsGrid: {
     gap: 8,
   },
@@ -853,81 +551,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
-  },
-  // Total Section
-  totalSection: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginTop: 20,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  totalLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  totalValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  grandTotal: {
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    marginTop: 8,
-    paddingTop: 12,
-  },
-  grandTotalLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  grandTotalValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  // Bottom Modal Styles
-  modalContentWrapper: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-  bottomModalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  bottomModalOptionsContainer: {
-    flex: 1,
-  },
-  bottomModalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  bottomModalOptionSelected: {
-    backgroundColor: '#EFF6FF',
-  },
-  bottomModalOptionText: {
-    fontSize: 15,
-    color: '#374151',
-  },
-  bottomModalOptionTextSelected: {
-    color: '#3B82F6',
-    fontWeight: '600',
   },
 });

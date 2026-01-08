@@ -111,7 +111,12 @@ const LoadPostForm: React.FC = () => {
         PickupLng: values?.pickup?.origin?.coordinates?.lng,
         VehicleType: values?.vehicle?.vehicleType,
       });
-      console.log({ response });
+      console.log('_CHECK', {
+        CustomerID: CustomerID,
+        PickupLat: values?.pickup?.origin?.coordinates?.lat,
+        PickupLng: values?.pickup?.origin?.coordinates?.lng,
+        VehicleType: values?.vehicle?.vehicleType,
+      });
 
       if (response?.data?.status === '00') {
         Toast.show({ type: 'success', text1: response?.data?.message });
