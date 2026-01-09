@@ -516,7 +516,7 @@ const RegistrationScreen: React.FC = () => {
           </Card>
 
           {/* Business Type (Only for Organization) */}
-          {formData.CompanyType === 'Organization' && (
+          {/*  {formData.CompanyType === 'Organization' && (
             <AddressTypeSelector
               value={{
                 Factory: formData.Factory,

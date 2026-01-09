@@ -47,7 +47,7 @@ const FirstStep: React.FC = () => {
     { vehicleType: values?.vehicle?.vehicleType },
     { skip: !values?.vehicle?.vehicleType },
   );
-
+  console.log({ ApproximateWeight });
   useLayoutEffect(() => {
     getTruck();
   }, [navigation]);
@@ -87,7 +87,17 @@ const FirstStep: React.FC = () => {
       ),
     [ApproximateWeight, values.vehicle.weightRange],
   );
+  const weightLimits = useMemo(() => {
+    if (!values.vehicle.weightRange) return null;
 
+    const match = values.vehicle.weightRange.match(/(\d+)\s*-\s*(\d+)/);
+    if (!match) return null;
+
+    return {
+      min: Number(match[1]),
+      max: Number(match[2]),
+    };
+  }, [values.vehicle.weightRange]);
   const handleOpenVehicleModal = useCallback(
     () => vehicleModalRef.current?.open(),
     [],
@@ -153,7 +163,7 @@ const FirstStep: React.FC = () => {
 
           <TouchableOpacity
             style={[
-              tw`p-3 border-2 border-dashed rounded-lg`,
+              tw`p-3 border-2  rounded-lg`,
               { borderColor: pickupBorderColor },
             ]}
             onPress={handleOpenPickupModal}
@@ -257,7 +267,7 @@ const FirstStep: React.FC = () => {
 
           <TouchableOpacity
             style={[
-              tw`p-3 border-2 border-dashed rounded-lg`,
+              tw`p-3 border-2  rounded-lg`,
               { borderColor: deliveryBorderColor },
             ]}
             onPress={handleOpenDropModal}
@@ -316,13 +326,13 @@ const FirstStep: React.FC = () => {
           <View style={tw`flex-row items-center mb-2`}>
             <View style={tw`w-2 h-2 bg-green-500 mr-2 rounded-full`} />
             <Text style={tw`text-base font-bold text-gray-800`}>
-              Vehicle Type
+              Vehicle Requirement
             </Text>
           </View>
 
           <TouchableOpacity
             style={[
-              tw`p-3 border-2 border-dashed rounded-lg`,
+              tw`p-3 border-2  rounded-lg`,
               {
                 borderColor: vehicleBorderColor,
                 backgroundColor: values.vehicle.vehicleType
@@ -395,7 +405,7 @@ const FirstStep: React.FC = () => {
 
           <TouchableOpacity
             style={[
-              tw`p-3 border-2 border-dashed rounded-lg`,
+              tw`p-3 border-2  rounded-lg`,
               {
                 borderColor: weightBorderColor,
                 backgroundColor: values.vehicle.weightRange
@@ -483,7 +493,11 @@ const FirstStep: React.FC = () => {
                 onChangeText={text =>
                   setFieldValue('vehicle.approximateWeightKg', text)
                 }
-                placeholder="Enter exact weight in kilograms"
+                placeholder={
+                  weightLimits
+                    ? `Enter weight between ${weightLimits.min}-${weightLimits.max} kg`
+                    : 'Enter exact weight in kilograms'
+                }
                 keyboardType="numeric"
                 placeholderTextColor="#9CA3AF"
               />

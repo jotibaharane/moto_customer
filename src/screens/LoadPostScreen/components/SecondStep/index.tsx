@@ -96,7 +96,7 @@ export const SelectionButton: React.FC<SelectionButtonProps> = ({
   testID,
 }) => (
   <TouchableOpacity
-    style={tw`border-2 border-dashed ${
+    style={tw`border-2  ${
       value
         ? hasError
           ? 'border-red-200 bg-red-50'
@@ -390,7 +390,7 @@ const SecondStep: React.FC = () => {
             testID="dhala-length-card"
           >
             <View
-              style={tw`border-2 border-dashed border-gray-300 bg-gray-50 p-2 rounded-lg`}
+              style={tw`border-2 border-gray-300 bg-gray-50 p-2 rounded-lg`}
             >
               <CustomRadioButton
                 options={Cargotypeoptions}
@@ -413,9 +413,7 @@ const SecondStep: React.FC = () => {
           touched={touched.load?.dhalaLength as boolean}
           testID="dhala-length-card"
         >
-          <View
-            style={tw`border-2 border-dashed border-gray-300 bg-gray-50 p-3 rounded-lg`}
-          >
+          <View style={tw`border-2 border-gray-300 bg-gray-50 p-3 rounded-lg`}>
             <CustomRadioButton
               options={DhalaLengthOptions}
               selectedOption={values.load.dhalaLength}
