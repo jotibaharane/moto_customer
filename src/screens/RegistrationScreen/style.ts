@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContainer: { padding: wp(20), paddingBottom: hp(40) },
+  scrollContainer: { padding: wp(5), paddingBottom: hp(10) },
   header: {
     fontSize: fontSize(24),
     fontWeight: 'bold',
@@ -33,7 +33,7 @@ export const styles = StyleSheet.create({
     marginBottom: hp(8),
   },
   halfInput: { width: '48%' },
-  input: { backgroundColor: colors.surface, marginBottom: hp(8) },
+  input: { backgroundColor: colors.surface, marginBottom: hp(2) },
   submitButton: {
     borderRadius: ms(10),
     marginTop: hp(10),
@@ -50,4 +50,8 @@ export const styles = StyleSheet.create({
     color: colors.textOnPrimary,
   },
   submitButtonContent: { height: hp(50) },
+  submit: {
+    color: '#fff',
+    fontWeight: '500',
+  },
 });

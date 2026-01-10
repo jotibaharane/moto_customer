@@ -44,6 +44,7 @@ import {
 import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
 import { routeName } from '@utils/navigationHelpers';
 import { styles as screenStyles } from './style';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 /* ---------------------------------------------------------------
  * CONSTANTS & INITIAL FORM STATE
@@ -332,17 +333,17 @@ const RegistrationScreen: React.FC = () => {
     }
 
     // ✅ CORRECT Address Type validation
-    if (
-      formData.Factory === 'N' &&
-      formData.Warehouse === 'N' &&
-      formData.Office === 'N'
-    ) {
-      setErrors(prev => ({
-        ...prev,
-        Factory: 'Select at least one pickup location',
-      }));
-      return false;
-    }
+    // if (
+    //   formData.Factory === 'N' &&
+    //   formData.Warehouse === 'N' &&
+    //   formData.Office === 'N'
+    // ) {
+    //   setErrors(prev => ({
+    //     ...prev,
+    //     Factory: 'Select at least one pickup location',
+    //   }));
+    //   return false;
+    // }
 
     if (formData.CompanyType === 'Organization' && !formData.CompanyName) {
       newErrors.CompanyName = 'Company name is required';
@@ -370,7 +371,7 @@ const RegistrationScreen: React.FC = () => {
       console.log('FINAL PAYLOAD 👉', payload);
 
       const response = await registrationMutation(payload).unwrap();
-
+      console.log({ response });
       if (response?.status === '00') {
         dispatch(
           setCustomerDetails({
@@ -408,113 +409,112 @@ const RegistrationScreen: React.FC = () => {
 
   return (
     <PaperProvider>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <KeyboardAwareScrollView
         style={[screenStyles.container, { paddingTop: insets.top }]}
+        contentContainerStyle={screenStyles.scrollContainer}
+        enableOnAndroid
+        keyboardShouldPersistTaps="handled"
+        extraScrollHeight={120}
       >
         <ScrollView
           contentContainerStyle={screenStyles.scrollContainer}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={screenStyles.header}>Customer Registration</Text>
-
           {/* Personal Information */}
-          <Card style={screenStyles.card}>
-            <Card.Content>
-              {/* Company Type */}
-              <CompanyTypeSelector
-                selected={formData.CompanyType}
-                onSelect={type => {
-                  setFormData(prev => ({
-                    ...prev,
-                    CompanyType: type,
-                    ...(type === 'Individual' && { CompanyName: '' }),
-                  }));
-                  setErrors(prev => {
-                    const updated = { ...prev };
-                    delete updated.CompanyType;
-                    delete updated.CompanyName;
-                    return updated;
-                  });
-                }}
-              />
+          {/* <Card style={screenStyles.card}> */}
+          <Card.Content>
+            {/* Company Type */}
+            <CompanyTypeSelector
+              selected={formData.CompanyType}
+              onSelect={type => {
+                setFormData(prev => ({
+                  ...prev,
+                  CompanyType: type,
+                  ...(type === 'Individual' && { CompanyName: '' }),
+                }));
+                setErrors(prev => {
+                  const updated = { ...prev };
+                  delete updated.CompanyType;
+                  delete updated.CompanyName;
+                  return updated;
+                });
+              }}
+            />
 
-              <HelperText type="error" visible={!!errors.CompanyType}>
-                {errors.CompanyType}
-              </HelperText>
+            <HelperText type="error" visible={!!errors.CompanyType}>
+              {errors.CompanyType}
+            </HelperText>
 
-              <Text style={screenStyles.sectionTitle}>
-                Personal Information
-              </Text>
+            <Text style={screenStyles.sectionTitle}>Personal Information</Text>
 
-              {/* Full Name */}
-              <TextInput
-                mode="outlined"
-                label="Full Name *"
-                value={formData.ContactPerson}
-                onChangeText={text => handleChange('ContactPerson', text)}
-                error={!!errors.ContactPerson}
-                style={screenStyles.input}
-                theme={{ roundness: 8 }}
-                left={<TextInput.Icon icon="account" />}
-              />
-              <HelperText type="error" visible={!!errors.ContactPerson}>
-                {errors.ContactPerson}
-              </HelperText>
+            {/* Full Name */}
+            <TextInput
+              mode="outlined"
+              label="Full Name *"
+              value={formData.ContactPerson}
+              onChangeText={text => handleChange('ContactPerson', text)}
+              error={!!errors.ContactPerson}
+              style={screenStyles.input}
+              theme={{ roundness: 8 }}
+              left={<TextInput.Icon icon="account" />}
+            />
+            <HelperText type="error" visible={!!errors.ContactPerson}>
+              {errors.ContactPerson}
+            </HelperText>
 
-              {/* Company Name */}
-              {formData.CompanyType === 'Organization' && (
-                <>
-                  <TextInput
-                    mode="outlined"
-                    label="Organization Name *"
-                    value={formData.CompanyName}
-                    onChangeText={text => handleChange('CompanyName', text)}
-                    error={!!errors.CompanyName}
-                    style={screenStyles.input}
-                    theme={{ roundness: 8 }}
-                    left={<TextInput.Icon icon="office-building" />}
-                  />
-                  <HelperText type="error" visible={!!errors.CompanyName}>
-                    {errors.CompanyName}
-                  </HelperText>
-                </>
-              )}
+            {/* Company Name */}
+            {formData.CompanyType === 'Organization' && (
+              <>
+                <TextInput
+                  mode="outlined"
+                  label="Organization Name *"
+                  value={formData.CompanyName}
+                  onChangeText={text => handleChange('CompanyName', text)}
+                  error={!!errors.CompanyName}
+                  style={screenStyles.input}
+                  theme={{ roundness: 8 }}
+                  left={<TextInput.Icon icon="office-building" />}
+                />
+                <HelperText type="error" visible={!!errors.CompanyName}>
+                  {errors.CompanyName}
+                </HelperText>
+              </>
+            )}
 
-              {/* Contact Number */}
-              <TextInput
-                mode="outlined"
-                label="Contact Number *"
-                value={formData.ContactNo}
-                editable={false}
-                style={screenStyles.input}
-                theme={{ roundness: 8 }}
-                left={<TextInput.Icon icon="phone" />}
-              />
-              <HelperText type="error" visible={!!errors.ContactNo}>
-                {errors.ContactNo}
-              </HelperText>
+            {/* Contact Number */}
+            <TextInput
+              mode="outlined"
+              label="Contact Number *"
+              value={formData.ContactNo}
+              editable={false}
+              style={screenStyles.input}
+              theme={{ roundness: 8 }}
+              left={<TextInput.Icon icon="phone" />}
+            />
+            <HelperText type="error" visible={!!errors.ContactNo}>
+              {errors.ContactNo}
+            </HelperText>
 
-              {/* Email */}
-              <TextInput
-                mode="outlined"
-                label="Email Address *"
-                value={formData.EmailID}
-                onChangeText={text => handleChange('EmailID', text)}
-                keyboardType="email-address"
-                error={!!errors.EmailID}
-                style={screenStyles.input}
-                theme={{ roundness: 8 }}
-                left={<TextInput.Icon icon="email" />}
-              />
-              <HelperText type="error" visible={!!errors.EmailID}>
-                {errors.EmailID}
-              </HelperText>
-            </Card.Content>
-          </Card>
+            {/* Email */}
+            <TextInput
+              mode="outlined"
+              label="Email Address *"
+              value={formData.EmailID}
+              onChangeText={text => handleChange('EmailID', text)}
+              keyboardType="email-address"
+              error={!!errors.EmailID}
+              style={screenStyles.input}
+              theme={{ roundness: 8 }}
+              left={<TextInput.Icon icon="email" />}
+            />
+            <HelperText type="error" visible={!!errors.EmailID}>
+              {errors.EmailID}
+            </HelperText>
+          </Card.Content>
+          {/* </Card> */}
 
           {/* Business Type (Only for Organization) */}
-          {/*  {formData.CompanyType === 'Organization' && (
+          {formData.CompanyType === 'Organization' && (
             <AddressTypeSelector
               value={{
                 Factory: formData.Factory,
@@ -532,103 +532,102 @@ const RegistrationScreen: React.FC = () => {
           )}
 
           {/* ADDRESS SECTION */}
-          <Card style={screenStyles.card}>
-            <Card.Content>
-              <Text style={screenStyles.sectionTitle}>Address Details</Text>
 
-              {/* Address Line 1 */}
-              <TextInput
-                mode="outlined"
-                label="Building, Apartment, Plot Number *"
-                value={formData.Address1}
-                onChangeText={text => handleChange('Address1', text)}
-                error={!!errors.Address1}
-                style={screenStyles.input}
-                theme={{ roundness: 8 }}
-                multiline
-                numberOfLines={2}
-                left={<TextInput.Icon icon="home" />}
-              />
-              <HelperText type="error" visible={!!errors.Address1}>
-                {errors.Address1}
-              </HelperText>
+          <Card.Content>
+            {/* Address Line 1 */}
+            <TextInput
+              mode="outlined"
+              label="Building, Apartment, Plot Number *"
+              value={formData.Address1}
+              onChangeText={text => handleChange('Address1', text)}
+              error={!!errors.Address1}
+              style={screenStyles.input}
+              theme={{ roundness: 8 }}
+              multiline
+              numberOfLines={2}
+              left={<TextInput.Icon icon="home" />}
+            />
+            <HelperText type="error" visible={!!errors.Address1}>
+              {errors.Address1}
+            </HelperText>
 
-              {/* Address Line 2 */}
-              <TextInput
-                mode="outlined"
-                label="Street,Area,Sector,Village"
-                value={formData.Address2}
-                onChangeText={text => handleChange('Address2', text)}
-                style={screenStyles.input}
-                theme={{ roundness: 8 }}
-                multiline
-                numberOfLines={2}
-                left={<TextInput.Icon icon="home" />}
-              />
-
-              {/* Pincode + City */}
-              <View style={screenStyles.row}>
-                <View style={screenStyles.halfInput}>
-                  <TextInput
-                    mode="outlined"
-                    label="Pincode *"
-                    value={formData.Pincode}
-                    onChangeText={text => handleChange('Pincode', text)}
-                    keyboardType="number-pad"
-                    error={!!errors.Pincode}
-                    style={screenStyles.input}
-                  />
-                  <HelperText type="error" visible={!!errors.Pincode}>
-                    {errors.Pincode}
-                  </HelperText>
-                </View>
-
-                <View style={screenStyles.halfInput}>
-                  <TextInput
-                    mode="outlined"
-                    label="Town/Tahsil"
-                    value={formData.City}
-                    onChangeText={text => handleChange('City', text)}
-                    style={screenStyles.input}
-                    theme={{ roundness: 8 }}
-                  />
-                </View>
+            {/* Address Line 2 */}
+            <TextInput
+              mode="outlined"
+              label="Street,Area,Sector,Village"
+              value={formData.Address2}
+              onChangeText={text => handleChange('Address2', text)}
+              style={screenStyles.input}
+              theme={{ roundness: 8 }}
+              multiline
+              numberOfLines={2}
+              left={<TextInput.Icon icon="home" />}
+            />
+            <HelperText type="error" visible={!!errors.Address2}>
+              {errors.Address2}
+            </HelperText>
+            {/* Pincode + City */}
+            <View style={screenStyles.row}>
+              <View style={screenStyles.halfInput}>
+                <TextInput
+                  mode="outlined"
+                  label="Pincode *"
+                  value={formData.Pincode}
+                  onChangeText={text => handleChange('Pincode', text)}
+                  keyboardType="number-pad"
+                  error={!!errors.Pincode}
+                  style={screenStyles.input}
+                />
+                <HelperText type="error" visible={!!errors.Pincode}>
+                  {errors.Pincode}
+                </HelperText>
               </View>
 
-              {/* State */}
-              <SelectList
-                label="State *"
-                data={stateData?.data || []}
-                displayKey="state"
-                save="state"
-                value={formData.State}
-                setSelected={(val: any) => handleChange('State', val)}
-                placeholder="Select State"
-                onClear={() => handleChange('State', '')}
-              />
-              <HelperText type="error" visible={!!errors.State}>
-                {errors.State}
-              </HelperText>
+              <View style={screenStyles.halfInput}>
+                <TextInput
+                  mode="outlined"
+                  label="Town/Tahsil"
+                  value={formData.City}
+                  onChangeText={text => handleChange('City', text)}
+                  style={screenStyles.input}
+                  theme={{ roundness: 8 }}
+                />
+              </View>
+            </View>
 
-              {/* District */}
-              <SelectList
-                label="District / City *"
-                data={availableDistricts}
-                displayKey="region"
-                save="region"
-                value={formData.Destination}
-                setSelected={(val: any) => handleChange('Destination', val)}
-                placeholder="Select District"
-                onClear={() => handleChange('Destination', '')}
-                disabled={!formData.State}
-              />
-              <HelperText type="error" visible={!!errors.Destination}>
-                {errors.Destination}
-              </HelperText>
+            {/* State */}
+            <SelectList
+              label="State *"
+              data={stateData?.data || []}
+              displayKey="state"
+              save="state"
+              value={formData.State}
+              setSelected={(val: any) => handleChange('State', val)}
+              placeholder="Select State"
+              onClear={() => handleChange('State', '')}
+            />
+            <HelperText type="error" visible={!!errors.State}>
+              {errors.State}
+            </HelperText>
 
-              <AddressSearch onSelect={handleOriginSelect} />
-            </Card.Content>
-          </Card>
+            {/* District */}
+            <SelectList
+              label="District / City *"
+              data={availableDistricts}
+              displayKey="region"
+              save="region"
+              value={formData.Destination}
+              setSelected={(val: any) => handleChange('Destination', val)}
+              placeholder="Select District"
+              onClear={() => handleChange('Destination', '')}
+              disabled={!formData.State}
+            />
+            <HelperText type="error" visible={!!errors.Destination}>
+              {errors.Destination}
+            </HelperText>
+
+            <AddressSearch onSelect={handleOriginSelect} />
+          </Card.Content>
 
           {/* SUBMIT BUTTON */}
           <Button
@@ -638,10 +637,10 @@ const RegistrationScreen: React.FC = () => {
             labelStyle={screenStyles.submitButtonText}
             contentStyle={screenStyles.submitButtonContent}
           >
-            Register Now
+            <Text style={screenStyles.submit}> Register Now</Text>
           </Button>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
       <Snackbar visible={snack.visible} onDismiss={hideSnack} duration={3000}>
         {snack.message}
       </Snackbar>
