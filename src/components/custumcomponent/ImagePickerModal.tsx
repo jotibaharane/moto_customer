@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
+  Alert,
   Modal,
   Platform,
-  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { PERMISSIONS, request, RESULTS } from 'react-native-permissions';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 // Image Source Options
 const IMAGE_SOURCE_OPTIONS = [
@@ -94,7 +94,6 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
           response => {
             setLoading(false);
             if (response.didCancel) {
-              console.log('User cancelled camera');
             } else if (response.errorCode) {
               Alert.alert('Error', `Camera Error: ${response.errorMessage}`);
             } else if (response.assets?.[0]?.uri) {
@@ -124,7 +123,6 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
           response => {
             setLoading(false);
             if (response.didCancel) {
-              console.log('User cancelled image picker');
             } else if (response.errorCode) {
               Alert.alert('Error', `Gallery Error: ${response.errorMessage}`);
             } else if (response.assets?.[0]?.uri) {

@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ScrollView,
+  Alert,
   KeyboardAvoidingView,
   Platform,
-  Alert,
+  ScrollView,
 } from 'react-native';
-import { Card, Text, TextInput, Button, HelperText } from 'react-native-paper';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { Button, Card, HelperText, Text, TextInput } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
@@ -17,14 +17,14 @@ import {
   useUpdateCustomerMutation,
 } from '@api/hooks_api';
 
-import { SelectList } from '@components/common/Select';
 import { RegisterRequest } from '@api/api.type';
+import { SelectList } from '@components/common/Select';
 import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
 
-import { styles } from './style';
-import { setRegisteredAddress } from '@store/slices/authSlice';
 import AddressSearch from '@screens/LoadPostScreen/components/AddressSearch';
+import { setRegisteredAddress } from '@store/slices/authSlice';
 import { useDispatch } from 'react-redux';
+import { styles } from './style';
 
 const EditCustomerScreen = () => {
   const navigation = useNavigation<any>();
@@ -49,7 +49,6 @@ const EditCustomerScreen = () => {
     RegisteredAddress: customer?.RegisteredAddress || null,
   });
 
-  console.log(formData);
   /** Load districts when screen loads */
   useEffect(() => {
     if (customer?.State) {
@@ -127,7 +126,6 @@ const EditCustomerScreen = () => {
 
     try {
       const response = await updateCustomer(formData).unwrap();
-      console.log(response, 'this is reposne for update');
 
       if (response?.status === '00') {
         Toast.show({

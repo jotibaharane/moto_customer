@@ -70,14 +70,13 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
     useGetActiveTripsMutation();
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [refreshing, setRefreshing] = useState(false);
-  console.log('Active Trips:', activeTrips);
+
   useImperativeHandle(ref, () => ({
     open: () => bottomModalRef.current?.open(),
     close: () => bottomModalRef.current?.close(),
   }));
 
   const callDriver = (phoneNumber: string) => {
-    console.log('Calling driver:', phoneNumber);
     // Implement actual call functionality
   };
 

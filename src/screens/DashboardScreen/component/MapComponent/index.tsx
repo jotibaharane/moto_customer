@@ -1,20 +1,23 @@
 import { useGetNearbyDriversQuery } from '@api/hooks_api';
 import { RootState } from '@store/index';
-import { addOrUpdateDriver, setOrigin } from '@store/slices/mapSlice';
+import { addOrUpdateDriver } from '@store/slices/mapSlice';
 import colors from '@utils/colors';
 import { GOOGLE_MAPS_API_KEY } from '@utils/env';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Platform, PermissionsAndroid } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { PermissionsAndroid, Platform, View } from 'react-native';
+import GetLocation from 'react-native-get-location';
+import MapView, {
+  AnimatedRegion,
+  Marker,
+  MarkerAnimated,
+  PROVIDER_GOOGLE,
+} from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { useDispatch, useSelector } from 'react-redux';
-import GetLocation from 'react-native-get-location';
 import DropMarker from '../icon/DropMarker';
-import OriginMarker from '../icon/OriginMarker';
 import Parcel from '../icon/Parcel';
 import Truck from '../icon/Truck';
 import { MAP_STYLE } from './helper';
-import { AnimatedRegion, MarkerAnimated } from 'react-native-maps';
 
 interface Coordinate {
   latitude: number;
@@ -75,22 +78,13 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
     region,
     postId,
   } = useSelector((state: RootState) => state.map);
-  console.log('data from maps', {
-    origin,
-    destination,
-    drivers,
-    // selectedDriver,
-    currentMap,
-    region,
-    postId,
-  });
+
   // let selectedDriver = {
   //   latitude: (19.212295 * Math.floor(Math.random() * 10)) / 10,
   //   longitude: (72.977166 * Math.floor(Math.random() * 10)) / 10,
   //   rotation: 0,
   // };
 
-  console.log('this is selected', selectedDriver);
   const mapRef = useRef<MapView | null>(null);
   const lastFitCoordinatesRef = useRef<Coordinate[]>([]);
   const lastDriverUpdateRef = useRef<number>(0);
@@ -137,7 +131,6 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
   //   return () => clearInterval(interval);
   // }, []);
 
-  console.log({ selectedDriver });
   //========socket for driver nearby alert========
   // useEffect(() => {
   //   socket.onAny((event, ...args) => {
@@ -203,7 +196,6 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
 
       const data = await response.json();
 
-      console.log(data, 'ful address');
       if (data.results?.length > 0) {
         const result = data.results[0];
 

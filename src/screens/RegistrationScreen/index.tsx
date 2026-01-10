@@ -1,12 +1,12 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
   TouchableOpacity,
   View,
-  StyleSheet,
 } from 'react-native';
 import {
   Button,
@@ -17,10 +17,10 @@ import {
   TextInput,
 } from 'react-native-paper';
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { RegisterRequest } from '@api/api.type';
 import {
@@ -30,9 +30,9 @@ import {
   useInsertCustomerMutation,
 } from '@api/hooks_api';
 
+import { BottomModalRef } from '@components/BottomModal';
 import { SelectList } from '@components/common/Select';
 import AddressSearch from '@screens/LoadPostScreen/components/AddressSearch';
-import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import { Snackbar } from 'react-native-paper';
 
 import { RootState } from '@store/index';
@@ -41,9 +41,9 @@ import {
   setRegisteredAddress,
 } from '@store/slices/authSlice';
 
+import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
 import { routeName } from '@utils/navigationHelpers';
 import { styles as screenStyles } from './style';
-import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
 
 /* ---------------------------------------------------------------
  * CONSTANTS & INITIAL FORM STATE
@@ -153,10 +153,8 @@ const RegistrationScreen: React.FC = () => {
     message: '',
   });
   const authState = useSelector((s: RootState) => s.auth);
-  console.log('Auth State in Registration:', authState);
-  const mobilenumber = authState?.mobileNumber ?? '';
 
-  console.log('Mobile Number in Registration Screen:', mobilenumber);
+  const mobilenumber = authState?.mobileNumber ?? '';
 
   const modalRef = useRef<BottomModalRef>(null);
 

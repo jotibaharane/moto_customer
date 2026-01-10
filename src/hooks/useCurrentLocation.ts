@@ -101,7 +101,6 @@ const useCurrentLocation = (
     Geolocation.getCurrentPosition(
       position => {
         const { latitude, longitude } = position.coords;
-        console.log('Current Location:', { latitude, longitude });
 
         const newLocation: Region = {
           latitude,
@@ -114,7 +113,6 @@ const useCurrentLocation = (
         setIsLoadingLocation(false);
       },
       error => {
-        console.log('Location error:', error);
         let errorMessage = 'Unable to retrieve location. Please try again.';
 
         if (error.code === 1) {
@@ -126,12 +124,11 @@ const useCurrentLocation = (
           errorMessage = 'Location is unavailable. Ensure GPS is enabled.';
         } else if (error.code === 3) {
           // TIMEOUT
-          console.log('High-accuracy timeout, attempting fallback location...');
+
           // Fallback to cached or coarse location
           Geolocation.getCurrentPosition(
             position => {
               const { latitude, longitude } = position.coords;
-              console.log('Fallback Location:', { latitude, longitude });
 
               const fallbackLocation: Region = {
                 latitude,
@@ -144,7 +141,6 @@ const useCurrentLocation = (
               setIsLoadingLocation(false);
             },
             fallbackError => {
-              console.log('Fallback location error:', fallbackError);
               setError('Failed to retrieve location. Using default location.');
               setIsLoadingLocation(false);
             },

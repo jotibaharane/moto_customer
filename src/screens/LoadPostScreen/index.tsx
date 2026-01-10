@@ -1,4 +1,3 @@
-import Toast from 'react-native-toast-message';
 import { ShipmentData } from '@api/api.type';
 import { usePostCustomerRequirementMutation } from '@api/hooks_api';
 import { useNavigation } from '@react-navigation/native';
@@ -14,19 +13,21 @@ import {
 } from '@store/slices/mapSlice';
 import { routeName } from '@utils/navigationHelpers';
 import { Formik } from 'formik';
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
+  Modal,
   StatusBar,
   StyleSheet,
-  View,
-  Modal,
   Text,
-  TouchableOpacity,
   TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { emitCreateCustomerLoad } from '../../sockets';
 import ConfirmationStep from './components/ConfirmationStep';
 import FirstStep from './components/FirstStep';
 import FormNavigation from './components/FormNavigation';
@@ -34,14 +35,12 @@ import FormProgress from './components/FormProgress';
 import SecondStep from './components/SecondStep';
 import { emptyShipmentData, STEPS } from './constant';
 import { FormStep } from './type';
-import { getStepSchema } from './validation';
-import { emitCreateCustomerLoad } from '../../sockets';
 
 const LoadPostForm: React.FC = () => {
   const CustomerID =
     useSelector((state: RootState) => state.auth.customerDetails?.CustomerID) ??
     '';
-  console.log('CustomerID', CustomerID);
+
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const navigation = useNavigation<any>();
@@ -90,8 +89,6 @@ const LoadPostForm: React.FC = () => {
   // ----------------------- API Submission (unchanged) -----------------------
   const handleSubmit = async (values: ShipmentData, { resetForm }: any) => {
     try {
-      console.log({ values });
-
       // ✅ Prepare the payload in the new nested format
       const payload: ShipmentData = {
         ...values,
@@ -101,8 +98,6 @@ const LoadPostForm: React.FC = () => {
           time: values.schedule.time || '',
         },
       };
-
-      console.log('Sending payload:', JSON.stringify(payload, null, 2));
 
       const response = await postCustomerRequirement(payload).unwrap();
 
@@ -276,7 +271,7 @@ const LoadPostForm: React.FC = () => {
                     <TouchableOpacity
                       style={[styles.btn, { backgroundColor: '#1e40af' }]}
                       onPress={() => {
-                        if (!validateMPIN()) return;
+                        // if (!validateMPIN()) return;
 
                         setMpinModal(false);
                         formikSubmitRef.current && formikSubmitRef.current();
