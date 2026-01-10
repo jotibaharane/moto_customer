@@ -1,5 +1,6 @@
 import { useGetProcessTripsQuery } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
+import { useRefreshOnFocus } from '@hooks/onFocusevent';
 import { RootState } from '@store/index';
 import {
   addOrUpdateDriver,
@@ -28,7 +29,6 @@ import {
 import { ActivityIndicator, Icon, Text } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
-import { useRefreshOnFocus } from '@hooks/onFocusevent';
 
 interface CustomerProcess {
   LoadPostID: string;
@@ -271,7 +271,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
       ? processTrips.data
       : DUMMY_PROCESS_TRIPS;
   // useRefreshOnFocus(() => getProcesTrips({ CustomerID }), true);
-  console.log({ processTrips });
+
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -311,7 +311,6 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
   }, []);
 
   const handleTripPress = (item: CustomerProcess) => {
-    console.log('Rendering trip item:', item);
     dispatch(addOrUpdateDriver([]));
     dispatch(setCustomerMap('Process'));
     dispatch(setPostId(item?.LoadPostID));

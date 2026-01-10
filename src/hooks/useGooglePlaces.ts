@@ -1,7 +1,7 @@
+import Geolocation from '@react-native-community/geolocation';
 import { Location } from '@store/slices/mapSliceType';
 import { GOOGLE_MAPS_API_KEY } from '@utils/env';
 import { useCallback, useState } from 'react';
-import Geolocation from '@react-native-community/geolocation';
 
 interface Suggestion {
   key: string;
@@ -75,7 +75,7 @@ export const useGooglePlacesSelect = () => {
         )}&key=${GOOGLE_MAPS_API_KEY}&components=country:IN`,
       );
       const data = await response.json();
-      console.log({ data });
+
       setSuggestions(
         (data.predictions || []).map((item: GooglePlace) => ({
           key: item.place_id,
@@ -103,7 +103,7 @@ export const useGooglePlacesSelect = () => {
 
         if (data?.result) {
           const location = formatLocationResult(data?.result);
-          console.log({ location });
+
           setSelectedLocation(location);
           return location;
         }

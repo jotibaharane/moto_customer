@@ -2,6 +2,7 @@
 import { CustomerLoadPost } from '@api/api.type';
 import { useGetCustomerPostsQuery } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
+import { useRefreshOnFocus } from '@hooks/useRefreshOnFocus';
 import { RootState } from '@store/index';
 import {
   addOrUpdateDriver,
@@ -11,7 +12,7 @@ import {
   setOriginAddress,
   setPostId,
 } from '@store/slices/mapSlice';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -23,9 +24,8 @@ import {
 } from 'react-native';
 import { Icon } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
-import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
-import { useRefreshOnFocus } from '@hooks/useRefreshOnFocus';
 import { emitSelectLoad } from '../../../../sockets';
+import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
 // ===== MULTIPLE DUMMY LOAD POSTS =====
 const DUMMY_CUSTOMER_POSTS: CustomerLoadPost[] = [
   {
@@ -128,7 +128,6 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
     customerPosts?.data && customerPosts.data.length > 0
       ? customerPosts.data
       : DUMMY_CUSTOMER_POSTS;
-  console.log(customerPosts, 'this is from loadpost');
 
   const [refreshing, setRefreshing] = useState(false);
   useRefreshOnFocus(refetch);

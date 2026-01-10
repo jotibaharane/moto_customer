@@ -10,29 +10,28 @@ import {
   setOriginAddress,
   setPostId,
 } from '@store/slices/mapSlice';
-import React, { useEffect, useLayoutEffect, useState, useRef } from 'react';
+import { routeName } from '@utils/navigationHelpers';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Animated,
+  FlatList,
   Image,
+  Modal,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Modal,
-  FlatList,
-  Animated,
-  ActivityIndicator,
 } from 'react-native';
 import { Icon } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
-import { FloatingActionButton } from './component/FloatingButtons';
-import MapComponent from './component/MapComponent';
-import { routeName } from '@utils/navigationHelpers';
-import MapView, { Marker } from 'react-native-maps';
 import DriverArrivalModal from './component/DriverArrivalModal';
+import { FloatingActionButton } from './component/FloatingButtons';
 import LoadingStatusModalUI from './component/LoadpostImage/LoadingStatusModalUI';
+import MapComponent from './component/MapComponent';
 
 const ORIGIN_MARKER_IMG = require('@assets/icons/origin-marker.png');
 
@@ -551,8 +550,6 @@ const Dashboard: React.FC = () => {
     }
   }, [customerPosts]);
 
-  console.log({ customerPosts });
-
   // Set initial selected load
   useEffect(() => {
     if (loads.length > 0 && !selectedLoad) {
@@ -657,7 +654,6 @@ const Dashboard: React.FC = () => {
 
   // Handle load selection from bottom sheet
   const handleSelectLoad = (load: any) => {
-    console.log('this is loadddd', { load });
     setSelectedLoad(load);
 
     // Update Redux store with selected load

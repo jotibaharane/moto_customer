@@ -1,4 +1,3 @@
-import Toast from 'react-native-toast-message';
 import { ShipmentData } from '@api/api.type';
 import { usePostCustomerRequirementMutation } from '@api/hooks_api';
 import { useNavigation } from '@react-navigation/native';
@@ -14,9 +13,19 @@ import {
 } from '@store/slices/mapSlice';
 import { routeName } from '@utils/navigationHelpers';
 import { Formik } from 'formik';
+
 import React, { useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import {
+  Modal,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { useDispatch, useSelector } from 'react-redux';
 
 import ConfirmationStep from './components/ConfirmationStep';
@@ -77,6 +86,7 @@ const LoadPostForm: React.FC = () => {
   // ----------------------- API SUBMISSION -----------------------
   const handleSubmit = async (values: ShipmentData, { resetForm }: any) => {
     try {
+      // ✅ Prepare the payload in the new nested format
       const payload: ShipmentData = {
         ...values,
         customerId: CustomerID,

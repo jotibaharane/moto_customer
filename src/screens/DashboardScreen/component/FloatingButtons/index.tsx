@@ -173,14 +173,13 @@ export const FloatingActionButton = () => {
     { CustomerID },
     { skip: !CustomerID },
   );
-  console.log('Customer Posts:', activeTrips);
-  console.log({ customerPosts });
+
   const {
     data: processTrips,
     isFetching,
     refetch,
   } = useGetProcessTripsQuery({ CustomerID });
-  console.log({ customerPosts });
+
   const activeTripsModalRef = useRef<ProcessTripsModalRef>(null);
   const processTripsModalRef = useRef<ProcessTripsModalRef>(null);
 
@@ -204,7 +203,6 @@ export const FloatingActionButton = () => {
     toggleMenu();
     dispatch(resetMap());
 
-    console.log({ id: button?.id });
     if (button?.id === 'load-posts') {
       dispatch(setCustomerMap('Load'));
 

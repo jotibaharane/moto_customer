@@ -1,34 +1,36 @@
 // MultiStepFormTabs.tsx
-import React, { useState, useEffect } from 'react';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { Formik } from 'formik';
+import React, { useEffect, useState } from 'react';
 import {
-  ScrollView,
-  StyleSheet,
   Alert,
-  View,
-  Text,
+  ScrollView,
   StatusBar,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { Button } from 'react-native-paper';
-import { Formik } from 'formik';
 import * as Yup from 'yup';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 
+import {
+  useGetcustomerloadpostdetailsQuery,
+  useInsertVehicleloadpostdatasheetMutation,
+  useUpdateloadpostMutation,
+} from '@api/hooks_api';
+import LoadpostDropdown from '@components/common/DropDown/LoadpostDropdown';
+import { RootState } from '@store/index';
+import { useSelector } from 'react-redux';
 import Step1_VehicleCustomer from './Step1_VehicleCustomer';
 import Step2_CargoInvoice from './Step2_CargoInvoice';
 import Step3_FreightDetails from './Step3_FreightDetails';
-import { useSelector } from 'react-redux';
-import { RootState } from '@store/index';
-import { useGetcustomerloadpostdetailsQuery } from '@api/hooks_api';
-import { useUpdateloadpostMutation } from '@api/hooks_api';
-import LoadpostDropdown from '@components/common/DropDown/LoadpostDropdown';
-import { useInsertVehicleloadpostdatasheetMutation } from '@api/hooks_api';
 
 // Import types
 import {
-  FormikValues,
-  LoadPostData,
   DropdownItem,
+  FormikValues,
   LoadPostApiPayload,
+  LoadPostData,
 } from '../forms/api.types';
 
 // ========== DUMMY DATA ==========
@@ -393,7 +395,6 @@ export default function MultiStepFormTabs() {
 
   // Submit Handler
   const handleSubmit = async (values: FormikValues) => {
-    console.log({ values });
     try {
       // Validate required fields
       if (!selectedLoadPost) {
@@ -409,12 +410,9 @@ export default function MultiStepFormTabs() {
       // Transform to API payload
       const payload = transformToApiPayload(values, selectedLoadPost);
 
-      console.log('API Payload:', JSON.stringify(payload, null, 2));
-
       // Call API
       const response = await insertVehicleloadpostdatasheet(payload).unwrap();
 
-      console.log('API Response:', response);
       Alert.alert('Success', 'Load data updated successfully!');
     } catch (error: any) {
       console.error('API Error:', error);
