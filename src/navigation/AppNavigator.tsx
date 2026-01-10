@@ -18,6 +18,7 @@ import { RootState } from '@store/index';
 import { useEffect } from 'react';
 import {
   disconnectSocket,
+  emitCustomerJoin,
   initSocket,
   registerSocketListeners,
 } from '../sockets';
@@ -29,13 +30,12 @@ const AppNavigator = () => {
   const CustomerID = useSelector(
     (state: RootState) => state?.auth?.customerDetails?.CustomerID,
   );
-  console.log({ CustomerID });
+
   useEffect(() => {
     if (!CustomerID) return;
-
     initSocket(CustomerID);
     registerSocketListeners();
-
+    emitCustomerJoin(CustomerID);
     return () => {
       disconnectSocket();
     };

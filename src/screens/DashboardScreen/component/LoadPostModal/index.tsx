@@ -25,6 +25,7 @@ import { Icon } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
 import { useRefreshOnFocus } from '@hooks/useRefreshOnFocus';
+import { emitSelectLoad } from '../../../../sockets';
 // ===== MULTIPLE DUMMY LOAD POSTS =====
 const DUMMY_CUSTOMER_POSTS: CustomerLoadPost[] = [
   {
@@ -149,6 +150,12 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
   // but if you need an immediate manual refetch when CustomerID becomes available:
 
   const handlePostPress = (item: CustomerLoadPost) => {
+    emitSelectLoad({
+      customerId: CustomerID,
+      postId: item.LoadPostID,
+      pickupLat: item.PickupLat,
+      pickupLng: item.PickupLng,
+    });
     dispatch(addOrUpdateDriver([]));
     dispatch(setPostId(item?.LoadPostID));
     dispatch(

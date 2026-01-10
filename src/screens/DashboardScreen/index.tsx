@@ -365,10 +365,16 @@ const LoadsBottomSheet = ({
                       <View
                         style={[
                           styles.statusBadge,
-                          { backgroundColor: getStatusColor(item.Status) },
+                          {
+                            backgroundColor: getStatusColor(
+                              item.CustomerStatus,
+                            ),
+                          },
                         ]}
                       >
-                        <Text style={styles.statusText}>{item.Status}</Text>
+                        <Text style={styles.statusText}>
+                          {item.CustomerStatus}
+                        </Text>
                       </View>
                     </View>
 
@@ -394,7 +400,7 @@ const LoadsBottomSheet = ({
                         />
                       </View>
                       <Text style={styles.locationText} numberOfLines={2}>
-                        {item.DestinationAddress}
+                        {item.DeliveryAddress}
                       </Text>
                     </View>
 
@@ -407,7 +413,7 @@ const LoadsBottomSheet = ({
                             color="#6B7280"
                           />
                           <Text style={styles.detailText}>
-                            {item.MaterialType}
+                            {item.CargoContent}
                           </Text>
                         </View>
                         <View style={styles.detailItem}>
@@ -421,17 +427,19 @@ const LoadsBottomSheet = ({
                             styles.detailItem,
                             {
                               backgroundColor:
-                                getLoadTypeColor(item.LoadType) + '15',
+                                getLoadTypeColor(item.CargoPackageType) + '15',
                             },
                           ]}
                         >
                           <Text
                             style={[
                               styles.loadTypeText,
-                              { color: getLoadTypeColor(item.LoadType) },
+                              {
+                                color: getLoadTypeColor(item.CargoPackageType),
+                              },
                             ]}
                           >
-                            {item.LoadType}
+                            {item.CargoPackageType}
                           </Text>
                         </View>
                       </View>

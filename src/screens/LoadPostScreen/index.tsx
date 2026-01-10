@@ -104,22 +104,22 @@ const LoadPostForm: React.FC = () => {
 
       console.log('Sending payload:', JSON.stringify(payload, null, 2));
 
-      const response = await postCustomerRequirement(payload);
-      emitCreateCustomerLoad({
-        CustomerID: CustomerID,
-        PickupLat: values?.pickup?.origin?.coordinates?.lat,
-        PickupLng: values?.pickup?.origin?.coordinates?.lng,
-        VehicleType: values?.vehicle?.vehicleType,
-      });
-      console.log('_CHECK', {
-        CustomerID: CustomerID,
-        PickupLat: values?.pickup?.origin?.coordinates?.lat,
-        PickupLng: values?.pickup?.origin?.coordinates?.lng,
-        VehicleType: values?.vehicle?.vehicleType,
-      });
+      const response = await postCustomerRequirement(payload).unwrap();
 
-      if (response?.data?.status === '00') {
-        Toast.show({ type: 'success', text1: response?.data?.message });
+      if (response?.status === '00') {
+        console.log('_CHECK', {
+          loadId: response?.data?.[0]?.LoadPostID,
+          customerId: CustomerID,
+          lat: values?.pickup?.origin?.coordinates?.lat || 0,
+          lng: values?.pickup?.origin?.coordinates?.lng || 0,
+        });
+        emitCreateCustomerLoad({
+          loadId: response?.data?.[0]?.LoadPostID,
+          customerId: CustomerID,
+          lat: values?.pickup?.origin?.coordinates?.lat || 0,
+          lng: values?.pickup?.origin?.coordinates?.lng || 0,
+        });
+        Toast.show({ type: 'success', text1: response?.message });
 
         dispatch(setCustomerMap('Load'));
         dispatch(addOrUpdateDriver([]));
