@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
   Modal,
+  ScrollView,
 } from 'react-native';
 import { RadioButton, TextInput } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
@@ -63,7 +64,16 @@ interface LocalPickupData {
   taluka: string;
   pincode: string;
   companyName: string;
+  addressType: 'Office' | 'Factory' | 'Warehouse' | 'Personal' | 'Other' | null;
 }
+
+const ADDRESS_TYPES = [
+  { label: 'Office', value: 'Office' },
+  { label: 'Factory', value: 'Factory' },
+  { label: 'Warehouse', value: 'Warehouse' },
+  { label: 'Personal', value: 'Personal' },
+  { label: 'Other', value: 'Other' },
+];
 
 const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const GoogleAddress = useSelector(
@@ -75,8 +85,11 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const CustomerDetail = useSelector(
     (state: RootState) => state?.auth?.customerDetails,
   );
-  const currentlocation = useSelector((state: RootState) => state?.map?.origin);
+  const currentlocation = useSelector(
+    (state: RootState) => state?.map?.currentlocation,
+  );
 
+  console.log('current location', { currentlocation });
   const {
     getCurrentLocation,
     selectedLocation,
@@ -87,6 +100,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [showAddressTypeModal, setShowAddressTypeModal] = useState(false);
   const [activeOriginButton, setActiveOriginButton] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
@@ -121,6 +135,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     taluka: '',
     pincode: '',
     companyName: '',
+    addressType: null,
   });
 
   // Initialize local values when modal opens
@@ -138,6 +153,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         taluka: values.pickup.taluka || '',
         pincode: values.pickup.pincode || '',
         companyName: values.pickup.companyName || '',
+        addressType: values.pickup.addressType || null,
       });
     }
   }, [isModalOpen, values]);
@@ -214,6 +230,9 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       } else if (localValues.contactNumber.length !== 10) {
         errors.contactNumber = 'Please enter a valid 10-digit number';
       }
+      if (!localValues.addressType) {
+        errors.addressType = 'Please select address type';
+      }
     }
 
     if (localValues.pickupType !== 'Registered') {
@@ -242,6 +261,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     setFieldValue('pickup.taluka', localValues.taluka);
     setFieldValue('pickup.pincode', localValues.pincode);
     setFieldValue('pickup.companyName', localValues.companyName);
+    setFieldValue('pickup.addressType', localValues.addressType);
 
     setFieldErrors({});
     handleModalClose();
@@ -265,7 +285,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
           tal: '',
         },
       };
-
+      console.log(selectedLocation);
       setLocalValues(prev => ({ ...prev, origin: selectedLocation }));
       setShowMapModal(false);
       setActiveOriginButton('');
@@ -310,6 +330,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         contactNumber: CustomerDetail?.ContactNo || '',
         plotOrBuilding: '',
         streetArea: '',
+        addressType: null,
       }));
     } else if (localValues.pickupType === 'self' && currentlocation) {
       setLocalValues(prev => ({
@@ -324,6 +345,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         },
         contactName: CustomerDetail?.CompanyName || '',
         contactNumber: CustomerDetail?.ContactNo || '',
+        addressType: null,
       }));
     } else if (localValues.pickupType === 'other') {
       // Clear fields for other type
@@ -334,7 +356,10 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         contactNumber: '',
         plotOrBuilding: '',
         streetArea: '',
+        addressType: null,
       }));
+      // Show address type modal for other pickup type
+      setShowAddressTypeModal(true);
     }
   }, [localValues.pickupType, GoogleAddress, CustomerDetail, currentlocation]);
 
@@ -352,15 +377,46 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       state: item.State,
       contactName: item.contactName,
       contactNumber: item.contactNumber,
+      addressType: item.addressType || null,
     }));
 
     setShowHistoryModal(false);
   }, []);
 
+  const handleAddressTypeSelect = useCallback(
+    (type: LocalPickupData['addressType']) => {
+      setLocalValues(prev => ({ ...prev, addressType: type }));
+      setShowAddressTypeModal(false);
+
+      // Auto-fill company name based on address type
+      if (type === 'Personal') {
+        setLocalValues(prev => ({
+          ...prev,
+          companyName: '',
+          contactName: CustomerDetail?.FullName || '',
+          contactNumber: CustomerDetail?.ContactNo || '',
+        }));
+      } else if (
+        type === 'Office' ||
+        type === 'Factory' ||
+        type === 'Warehouse'
+      ) {
+        setLocalValues(prev => ({
+          ...prev,
+          companyName: CustomerDetail?.CompanyName || '',
+          contactName: CustomerDetail?.FullName || '',
+          contactNumber: CustomerDetail?.ContactNo || '',
+        }));
+      }
+    },
+    [CustomerDetail],
+  );
+
   const handleModalClose = useCallback(() => {
     setActiveOriginButton('');
     setShowHistoryModal(false);
     setShowMapModal(false);
+    setShowAddressTypeModal(false);
     setIsModalOpen(false);
     bottomModalRef.current?.close();
   }, []);
@@ -403,6 +459,89 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     [activeOriginButton],
   );
 
+  const AddressTypeModal = useMemo(
+    () => (
+      <Modal
+        visible={showAddressTypeModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAddressTypeModal(false)}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.addressTypeModal}>
+            <View style={styles.addressTypeHeader}>
+              <Text style={styles.addressTypeTitle}>Select Address Type</Text>
+              <TouchableOpacity
+                onPress={() => setShowAddressTypeModal(false)}
+                style={styles.addressTypeCloseButton}
+              >
+                <Icon name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.addressTypeSubtitle}>
+              Please select the type of address for pickup location
+            </Text>
+
+            <View style={styles.addressTypeList}>
+              {ADDRESS_TYPES.map(type => (
+                <TouchableOpacity
+                  key={type.value}
+                  style={[
+                    styles.addressTypeButton,
+                    localValues.addressType === type.value &&
+                      styles.addressTypeButtonSelected,
+                  ]}
+                  onPress={() =>
+                    handleAddressTypeSelect(
+                      type.value as LocalPickupData['addressType'],
+                    )
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.addressTypeText,
+                      localValues.addressType === type.value &&
+                        styles.addressTypeTextSelected,
+                    ]}
+                  >
+                    {type.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {fieldErrors.addressType && (
+              <Text style={styles.errorText}>{fieldErrors.addressType}</Text>
+            )}
+
+            <TouchableOpacity
+              style={styles.addressTypeConfirmButton}
+              onPress={() => {
+                if (localValues.addressType) {
+                  setShowAddressTypeModal(false);
+                } else {
+                  setFieldErrors(prev => ({
+                    ...prev,
+                    addressType: 'Please select address type',
+                  }));
+                }
+              }}
+            >
+              <Text style={styles.addressTypeConfirmText}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    ),
+    [
+      showAddressTypeModal,
+      localValues.addressType,
+      fieldErrors.addressType,
+      handleAddressTypeSelect,
+    ],
+  );
+
   const MapSelectionModal = useMemo(
     () => (
       <Modal
@@ -438,195 +577,106 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   );
 
   return (
-    <BottomModal
-      ref={bottomModalRef}
-      customHeight="85%"
-      backdropOpacity={0.8}
-      animationDuration={500}
-      swipeThreshold={50}
-      onClose={handleBottomModalClose}
-      disableSwipe
-    >
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <Text style={styles.title}>Pickup Location</Text>
+    <>
+      <BottomModal
+        ref={bottomModalRef}
+        customHeight="85%"
+        backdropOpacity={0.8}
+        animationDuration={500}
+        swipeThreshold={50}
+        onClose={handleBottomModalClose}
+        disableSwipe
+      >
+        <ScrollView style={styles.container}>
+          <View style={styles.header}>
+            <View style={styles.headerContent}>
+              <Text style={styles.title}>Pickup Location</Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleModalClose}
+              style={styles.closeButton}
+              accessibilityLabel="Close pickup modal"
+              accessibilityHint="Closes the pickup location selection modal"
+            >
+              <Icon name="close" size={24} color="#666" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={handleModalClose}
-            style={styles.closeButton}
-            accessibilityLabel="Close pickup modal"
-            accessibilityHint="Closes the pickup location selection modal"
-          >
-            <Icon name="close" size={24} color="#666" />
-          </TouchableOpacity>
-        </View>
 
-        <View style={styles.sectionContainer}>
-          <View style={tw`flex-row items-center`}>
-            {/* Registered Option */}
-            <View style={tw`flex-row items-center`}>
-              <RadioButton
-                value="Registered"
-                status={
-                  localValues.pickupType == 'Registered'
-                    ? 'checked'
-                    : 'unchecked'
-                }
-                onPress={() => {
-                  setLocalValues(prev => ({
-                    ...prev,
-                    pickupType: 'Registered',
-                  }));
-                }}
-                color={tw.color('blue-500')}
-              />
-              <Text style={styles.radioLabel}>Registered</Text>
-            </View>
-
-            {/* Current Option */}
-            <View style={tw`flex-row items-center mr-6`}>
-              <RadioButton
-                value="self"
-                status={
-                  localValues.pickupType === 'self' ? 'checked' : 'unchecked'
-                }
-                onPress={() => {
-                  setLocalValues(prev => ({ ...prev, pickupType: 'self' }));
-                }}
-                color={tw.color('blue-500')}
-              />
-              <Text style={styles.radioLabel}>Current</Text>
-            </View>
-
-            {/* Other Option + History */}
-            <View style={tw`flex-row items-center`}>
-              <RadioButton
-                value="other"
-                status={
-                  localValues.pickupType == 'other' ? 'checked' : 'unchecked'
-                }
-                onPress={() => {
-                  setLocalValues(prev => ({ ...prev, pickupType: 'other' }));
-                }}
-                color={tw.color('blue-500')}
-              />
-              <Text style={styles.radioLabel}>Other</Text>
-
-              {localValues.pickupType == 'other' && (
-                <TouchableOpacity
+          <View style={styles.sectionContainer}>
+            <View style={tw`flex-row items-center flex-wrap`}>
+              {/* Registered Option */}
+              <View style={tw`flex-row items-center mr-4`}>
+                <RadioButton
+                  value="Registered"
+                  status={
+                    localValues.pickupType == 'Registered'
+                      ? 'checked'
+                      : 'unchecked'
+                  }
                   onPress={() => {
-                    setActiveOriginButton('history');
-                    setShowHistoryModal(true);
+                    setLocalValues(prev => ({
+                      ...prev,
+                      pickupType: 'Registered',
+                    }));
                   }}
-                  style={tw`ml-3 flex-row items-center bg-gray-100 px-3 py-1 rounded-full border border-gray-300`}
-                >
-                  <FontAwesome
-                    name="history"
-                    size={16}
-                    color={tw.color('gray-700')}
-                  />
-                  <Text style={tw`ml-1 text-gray-700 text-sm font-medium`}>
-                    History
-                  </Text>
-                </TouchableOpacity>
-              )}
+                  color={tw.color('blue-500')}
+                />
+                <Text style={styles.radioLabel}>Registered</Text>
+              </View>
+
+              {/* Current Option */}
+              <View style={tw`flex-row items-center mr-4`}>
+                <RadioButton
+                  value="self"
+                  status={
+                    localValues.pickupType === 'self' ? 'checked' : 'unchecked'
+                  }
+                  onPress={() => {
+                    setLocalValues(prev => ({ ...prev, pickupType: 'self' }));
+                  }}
+                  color={tw.color('blue-500')}
+                />
+                <Text style={styles.radioLabel}>Current</Text>
+              </View>
+
+              {/* Other Option + History */}
+              <View style={tw`flex-row items-center`}>
+                <RadioButton
+                  value="other"
+                  status={
+                    localValues.pickupType == 'other' ? 'checked' : 'unchecked'
+                  }
+                  onPress={() => {
+                    setLocalValues(prev => ({ ...prev, pickupType: 'other' }));
+                  }}
+                  color={tw.color('blue-500')}
+                />
+                <Text style={styles.radioLabel}>Other</Text>
+
+                {localValues.pickupType == 'other' && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setActiveOriginButton('history');
+                      setShowHistoryModal(true);
+                    }}
+                    style={tw`ml-3 flex-row items-center bg-gray-100 px-3 py-1 rounded-full border border-gray-300`}
+                  >
+                    <FontAwesome
+                      name="history"
+                      size={16}
+                      color={tw.color('gray-700')}
+                    />
+                    <Text style={tw`ml-1 text-gray-700 text-sm font-medium`}>
+                      History
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={styles.sectionContainer}>
-          {isRegisteredPickupType && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Contact Name *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  fieldErrors.contactName && {
-                    borderColor: 'red',
-                    borderWidth: 1,
-                  },
-                ]}
-                placeholder="Enter contact person name"
-                value={localValues.contactName}
-                textTransform="capitalize"
-                onChangeText={text => {
-                  setLocalValues(prev => ({ ...prev, contactName: text }));
-                  if (fieldErrors.contactName) {
-                    setFieldErrors(prev => ({
-                      ...prev,
-                      contactName: '',
-                    }));
-                  }
-                }}
-              />
-              {fieldErrors.contactName && (
-                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                  {fieldErrors.contactName}
-                </Text>
-              )}
-              <Text style={styles.label}>Contact Number *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  fieldErrors.contactNumber && {
-                    borderColor: 'red',
-                    borderWidth: 1,
-                  },
-                ]}
-                placeholder="Enter contact number"
-                value={localValues.contactNumber}
-                maxLength={10}
-                onChangeText={text => {
-                  setLocalValues(prev => ({ ...prev, contactNumber: text }));
-                  if (fieldErrors.contactNumber) {
-                    setFieldErrors(prev => ({
-                      ...prev,
-                      contactNumber: '',
-                    }));
-                  }
-                }}
-                keyboardType="phone-pad"
-              />
-              {fieldErrors.contactNumber && (
-                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                  {fieldErrors.contactNumber}
-                </Text>
-              )}
-              <Text style={styles.label}>Registered Pickup Address *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  fieldErrors.origin && { borderColor: 'red', borderWidth: 1 },
-                ]}
-                placeholder="Enter registered pickup address"
-                value={localValues?.origin?.address || ''}
-                textTransform="capitalize"
-                onChangeText={text => {
-                  setLocalValues(prev => ({
-                    ...prev,
-                    origin: {
-                      ...prev.origin,
-                      address: text,
-                    },
-                  }));
-
-                  if (fieldErrors.origin) {
-                    setFieldErrors(prev => ({ ...prev, origin: '' }));
-                  }
-                }}
-              />
-
-              {fieldErrors.origin && (
-                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                  {fieldErrors.origin}
-                </Text>
-              )}
-            </View>
-          )}
-
-          {isOtherPickupType && (
-            <View style={styles.sectionContainer}>
+          <View style={styles.sectionContainer}>
+            {isRegisteredPickupType && (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Contact Name *</Text>
                 <TextInput
@@ -655,37 +705,6 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                     {fieldErrors.contactName}
                   </Text>
                 )}
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Company / Warehouse Name *</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    fieldErrors.companyName && {
-                      borderColor: 'red',
-                      borderWidth: 1,
-                    },
-                  ]}
-                  placeholder="Enter Company / Warehouse Name"
-                  value={localValues.companyName}
-                  onChangeText={text => {
-                    setLocalValues(prev => ({ ...prev, companyName: text }));
-                    if (fieldErrors.companyName) {
-                      setFieldErrors(prev => ({
-                        ...prev,
-                        companyName: '',
-                      }));
-                    }
-                  }}
-                />
-                {fieldErrors.companyName && (
-                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                    {fieldErrors.companyName}
-                  </Text>
-                )}
-              </View>
-
-              <View style={styles.inputGroup}>
                 <Text style={styles.label}>Contact Number *</Text>
                 <TextInput
                   style={[
@@ -714,116 +733,219 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                     {fieldErrors.contactNumber}
                   </Text>
                 )}
+                <Text style={styles.label}>Registered Pickup Address *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    fieldErrors.origin && {
+                      borderColor: 'red',
+                      borderWidth: 1,
+                    },
+                  ]}
+                  placeholder="Enter registered pickup address"
+                  value={localValues?.origin?.address || ''}
+                  textTransform="capitalize"
+                  onChangeText={text => {
+                    setLocalValues(prev => ({
+                      ...prev,
+                      origin: {
+                        ...prev.origin,
+                        address: text,
+                      },
+                    }));
+
+                    if (fieldErrors.origin) {
+                      setFieldErrors(prev => ({ ...prev, origin: '' }));
+                    }
+                  }}
+                />
+
+                {fieldErrors.origin && (
+                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                    {fieldErrors.origin}
+                  </Text>
+                )}
               </View>
-            </View>
-          )}
+            )}
 
-          {isselfPickupType && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Current Location (fetched)</Text>
-              <TextInput
-                style={[styles.input]}
-                placeholder="Current location"
-                value={localValues?.origin?.address || ''}
-                editable={false}
-              />
-              <Text style={styles.label}>Contact Name *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  fieldErrors.contactName && {
-                    borderColor: 'red',
-                    borderWidth: 1,
-                  },
-                ]}
-                placeholder="Enter contact person name"
-                value={localValues.contactName}
-                textTransform="capitalize"
-                onChangeText={text => {
-                  setLocalValues(prev => ({ ...prev, contactName: text }));
-                  if (fieldErrors.contactName) {
-                    setFieldErrors(prev => ({
-                      ...prev,
-                      contactName: '',
-                    }));
-                  }
-                }}
-              />
-              {fieldErrors.contactName && (
-                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                  {fieldErrors.contactName}
-                </Text>
-              )}
-              <Text style={styles.label}>Contact Number *</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  fieldErrors.contactNumber && {
-                    borderColor: 'red',
-                    borderWidth: 1,
-                  },
-                ]}
-                placeholder="Enter contact number"
-                value={localValues.contactNumber}
-                maxLength={10}
-                onChangeText={text => {
-                  setLocalValues(prev => ({ ...prev, contactNumber: text }));
-                  if (fieldErrors.contactNumber) {
-                    setFieldErrors(prev => ({
-                      ...prev,
-                      contactNumber: '',
-                    }));
-                  }
-                }}
-                keyboardType="phone-pad"
-              />
-              {fieldErrors.contactNumber && (
-                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                  {fieldErrors.contactNumber}
-                </Text>
-              )}
-              <Text style={[styles.label, { marginTop: 10 }]}>
-                Plot / Unit / Building *
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  fieldErrors.plotOrBuilding && {
-                    borderColor: 'red',
-                    borderWidth: 1,
-                  },
-                ]}
-                placeholder="Enter plot/unit number"
-                value={localValues.plotOrBuilding}
-                onChangeText={text =>
-                  setLocalValues(prev => ({ ...prev, plotOrBuilding: text }))
-                }
-              />
-
-              <Text style={styles.label}>
-                Street / Area /Sector / Village *
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  fieldErrors.streetArea && {
-                    borderColor: 'red',
-                    borderWidth: 1,
-                  },
-                ]}
-                placeholder="Enter area details"
-                value={localValues.streetArea}
-                onChangeText={text =>
-                  setLocalValues(prev => ({ ...prev, streetArea: text }))
-                }
-              />
-            </View>
-          )}
-
-          {isOtherPickupType && (
-            <>
+            {isOtherPickupType && (
               <View style={styles.sectionContainer}>
-                <Text style={styles.label}>Plot / Unit / Building *</Text>
+                {/* Show selected address type */}
+                {localValues.addressType && (
+                  <View style={styles.addressTypeBadge}>
+                    <Text style={styles.addressTypeBadgeText}>
+                      {localValues.addressType}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowAddressTypeModal(true)}
+                      style={styles.addressTypeEditButton}
+                    >
+                      <Icon name="edit" size={16} color="#3B82F6" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Contact Name *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      fieldErrors.contactName && {
+                        borderColor: 'red',
+                        borderWidth: 1,
+                      },
+                    ]}
+                    placeholder="Enter contact person name"
+                    value={localValues.contactName}
+                    textTransform="capitalize"
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, contactName: text }));
+                      if (fieldErrors.contactName) {
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          contactName: '',
+                        }));
+                      }
+                    }}
+                  />
+                  {fieldErrors.contactName && (
+                    <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                      {fieldErrors.contactName}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Company / Warehouse Name *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      fieldErrors.companyName && {
+                        borderColor: 'red',
+                        borderWidth: 1,
+                      },
+                    ]}
+                    placeholder="Enter Company / Warehouse Name"
+                    value={localValues.companyName}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, companyName: text }));
+                      if (fieldErrors.companyName) {
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          companyName: '',
+                        }));
+                      }
+                    }}
+                  />
+                  {fieldErrors.companyName && (
+                    <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                      {fieldErrors.companyName}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Contact Number *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      fieldErrors.contactNumber && {
+                        borderColor: 'red',
+                        borderWidth: 1,
+                      },
+                    ]}
+                    placeholder="Enter contact number"
+                    value={localValues.contactNumber}
+                    maxLength={10}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({
+                        ...prev,
+                        contactNumber: text,
+                      }));
+                      if (fieldErrors.contactNumber) {
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          contactNumber: '',
+                        }));
+                      }
+                    }}
+                    keyboardType="phone-pad"
+                  />
+                  {fieldErrors.contactNumber && (
+                    <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                      {fieldErrors.contactNumber}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {isselfPickupType && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Current Location (fetched)</Text>
+                <TextInput
+                  style={[styles.input]}
+                  placeholder="Current location"
+                  value={localValues?.origin?.address || ''}
+                  editable={false}
+                />
+                <Text style={styles.label}>Contact Name *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    fieldErrors.contactName && {
+                      borderColor: 'red',
+                      borderWidth: 1,
+                    },
+                  ]}
+                  placeholder="Enter contact person name"
+                  value={localValues.contactName}
+                  textTransform="capitalize"
+                  onChangeText={text => {
+                    setLocalValues(prev => ({ ...prev, contactName: text }));
+                    if (fieldErrors.contactName) {
+                      setFieldErrors(prev => ({
+                        ...prev,
+                        contactName: '',
+                      }));
+                    }
+                  }}
+                />
+                {fieldErrors.contactName && (
+                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                    {fieldErrors.contactName}
+                  </Text>
+                )}
+                <Text style={styles.label}>Contact Number *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    fieldErrors.contactNumber && {
+                      borderColor: 'red',
+                      borderWidth: 1,
+                    },
+                  ]}
+                  placeholder="Enter contact number"
+                  value={localValues.contactNumber}
+                  maxLength={10}
+                  onChangeText={text => {
+                    setLocalValues(prev => ({ ...prev, contactNumber: text }));
+                    if (fieldErrors.contactNumber) {
+                      setFieldErrors(prev => ({
+                        ...prev,
+                        contactNumber: '',
+                      }));
+                    }
+                  }}
+                  keyboardType="phone-pad"
+                />
+                {fieldErrors.contactNumber && (
+                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                    {fieldErrors.contactNumber}
+                  </Text>
+                )}
+                <Text style={[styles.label, { marginTop: 10 }]}>
+                  Plot / Unit / Building *
+                </Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -840,7 +962,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                 />
 
                 <Text style={styles.label}>
-                  Street / Area /Sector /Village *
+                  Street / Area /Sector / Village *
                 </Text>
                 <TextInput
                   style={[
@@ -856,184 +978,228 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                     setLocalValues(prev => ({ ...prev, streetArea: text }))
                   }
                 />
-                <View style={tw`flex-row gap-3 mb-4`}>
-                  <View style={tw`flex-1`}>
-                    <Text style={styles.label}>Pincode *</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter Pincode"
-                      value={localValues.pincode}
-                      onChangeText={text => {
-                        handlePinchange(text);
-                        if (fieldErrors.pincode) {
-                          setFieldErrors(prev => ({ ...prev, pincode: '' }));
-                        }
-                      }}
-                      keyboardType="numeric"
-                      maxLength={6}
-                      error={!!fieldErrors.pincode}
-                    />
-                    {fieldErrors.pincode && (
-                      <Text style={{ color: 'red', fontSize: 12 }}>
-                        {fieldErrors.pincode}
-                      </Text>
-                    )}
-                  </View>
-
-                  <View style={tw`flex-1`}>
-                    <Text style={styles.label}>State *</Text>
-                    <SelectList
-                      data={stateData?.data || []}
-                      displayKey="state"
-                      save="state"
-                      value={localValues.state}
-                      setSelected={value => {
-                        handleState(value);
-                        if (fieldErrors.state) {
-                          setFieldErrors(prev => ({ ...prev, state: '' }));
-                        }
-                      }}
-                      placeholder="Select State"
-                      onClear={() =>
-                        setLocalValues(prev => ({ ...prev, state: '' }))
-                      }
-                      inputStyles={tw`border-gray-200`}
-                      style={
-                        fieldErrors.state && {
-                          borderColor: 'red',
-                          borderWidth: 1,
-                        }
-                      }
-                    />
-                    {fieldErrors.state && (
-                      <Text style={{ color: 'red', fontSize: 12 }}>
-                        {fieldErrors.state}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-
-                <View style={tw`flex-row gap-3 mb-4`}>
-                  <View style={tw`flex-1`}>
-                    <Text style={styles.label}>District / City *</Text>
-                    <SelectList
-                      data={availableDistricts}
-                      displayKey="region"
-                      save="region"
-                      value={localValues.district}
-                      setSelected={val =>
-                        setLocalValues(prev => ({ ...prev, district: val }))
-                      }
-                      placeholder="Select District"
-                      onClear={() =>
-                        setLocalValues(prev => ({ ...prev, district: '' }))
-                      }
-                      disabled={!localValues.state}
-                      inputStyles={tw`border-gray-200`}
-                    />
-                  </View>
-
-                  <View style={tw`flex-1`}>
-                    <Text style={styles.label}>Taluka / Town</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter Taluka"
-                      value={localValues.taluka}
-                      error={!!fieldErrors.taluka}
-                      onChangeText={text => {
-                        setLocalValues(prev => ({ ...prev, taluka: text }));
-                        if (fieldErrors.taluka) {
-                          setFieldErrors(prev => ({ ...prev, taluka: '' }));
-                        }
-                      }}
-                    />
-                    {fieldErrors.taluka && (
-                      <Text style={{ color: 'red', fontSize: 12 }}>
-                        {fieldErrors.taluka}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-
-                <SelectList
-                  data={originPlaces?.suggestions}
-                  displayKey="value"
-                  value={
-                    originPlaces.inputValue ||
-                    localValues?.origin?.address ||
-                    ''
-                  }
-                  save="object"
-                  setSelected={handleOriginSelect}
-                  placeholder="Search pickup location..."
-                  search={true}
-                  onSearchChange={originPlaces.handleInputChange}
-                  searchValue={originPlaces.inputValue}
-                  inputStyles={[
-                    tw`border-gray-200`,
-                    fieldErrors.origin && {
-                      borderColor: 'red',
-                      borderWidth: 1,
-                    },
-                  ]}
-                />
-                <View style={styles.actionButtonsContainer}>
-                  {actionButtons.map(button => (
-                    <ActionButton
-                      key={button.key}
-                      icon={button.icon}
-                      text={button.text}
-                      onPress={button.onPress}
-                      color={button.color || ''}
-                      style={[
-                        styles.actionButton,
-                        tw`border border-${button.borderColor}`,
-                      ]}
-                    />
-                  ))}
-                </View>
               </View>
-            </>
-          )}
-        </View>
+            )}
 
-        <View style={styles.modalFooter}>
-          <TouchableOpacity
-            style={[styles.cancelButton, tw`border border-gray-300`]}
-            onPress={handleModalClose}
-            accessibilityLabel="Cancel pickup selection"
-            accessibilityHint="Closes the modal without saving changes"
-          >
-            <Text style={[styles.cancelButtonText, tw`text-gray-700`]}>
-              Cancel
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.confirmButton, tw`bg-blue-600`]}
-            onPress={handleConfirm}
-            accessibilityLabel="Confirm pickup location"
-            accessibilityHint="Saves the selected pickup location and closes the modal"
-          >
-            <Text style={[styles.confirmButtonText, tw`text-white`]}>
-              Confirm Pickup
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            {isOtherPickupType && (
+              <>
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.label}>Plot / Unit / Building *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      fieldErrors.plotOrBuilding && {
+                        borderColor: 'red',
+                        borderWidth: 1,
+                      },
+                    ]}
+                    placeholder="Enter plot/unit number"
+                    value={localValues.plotOrBuilding}
+                    onChangeText={text =>
+                      setLocalValues(prev => ({
+                        ...prev,
+                        plotOrBuilding: text,
+                      }))
+                    }
+                  />
 
-      <LocationHistoryModal
-        visible={showHistoryModal}
-        onClose={() => {
-          setShowHistoryModal(false);
-          setActiveOriginButton('');
-        }}
-        onSelectLocation={handleHistoryLocationSelect}
-        locations={currentData?.Address || []}
-        type="origin"
-      />
+                  <Text style={styles.label}>
+                    Street / Area /Sector /Village *
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      fieldErrors.streetArea && {
+                        borderColor: 'red',
+                        borderWidth: 1,
+                      },
+                    ]}
+                    placeholder="Enter area details"
+                    value={localValues.streetArea}
+                    onChangeText={text =>
+                      setLocalValues(prev => ({ ...prev, streetArea: text }))
+                    }
+                  />
+                  <View style={tw`flex-row gap-3 mb-4`}>
+                    <View style={tw`flex-1`}>
+                      <Text style={styles.label}>Pincode *</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Pincode"
+                        value={localValues.pincode}
+                        onChangeText={text => {
+                          handlePinchange(text);
+                          if (fieldErrors.pincode) {
+                            setFieldErrors(prev => ({ ...prev, pincode: '' }));
+                          }
+                        }}
+                        keyboardType="numeric"
+                        maxLength={6}
+                        error={!!fieldErrors.pincode}
+                      />
+                      {fieldErrors.pincode && (
+                        <Text style={{ color: 'red', fontSize: 12 }}>
+                          {fieldErrors.pincode}
+                        </Text>
+                      )}
+                    </View>
 
+                    <View style={tw`flex-1`}>
+                      <Text style={styles.label}>State *</Text>
+                      <SelectList
+                        data={stateData?.data || []}
+                        displayKey="state"
+                        save="state"
+                        value={localValues.state}
+                        setSelected={value => {
+                          handleState(value);
+                          if (fieldErrors.state) {
+                            setFieldErrors(prev => ({ ...prev, state: '' }));
+                          }
+                        }}
+                        placeholder="Select State"
+                        onClear={() =>
+                          setLocalValues(prev => ({ ...prev, state: '' }))
+                        }
+                        inputStyles={tw`border-gray-200`}
+                        style={
+                          fieldErrors.state && {
+                            borderColor: 'red',
+                            borderWidth: 1,
+                          }
+                        }
+                      />
+                      {fieldErrors.state && (
+                        <Text style={{ color: 'red', fontSize: 12 }}>
+                          {fieldErrors.state}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={tw`flex-row gap-3 mb-4`}>
+                    <View style={tw`flex-1`}>
+                      <Text style={styles.label}>District / City *</Text>
+                      <SelectList
+                        data={availableDistricts}
+                        displayKey="region"
+                        save="region"
+                        value={localValues.district}
+                        setSelected={val =>
+                          setLocalValues(prev => ({ ...prev, district: val }))
+                        }
+                        placeholder="Select District"
+                        onClear={() =>
+                          setLocalValues(prev => ({ ...prev, district: '' }))
+                        }
+                        disabled={!localValues.state}
+                        inputStyles={tw`border-gray-200`}
+                      />
+                    </View>
+
+                    <View style={tw`flex-1`}>
+                      <Text style={styles.label}>Taluka / Town</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Taluka"
+                        value={localValues.taluka}
+                        error={!!fieldErrors.taluka}
+                        onChangeText={text => {
+                          setLocalValues(prev => ({ ...prev, taluka: text }));
+                          if (fieldErrors.taluka) {
+                            setFieldErrors(prev => ({ ...prev, taluka: '' }));
+                          }
+                        }}
+                      />
+                      {fieldErrors.taluka && (
+                        <Text style={{ color: 'red', fontSize: 12 }}>
+                          {fieldErrors.taluka}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <SelectList
+                    data={originPlaces?.suggestions}
+                    displayKey="value"
+                    value={
+                      originPlaces.inputValue ||
+                      localValues?.origin?.address ||
+                      ''
+                    }
+                    save="object"
+                    setSelected={handleOriginSelect}
+                    placeholder="Search pickup location..."
+                    search={true}
+                    onSearchChange={originPlaces.handleInputChange}
+                    searchValue={originPlaces.inputValue}
+                    inputStyles={[
+                      tw`border-gray-200`,
+                      fieldErrors.origin && {
+                        borderColor: 'red',
+                        borderWidth: 1,
+                      },
+                    ]}
+                  />
+                  <View style={styles.actionButtonsContainer}>
+                    {actionButtons.map(button => (
+                      <ActionButton
+                        key={button.key}
+                        icon={button.icon}
+                        text={button.text}
+                        onPress={button.onPress}
+                        color={button.color || ''}
+                        style={[
+                          styles.actionButton,
+                          tw`border border-${button.borderColor}`,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </>
+            )}
+          </View>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.cancelButton, tw`border border-gray-300`]}
+              onPress={handleModalClose}
+              accessibilityLabel="Cancel pickup selection"
+              accessibilityHint="Closes the modal without saving changes"
+            >
+              <Text style={[styles.cancelButtonText, tw`text-gray-700`]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.confirmButton, tw`bg-blue-600`]}
+              onPress={handleConfirm}
+              accessibilityLabel="Confirm pickup location"
+              accessibilityHint="Saves the selected pickup location and closes the modal"
+            >
+              <Text style={[styles.confirmButtonText, tw`text-white`]}>
+                Confirm Pickup
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        <LocationHistoryModal
+          visible={showHistoryModal}
+          onClose={() => {
+            setShowHistoryModal(false);
+            setActiveOriginButton('');
+          }}
+          onSelectLocation={handleHistoryLocationSelect}
+          locations={currentData?.Address || []}
+          type="origin"
+        />
+      </BottomModal>
+
+      {AddressTypeModal}
       {MapSelectionModal}
-    </BottomModal>
+    </>
   );
 });
 
@@ -1160,6 +1326,101 @@ const styles = StyleSheet.create({
   },
   mapCloseButton: {
     padding: 4,
+  },
+  // Address Type Modal Styles
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  addressTypeModal: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  addressTypeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  addressTypeTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  addressTypeCloseButton: {
+    padding: 4,
+  },
+  addressTypeSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  addressTypeList: {
+    marginBottom: 20,
+  },
+  addressTypeButton: {
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  addressTypeButtonSelected: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  addressTypeText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  addressTypeTextSelected: {
+    color: 'white',
+  },
+  addressTypeConfirmButton: {
+    backgroundColor: '#3B82F6',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  addressTypeConfirmText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  // Address Type Badge
+  addressTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginBottom: 15,
+  },
+  addressTypeBadgeText: {
+    color: '#1E40AF',
+    fontWeight: '600',
+    fontSize: 14,
+    marginRight: 8,
+  },
+  addressTypeEditButton: {
+    padding: 2,
   },
 });
 

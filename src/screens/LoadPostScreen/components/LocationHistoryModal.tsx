@@ -30,9 +30,9 @@ const LocationHistoryModal: React.FC<LocationHistoryModalProps> = ({
 
   const filteredList = locations.filter(item => {
     if (type === 'origin') {
-      return item.address === item.Origin; // only origin
+      return !!item.PickupAddress;
     } else if (type === 'destination') {
-      return item.address === item.Destination; // only destination
+      return !!item.DeliveryAddress;
     }
     return true;
   });

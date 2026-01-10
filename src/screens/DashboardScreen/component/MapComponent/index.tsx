@@ -1,6 +1,10 @@
 import { useGetNearbyDriversQuery } from '@api/hooks_api';
 import { RootState } from '@store/index';
-import { addOrUpdateDriver, setOrigin } from '@store/slices/mapSlice';
+import {
+  addOrUpdateDriver,
+  setCurrentLocation,
+  setOrigin,
+} from '@store/slices/mapSlice';
 import colors from '@utils/colors';
 import { GOOGLE_MAPS_API_KEY } from '@utils/env';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -70,6 +74,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
     origin,
     destination,
     drivers,
+    currentlocation,
     // selectedDriver,
     currentMap,
     region,
@@ -258,64 +263,64 @@ const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
     requestLocationPermission();
   }, [dispatch, origin]);
 
-  // useEffect(() => {
-  //   const requestLocationPermission = async () => {
-  //     try {
-  //       if (Platform.OS === 'android') {
-  //         const granted = await PermissionsAndroid.request(
-  //           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-  //           {
-  //             title: 'Location Permission',
-  //             message: 'We need your location to show nearby drivers.',
-  //             buttonPositive: 'OK',
-  //           },
-  //         );
-  //         if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
-  //       }
+  useEffect(() => {
+    const requestLocationPermission = async () => {
+      try {
+        if (Platform.OS === 'android') {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            {
+              title: 'Location Permission',
+              message: 'We need your location to show nearby drivers.',
+              buttonPositive: 'OK',
+            },
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+        }
 
-  //       const location = await GetLocation.getCurrentPosition({
-  //         enableHighAccuracy: true,
-  //         timeout: 10000,
-  //       });
-  //       console.log(location, 'this is current position');
-  //       // 🌐 Calculate map deltas for ~20 km radius view
-  //       const RADIUS_KM = 20;
-  //       const latitudeDelta = (RADIUS_KM * 2) / 111; // ~40 km diameter vertically
-  //       const longitudeDelta =
-  //         latitudeDelta / Math.cos((location.latitude * Math.PI) / 180);
+        const location = await GetLocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+        console.log(location, 'this is current position');
+        // 🌐 Calculate map deltas for ~20 km radius view
+        const RADIUS_KM = 20;
+        const latitudeDelta = (RADIUS_KM * 2) / 111; // ~40 km diameter vertically
+        const longitudeDelta =
+          latitudeDelta / Math.cos((location.latitude * Math.PI) / 180);
 
-  //       const currentRegion = {
-  //         latitude: location.latitude,
-  //         longitude: location.longitude,
-  //         latitudeDelta,
-  //         longitudeDelta,
-  //       };
+        const currentRegion = {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          latitudeDelta,
+          longitudeDelta,
+        };
 
-  //       // Animate to current location
-  //       if (mapRef.current) {
-  //         mapRef.current.animateToRegion(currentRegion, 1000);
-  //       }
-  //       const geoData = await reverseGeocode(
-  //         location.latitude,
-  //         location.longitude,
-  //       );
+        // Animate to current location
+        if (mapRef.current) {
+          mapRef.current.animateToRegion(currentRegion, 1000);
+        }
+        const geoData = await reverseGeocode(
+          location.latitude,
+          location.longitude,
+        );
 
-  //       console.log(geoData, 'this is from data');
-  //       // Save to Redux as origin
-  //       dispatch(
-  //         setOrigin({
-  //           latitude: location?.latitude,
-  //           longitude: location?.longitude,
-  //           address: geoData?.address,
-  //         }),
-  //       );
-  //     } catch (error) {
-  //       console.warn('Error fetching location:', error);
-  //     }
-  //   };
+        console.log(geoData, 'this is from data');
+        // Save to Redux as origin
+        dispatch(
+          setCurrentLocation({
+            latitude: location?.latitude,
+            longitude: location?.longitude,
+            address: geoData?.address,
+          }),
+        );
+      } catch (error) {
+        console.warn('Error fetching location:', error);
+      }
+    };
 
-  //   requestLocationPermission();
-  // }, [dispatch]);
+    requestLocationPermission();
+  }, [dispatch]);
 
   // Clear map when currentMap changes to prevent stale markers
   useEffect(() => {
