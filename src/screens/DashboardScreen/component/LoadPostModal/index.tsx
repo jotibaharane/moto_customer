@@ -1,7 +1,8 @@
 // components/LoadPostModal.tsx
 import { CustomerLoadPost } from '@api/api.type';
-import { useGetCustomerPostsMutation } from '@api/hooks_api';
+import { useGetCustomerPostsQuery } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
+import { useRefreshOnFocus } from '@hooks/useRefreshOnFocus';
 import { RootState } from '@store/index';
 import {
   addOrUpdateDriver,
@@ -11,7 +12,7 @@ import {
   setOriginAddress,
   setPostId,
 } from '@store/slices/mapSlice';
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -23,37 +24,144 @@ import {
 } from 'react-native';
 import { Icon } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
+import { emitSelectLoad } from '../../../../sockets';
 import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
+// ===== MULTIPLE DUMMY LOAD POSTS =====
+const DUMMY_CUSTOMER_POSTS: CustomerLoadPost[] = [
+  {
+    LoadPostID: 'LP-DUMMY-001',
+    PickupLat: 28.6139,
+    PickupLng: 77.209,
+    PickupAddress: 'Connaught Place, New Delhi',
+    PickupState: 'Delhi',
+    PickupPincode: '110001',
+
+    DeliveryLat: 28.4595,
+    DeliveryLng: 77.0266,
+    DeliveryAddress: 'DLF Cyber City, Gurugram',
+    DeliveryState: 'Haryana',
+    DeliveryPincode: '122002',
+
+    VehicleType: 'Container',
+    BodyType: 'Closed',
+    Weight: '10 MT',
+    Approximate_weight: '9.5 MT',
+
+    CargoContent: 'Electronics',
+    CargoPackageType: 'Box',
+
+    LP_Status: 'Pending',
+    LoadPost_InsertDate: new Date().toISOString(),
+  },
+  {
+    LoadPostID: 'LP-DUMMY-002',
+    PickupLat: 19.076,
+    PickupLng: 72.8777,
+    PickupAddress: 'Andheri East, Mumbai',
+    PickupState: 'Maharashtra',
+    PickupPincode: '400069',
+
+    DeliveryLat: 18.5204,
+    DeliveryLng: 73.8567,
+    DeliveryAddress: 'Hinjewadi Phase 1, Pune',
+    DeliveryState: 'Maharashtra',
+    DeliveryPincode: '411057',
+
+    VehicleType: 'Trailer',
+    BodyType: 'Open',
+    Weight: '18 MT',
+    Approximate_weight: '17 MT',
+
+    CargoContent: 'Steel Rods',
+    CargoPackageType: 'Loose',
+
+    LP_Status: 'Assigned',
+    LoadPost_InsertDate: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    LoadPostID: 'LP-DUMMY-003',
+    PickupLat: 12.9716,
+    PickupLng: 77.5946,
+    PickupAddress: 'Whitefield, Bengaluru',
+    PickupState: 'Karnataka',
+    PickupPincode: '560066',
+
+    DeliveryLat: 13.0827,
+    DeliveryLng: 80.2707,
+    DeliveryAddress: 'Guindy Industrial Estate, Chennai',
+    DeliveryState: 'Tamil Nadu',
+    DeliveryPincode: '600032',
+
+    VehicleType: 'Truck',
+    BodyType: 'Closed',
+    Weight: '12 MT',
+    Approximate_weight: '11.8 MT',
+
+    CargoContent: 'Machinery Parts',
+    CargoPackageType: 'Crate',
+
+    LP_Status: 'Pending',
+    LoadPost_InsertDate: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+];
 
 const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
   const CustomerID = useSelector(
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
   const dispatch = useDispatch();
-  const [fetchCustomerPost, { data: customerPosts, isLoading }] =
-    useGetCustomerPostsMutation();
+
+  // Query hook (auto-fetches). refetch is used for manual refresh.
+  const {
+    data: customerPosts,
+    isLoading,
+    refetch,
+  } = useGetCustomerPostsQuery(
+    { CustomerID },
+    {
+      skip: !CustomerID, // ✅ typesafe skip condition
+      refetchOnMountOrArgChange: true,
+      keepUnusedDataFor: 0,
+    },
+  );
+  const postsData: CustomerLoadPost[] =
+    customerPosts?.data && customerPosts.data.length > 0
+      ? customerPosts.data
+      : DUMMY_CUSTOMER_POSTS;
 
   const [refreshing, setRefreshing] = useState(false);
-
+  useRefreshOnFocus(refetch);
   // Handle refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchCustomerPost({ CustomerID });
-    setRefreshing(false);
+    try {
+      // refetch returns a Promise-like object; awaiting ensures the UI waits
+      await refetch();
+    } catch (e) {
+      // optionally handle/log error
+      // console.warn('Failed to refresh customer posts', e);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
-  useLayoutEffect(() => {
-    handleRefresh();
-  }, [ref]);
+  // If you want to fetch when CustomerID changes, RTK Query already re-runs query,
+  // but if you need an immediate manual refetch when CustomerID becomes available:
 
   const handlePostPress = (item: CustomerLoadPost) => {
+    emitSelectLoad({
+      customerId: CustomerID,
+      postId: item.LoadPostID,
+      pickupLat: item.PickupLat,
+      pickupLng: item.PickupLng,
+    });
     dispatch(addOrUpdateDriver([]));
     dispatch(setPostId(item?.LoadPostID));
     dispatch(
-      setOrigin({ latitude: item?.Origin_Lat, longitude: item?.Origin_Lng }),
+      setOrigin({ latitude: item?.PickupLat, longitude: item?.PickupLng }),
     );
-    dispatch(setOriginAddress(item?.Origin_City));
-    dispatch(setDestinationAddress(item?.Destination_City));
+    dispatch(setOriginAddress(item?.PickupAddress));
+    dispatch(setDestinationAddress(item?.DeliveryAddress));
     dispatch(setDestination(null));
     if (ref && typeof ref !== 'function' && ref.current) {
       ref.current.close();
@@ -66,7 +174,6 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
     }
   };
 
-  // Render list item - ENHANCED CARD DESIGN
   const renderPostItem = ({ item }: { item: CustomerLoadPost }) => (
     <TouchableOpacity
       style={styles.cardContainer}
@@ -76,16 +183,20 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
       <View style={styles.cardHeader}>
         <View style={styles.idContainer}>
           <Icon source="identifier" size={14} color="#666" />
-          <Text style={styles.cardId}>ID: {item.LoadPostID}</Text>
+          <Text style={styles.cardId}>ID: {item?.LoadPostID}</Text>
+        </View>
+
+        <View>
+          <Text> {formatDate(item?.LoadPost_InsertDate || '')}</Text>
         </View>
         <View
           style={[
             styles.statusBadge,
-            { backgroundColor: getStatusColor(item.trip_status) },
+            { backgroundColor: getStatusColor(item?.LP_Status) },
           ]}
         >
           <Text style={styles.statusText}>
-            {item.trip_status.toUpperCase()}
+            {item?.LP_Status?.toUpperCase()}
           </Text>
         </View>
       </View>
@@ -106,10 +217,10 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
               <Text style={styles.locationLabel}>From</Text>
             </View>
             <Text style={styles.locationText} numberOfLines={2}>
-              {item.Origin_City}
+              {item?.PickupAddress}
             </Text>
             <Text style={styles.locationSubtext}>
-              {item.Origin_State} • {item.Origin_Pincode}
+              {item.PickupState} • {item.PickupPincode}
             </Text>
           </View>
 
@@ -120,10 +231,10 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
               <Text style={styles.locationLabel}>To</Text>
             </View>
             <Text style={styles.locationText} numberOfLines={2}>
-              {item.Destination_City}
+              {item.DeliveryAddress}
             </Text>
             <Text style={styles.locationSubtext}>
-              {item.Destination_State} • {item.Destination_Pincode}
+              {item.DeliveryState} • {item.DeliveryPincode}
             </Text>
           </View>
         </View>
@@ -150,10 +261,8 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
           </View>
 
           <View style={styles.detailItem}>
-            <Icon source="calendar" size={16} color="#5e6bff" />
-            <Text style={styles.detailText}>
-              {formatDate(item?.PostInsertDate || '')}
-            </Text>
+            <Icon source="weight" size={16} color="#5e6bff" />
+            <Text style={styles.detailText}>{item?.Approximate_weight}</Text>
           </View>
         </View>
       </View>
@@ -171,7 +280,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
       </View>
 
       {/* Pending Status Indicator */}
-      {item.trip_status === 'Pending' && (
+      {item.LP_Status === 'Pending' && (
         <View style={styles.pendingContainer}>
           <Icon source="clock-outline" size={14} color="#FF9800" />
           <Text style={styles.pendingText}>Awaiting driver assignment</Text>
@@ -180,18 +289,14 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
     </TouchableOpacity>
   );
 
-  // Render list view
   const renderListView = () => (
     <View style={styles.listContainer}>
       <View style={styles.listHeader}>
         <View style={styles.titleContainer}>
           <Text style={styles.listTitle}>My Load Posts</Text>
-          {customerPosts?.data && customerPosts.data.length > 0 && (
-            <Text style={styles.postCount}>
-              {customerPosts.data.length} post
-              {customerPosts.data.length !== 1 ? 's' : ''}
-            </Text>
-          )}
+          <Text style={styles.postCount}>
+            {postsData.length} post{postsData.length !== 1 ? 's' : ''}
+          </Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -214,7 +319,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
           <ActivityIndicator size="large" color="#5e6bff" />
           <Text style={styles.loadingText}>Loading posts...</Text>
         </View>
-      ) : customerPosts?.data?.length === 0 ? (
+      ) : postsData.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyContent}>
             <Icon source="package-variant" size={64} color="#E0E0E0" />
@@ -226,11 +331,12 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
         </View>
       ) : (
         <FlatList
-          data={customerPosts?.data || []}
+          data={postsData}
           renderItem={renderPostItem}
           keyExtractor={item => item.LoadPostID}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={true}
+          // scrollEnabled={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
@@ -246,6 +352,7 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
       backdropOpacity={0.8}
       animationDuration={400}
       swipeThreshold={50}
+      onOpen={handleRefresh}
       disableSwipe
     >
       <View style={styles.container}>{renderListView()}</View>

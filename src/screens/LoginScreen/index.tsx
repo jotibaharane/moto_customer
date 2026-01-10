@@ -7,13 +7,14 @@ import {
 } from '@store/slices/authSlice';
 import colors from '@utils/colors';
 import { routeName } from '@utils/navigationHelpers';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
   Platform,
   TextInput,
   View,
+  Animated,
 } from 'react-native';
 import {
   Button,
@@ -33,6 +34,7 @@ const OtpLoginScreen = () => {
   const dispatch = useDispatch();
   const [sendOTP] = useSendOtpMutation();
   const [validateOTP] = useValidateOtpMutation();
+
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [isOtpSent, setIsOtpSent] = useState(false);
@@ -40,6 +42,17 @@ const OtpLoginScreen = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const otpInputRef = useRef<TextInput>(null);
+  const phoneInputRef = useRef<any>(null);
+
+  // Animation for smooth transition
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, [isOtpSent]);
 
   const handleSendOtp = async () => {
     if (!phoneNumber || phoneNumber?.length < 10) {
@@ -60,17 +73,13 @@ const OtpLoginScreen = () => {
         setIsLoading(false);
         setIsOtpSent(true);
         setSuccessMessage('OTP sent successfully!');
+        setTimeout(() => otpInputRef?.current?.focus(), 200);
       } else {
         setIsLoading(false);
         setError(
           response?.data?.message || 'Failed to send OTP. Please try again.',
         );
       }
-
-      // Focus on OTP input after a short delay
-      setTimeout(() => {
-        otpInputRef?.current?.focus();
-      }, 100);
     } catch (err: any) {
       setIsLoading(false);
       setError(err?.data?.message || 'Failed to send OTP. Please try again.');
@@ -78,7 +87,6 @@ const OtpLoginScreen = () => {
   };
 
   const handleVerifyOtp = async () => {
-    // Change from 6 to 4 digits
     if (!otp || otp.length < 4) {
       setError('Please enter a valid 4-digit OTP');
       return;
@@ -93,7 +101,7 @@ const OtpLoginScreen = () => {
         mobile_number: phoneNumber,
         otp: otp,
       });
-      console.log({ response });
+
       if (response?.data?.status === '00') {
         dispatch(setMobileNumber(phoneNumber));
 
@@ -101,8 +109,7 @@ const OtpLoginScreen = () => {
           setIsLoading(false);
           setSuccessMessage('OTP verified successfully!');
           navigation.replace(routeName.REGISTRATION);
-        }
-        if (response?.data?.Customer_Details) {
+        } else {
           dispatch(setCustomerDetails(response?.data?.Customer_Details));
           if (response?.data?.Customer_Details?.MPIN_Flag !== 'Y') {
             navigation.replace(routeName.SET_MPIN);
@@ -130,39 +137,40 @@ const OtpLoginScreen = () => {
       const payload: SendOtpPayload = {
         mobile_number: phoneNumber,
       };
-      console.log({ payload });
+
       const response = await sendOTP(payload);
-      console.log({ response });
       if (response?.data?.status === '00') {
         setIsLoading(false);
         setOtp('');
         setSuccessMessage('New OTP sent successfully!');
+        setTimeout(() => otpInputRef.current?.focus(), 200);
       } else {
         setIsLoading(false);
         setError(
           response?.data?.message || 'Failed to resend OTP. Please try again.',
         );
       }
-
-      // Focus on OTP input
-      setTimeout(() => {
-        otpInputRef.current?.focus();
-      }, 100);
     } catch (err: any) {
-      console.log({ err });
       setIsLoading(false);
       setError(err.data?.message || 'Failed to resend OTP. Please try again.');
     }
   };
 
+  // ✅ NEW: Handle change number
+  const handleChangeNumber = () => {
+    setIsOtpSent(false);
+    setOtp('');
+    setError('');
+    setSuccessMessage('');
+    setTimeout(() => phoneInputRef.current?.focus(), 200);
+  };
+
   const handlePhoneNumberChange = (text: string) => {
-    // Allow only numbers and limit to 10 digits
     const cleaned = text.replace(/\D/g, '').slice(0, 10);
     setPhoneNumber(cleaned);
   };
 
   const handleOtpChange = (text: string) => {
-    // Change from 6 to 4 digits
     const cleaned = text.replace(/\D/g, '').slice(0, 4);
     setOtp(cleaned);
   };
@@ -173,7 +181,6 @@ const OtpLoginScreen = () => {
       style={styles.container}
     >
       <View style={styles.content}>
-        {/* Company Logo and Name */}
         <View style={styles.logoContainer}>
           <View style={styles.logoBackground}>
             <Image
@@ -182,11 +189,11 @@ const OtpLoginScreen = () => {
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.companyName}>MOTO HELP</Text>
+          <Text style={styles.companyName}>ABC COMPANY</Text>
           <Text style={styles.tagline}>Your Roadside Assistance Partner</Text>
         </View>
 
-        <View style={styles.card}>
+        <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
           <Text style={styles.cardTitle}>
             {isOtpSent ? 'Enter Verification Code' : 'Login with Phone Number'}
           </Text>
@@ -198,6 +205,7 @@ const OtpLoginScreen = () => {
 
           {!isOtpSent ? (
             <PaperTextInput
+              ref={phoneInputRef}
               mode="outlined"
               label="Phone Number"
               placeholder="Enter your 10-digit phone number"
@@ -224,13 +232,12 @@ const OtpLoginScreen = () => {
                 value={otp}
                 onChangeText={handleOtpChange}
                 keyboardType="number-pad"
-                maxLength={4} // Changed from 6 to 4
+                maxLength={4}
                 style={styles.otpInput}
                 selectionColor={colors.primary}
                 textContentType="oneTimeCode"
               />
               <View style={styles.otpBoxes}>
-                {/* Changed from 6 to 4 boxes */}
                 {[0, 1, 2, 3].map(index => (
                   <View
                     key={index}
@@ -244,6 +251,15 @@ const OtpLoginScreen = () => {
                   </View>
                 ))}
               </View>
+
+              {/* ✅ Change Number Option */}
+              <Button
+                mode="text"
+                onPress={handleChangeNumber}
+                labelStyle={[styles.resendButton, { fontSize: 14 }]}
+              >
+                Change Contact Number
+              </Button>
             </View>
           )}
 
@@ -273,7 +289,7 @@ const OtpLoginScreen = () => {
 
           {isOtpSent && (
             <View style={styles.resendContainer}>
-              <Text style={styles.resendText}>Didn't receive code?</Text>
+              <Text style={styles.resendText}>Didn’t receive code?</Text>
               <Button
                 mode="text"
                 onPress={handleResendOtp}
@@ -284,7 +300,7 @@ const OtpLoginScreen = () => {
               </Button>
             </View>
           )}
-        </View>
+        </Animated.View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>By continuing, you agree to our</Text>

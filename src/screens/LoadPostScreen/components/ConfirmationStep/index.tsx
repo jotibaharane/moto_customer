@@ -19,33 +19,43 @@ const ConfirmationStep: React.FC = () => {
     duration: string;
   } | null>(null);
   const { values } = useFormikContext<ShipmentData>();
+
+  console.log('values', values, distanceInfo);
+
   const { data: BodyTypeData } = useGetBodyTypeQuery(
     {
-      vehicleType: values.VehicleType,
-      weightRange: values.Weight,
+      vehicleType: values.vehicle.vehicleType,
+      weightRange: values.vehicle.weightRange,
     },
-    { skip: !values.VehicleType || !values.Weight },
+    { skip: !values.vehicle.vehicleType || !values.vehicle.weightRange },
   );
   const { data: packageTypeData } = useGetPackageTypeQuery(
-    { cargotype: values?.CargoContent },
-    { skip: !values?.CargoContent },
+    { cargotype: values.load.cargoContent },
+    { skip: !values.load.cargoContent },
   );
-
   const { data: cargoContentData } = useGetCargoContentQuery();
+
   const fadeAnim = new Animated.Value(0);
 
   useEffect(() => {
     const getDistance = async () => {
-      if (values.origin && values.destination) {
+      if (values.pickup.origin && values.delivery.destination) {
         const result = await calculateDistance(
           {
-            lat: values.origin?.coordinates?.lat,
-            lng: values.origin.coordinates?.lng,
+            lat: values.pickup.origin.coordinates.lat,
+            lng: values.pickup.origin.coordinates.lng,
           },
           {
-            lat: values.destination?.coordinates?.lat,
-            lng: values?.destination?.coordinates?.lng,
+            lat: values.delivery.destination.coordinates.lat,
+            lng: values.delivery.destination.coordinates.lng,
           },
+        );
+        console.log(
+          result,
+          values.pickup.origin.coordinates.lat,
+          values.pickup.origin.coordinates.lng,
+          values.delivery.destination.coordinates.lat,
+          values.delivery.destination.coordinates.lng,
         );
         setDistanceInfo(result);
       } else {
@@ -55,313 +65,366 @@ const ConfirmationStep: React.FC = () => {
 
     getDistance();
 
-    // Fade in animation
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
     }).start();
-  }, [values.origin, values.destination]);
+  }, [values.pickup.origin, values.delivery.destination]);
 
-  const selectedBodyType = values.BodyType
-    ? BodyTypeData?.data?.find(b => b.BodyType === values.BodyType)
+  const selectedBodyType = values.load.bodyType
+    ? BodyTypeData?.data?.find(b => b.BodyType === values.load.bodyType)
     : null;
-  const selectedCargoContent = values.CargoContent
-    ? cargoContentData?.data.find(c => c.cargo_type === values.CargoContent)
+  const selectedCargoContent = values.load.cargoContent
+    ? cargoContentData?.data.find(
+        c => c.cargo_type === values.load.cargoContent,
+      )
     : null;
-  const selectedPackageType = values.CargoContent
+  const selectedPackageType = values.load.packageType
     ? packageTypeData?.data?.find(
-        p => p.packaging_type === values.CargoPackageType,
+        p => p.packaging_type === values.load.packageType,
       )
     : null;
 
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
   return (
-    <Animated.ScrollView style={[tw`flex-1 bg-gray-50 p-4`]}>
-      {/* Header */}
-
-      {/* Route Information Card */}
-      <View style={[tw`bg-white rounded-2xl p-6 mb-5`, styles.card]}>
-        <View style={tw`flex-row items-center mb-4`}>
-          <View style={tw`bg-blue-100 p-2 rounded-full mr-3`}>
-            <MaterialIcons name="route" size={20} color="#3b82f6" />
-          </View>
-          <Text style={tw`text-xl font-bold text-gray-800`}>Route Details</Text>
-        </View>
-
-        {/* Route Visualization */}
-        <View style={tw`flex-row items-start mb-5`}>
-          {/* Vertical Line with Markers */}
-          <View style={tw`items-center mr-4`}>
-            <View
-              style={tw`w-6 h-6 bg-blue-500 rounded-full items-center justify-center mb-1`}
-            >
-              <Ionicons name="location" size={12} color="white" />
+    <Animated.ScrollView style={[tw`flex-1 bg-gray-50 p-1`]}>
+      {/* Main Shipment Card */}
+      <View style={[tw`bg-white mb-4  `, styles.card]}>
+        {/* Location Section */}
+        <View style={tw`p-6`}>
+          {/* From Section */}
+          <View style={tw`mb-6`}>
+            <View style={tw`flex-row items-center mb-3`}>
+              <View style={tw`w-3 h-3 bg-green-500 rounded-full mr-3`} />
+              <Text style={tw`text-gray-800 font-bold text-base`}>From</Text>
             </View>
-            <View style={tw`w-1 bg-blue-200 h-32 my-1`} />
-            <View
-              style={tw`w-6 h-6 bg-red-500 rounded-full items-center justify-center`}
-            >
-              <Ionicons name="flag" size={12} color="white" />
-            </View>
-          </View>
 
-          {/* Addresses with Full Details */}
-          <View style={tw`flex-1`}>
-            {/* Pickup Location */}
-            <View style={tw`mb-8`}>
-              <Text style={tw`text-blue-700 font-semibold text-sm mb-2`}>
-                Pickup Location
-              </Text>
-              <Text style={tw`text-gray-800 font-medium text-base mb-1`}>
-                {values.origin.address}
-              </Text>
-
-              {/* Pickup Address Details */}
-              {(values.Origin_1 || values.Origin_2) && (
-                <View style={tw`bg-blue-50 p-3 rounded-lg mt-2`}>
-                  <Text style={tw`text-blue-700 text-sm`}>
-                    {values.Origin_1}
-                    {values.Origin_2 && `, ${values.Origin_2}`}
+            <View style={tw`ml-6`}>
+              <Text style={tw`text-gray-900 font-semibold text-lg mb-1`}>
+                {values.pickup.contactName}
+                {values.pickup.contactNumber && (
+                  <Text style={tw`text-gray-600 text-base`}>
+                    {' '}
+                    • {values.pickup.contactNumber}
                   </Text>
-                </View>
-              )}
+                )}
+              </Text>
 
-              {/* Contact Info for Pickup */}
+              <View style={tw`mb-2`}>
+                <Text style={tw`text-gray-700 text-sm mb-1`}>
+                  {values.pickup.plotOrBuilding}
+                  {values.pickup.streetArea && `, ${values.pickup.streetArea}`}
+                </Text>
+                <Text style={tw`text-gray-500 text-xs`}>
+                  {values.pickup.origin?.address}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Divider with distance */}
+          <View style={tw`flex-row items-center justify-center mb-6`}>
+            <View style={tw`flex-1 h-px bg-gray-300`} />
+            <View style={tw`px-3`}>
+              <View style={tw`bg-blue-500 px-3 py-1 rounded-full`}>
+                <Text style={tw`text-white text-xl font-semibold`}>
+                  {distanceInfo?.distance || '3,500'}
+                </Text>
+              </View>
+              <Text style={tw`text-gray-500 text-xs text-center mt-1`}>
+                {distanceInfo?.duration || ''}
+              </Text>
+            </View>
+            <View style={tw`flex-1 h-px bg-gray-300`} />
+          </View>
+
+          {/* To Section */}
+          <View>
+            <View style={tw`flex-row items-center mb-3`}>
+              <View style={tw`w-3 h-3 bg-red-500 rounded-full mr-3`} />
+              <Text style={tw`text-gray-800 font-bold text-base`}>To</Text>
             </View>
 
-            {/* Delivery Location */}
-            <View>
-              <Text style={tw`text-red-600 font-semibold text-sm mb-2`}>
-                Delivery Location
-              </Text>
-              <Text style={tw`text-gray-800 font-medium text-base mb-1`}>
-                {values.destination.address}
+            <View style={tw`ml-6`}>
+              <Text style={tw`text-gray-900 font-semibold text-lg mb-1`}>
+                {values.delivery.consigneeName}
+                {values.delivery.contactNumber && (
+                  <Text style={tw`text-gray-600 text-base`}>
+                    {' '}
+                    • {values.delivery.contactNumber}
+                  </Text>
+                )}
               </Text>
 
-              {/* Delivery Address Details */}
-              {(values.Destination_1 ||
-                values.Destination_2 ||
-                values.District ||
-                values.Taluka ||
-                values.state ||
-                values.Pincode) && (
-                <View style={tw`bg-red-50 p-3 rounded-lg mt-2`}>
-                  {(values.Destination_1 || values.Destination_2) && (
-                    <Text style={tw`text-red-700 text-sm mb-1`}>
-                      {values.Destination_1}
-                      {values.Destination_2 && `, ${values.Destination_2}`}
-                    </Text>
-                  )}
-                  {(values.District ||
-                    values.Taluka ||
-                    values.state ||
-                    values.Pincode) && (
-                    <Text style={tw`text-red-700 text-sm`}>
-                      {[values.District, values.Taluka, values.state]
+              <View style={tw`mb-2`}>
+                <Text style={tw`text-gray-700 text-sm mb-1`}>
+                  {values.delivery.plotOrBuilding}
+                  {values.delivery.streetArea &&
+                    `, ${values.delivery.streetArea}`}
+                </Text>
+                <Text style={tw`text-gray-500 text-xs`}>
+                  {values.delivery.destination?.address}
+                  {(values.delivery.district ||
+                    values.delivery.taluka ||
+                    values.delivery.state ||
+                    values.delivery.pincode) && (
+                    <Text>
+                      {', '}
+                      {[
+                        values.delivery.district,
+                        values.delivery.taluka,
+                        values.delivery.state,
+                      ]
                         .filter(Boolean)
                         .join(', ')}
-                      {values.Pincode && ` - ${values.Pincode}`}
+                      {values.delivery.pincode &&
+                        ` - ${values.delivery.pincode}`}
                     </Text>
                   )}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Vehicle & Cargo Details with Images */}
+        <View style={tw`bg-gray-50 px-6 py-4 border-t border-gray-200`}>
+          {/* Vehicle Section with Image */}
+          <View style={tw`flex-row items-start mb-4`}>
+            <View style={tw`mr-4`}>
+              <View
+                style={tw`bg-white p-3 rounded-lg shadow-sm border border-gray-200`}
+              >
+                <Image
+                  source={
+                    selectedBodyType?.img ? { uri: selectedBodyType.img } : {}
+                  }
+                  style={tw`w-16 h-16`}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+
+            <View style={tw`flex-1`}>
+              <Text style={tw`text-gray-800 font-bold text-base mb-3`}>
+                Vehicle Details
+              </Text>
+
+              <View style={tw`flex-row justify-between mb-3`}>
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
+                    VEHICLE TYPE
+                  </Text>
+                  <View style={tw`flex-row items-center`}>
+                    <FontAwesome5
+                      name="truck"
+                      size={14}
+                      color="#6b7280"
+                      style={tw`mr-2`}
+                    />
+                    <Text style={tw`text-gray-800 font-semibold`}>
+                      {values.vehicle.vehicleType}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
+                    WEIGHT RANGE
+                  </Text>
+                  <View style={tw`flex-row items-center`}>
+                    <FontAwesome5
+                      name="weight-hanging"
+                      size={14}
+                      color="#6b7280"
+                      style={tw`mr-2`}
+                    />
+                    <Text style={tw`text-gray-800 font-semibold`}>
+                      {values.vehicle.weightRange}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={tw`flex-row justify-between`}>
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
+                    BODY TYPE
+                  </Text>
+                  <View style={tw`flex-row items-center`}>
+                    <MaterialIcons
+                      name="local-shipping"
+                      size={14}
+                      color="#6b7280"
+                      style={tw`mr-2`}
+                    />
+                    <Text style={tw`text-gray-800 font-semibold`}>
+                      {values.load.bodyType}
+                    </Text>
+                  </View>
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
+                    APPROX. WEIGHT
+                  </Text>
+                  <View style={tw`flex-row items-center`}>
+                    <MaterialIcons
+                      name="scale"
+                      size={14}
+                      color="#6b7280"
+                      style={tw`mr-2`}
+                    />
+                    <Text style={tw`text-gray-800 font-semibold`}>
+                      {values.vehicle.approximateWeightKg} kg
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Cargo Section with Images */}
+          <View style={tw`flex-row items-start`}>
+            <View style={tw`mr-4`}>
+              <View
+                style={tw`bg-white p-3 rounded-lg shadow-sm border border-gray-200`}
+              >
+                <Image
+                  source={
+                    selectedCargoContent?.img
+                      ? { uri: selectedCargoContent.img }
+                      : {}
+                  }
+                  style={tw`w-16 h-16`}
+                  resizeMode="contain"
+                />
+              </View>
+              {selectedPackageType?.img && (
+                <View
+                  style={tw`bg-white p-3 rounded-lg shadow-sm border border-gray-200 mt-2`}
+                >
+                  <Image
+                    source={{ uri: selectedPackageType.img }}
+                    style={tw`w-16 h-16`}
+                    resizeMode="contain"
+                  />
+                </View>
+              )}
+            </View>
+
+            <View style={tw`flex-1`}>
+              <Text style={tw`text-gray-800 font-bold text-base mb-3`}>
+                Load Details
+              </Text>
+
+              <View style={tw`mb-3`}>
+                <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
+                  CARGO TYPE
+                </Text>
+                <View style={tw`flex-row items-center`}>
+                  <MaterialIcons
+                    name="category"
+                    size={14}
+                    color="#6b7280"
+                    style={tw`mr-2`}
+                  />
+                  <Text style={tw`text-gray-800 font-semibold`}>
+                    {values.load.cargoType}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={tw`mb-3`}>
+                <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
+                  CARGO CONTENT
+                </Text>
+                <View style={tw`flex-row items-center`}>
+                  <MaterialIcons
+                    name="inventory"
+                    size={14}
+                    color="#6b7280"
+                    style={tw`mr-2`}
+                  />
+                  <Text style={tw`text-gray-800 font-semibold`}>
+                    {values.load.cargoContent}
+                  </Text>
+                </View>
+              </View>
+
+              {values.load.packageType && (
+                <View style={tw`mb-3`}>
+                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
+                    PACKAGING TYPE
+                  </Text>
+                  <View style={tw`flex-row items-center`}>
+                    <MaterialIcons
+                      name="package"
+                      size={14}
+                      color="#6b7280"
+                      style={tw`mr-2`}
+                    />
+                    <Text style={tw`text-gray-800 font-semibold`}>
+                      {values.load.packageType}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {values.load.dhalaLength && (
+                <View>
+                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
+                    DHALA LENGTH
+                  </Text>
+                  <View style={tw`flex-row items-center`}>
+                    <MaterialIcons
+                      name="straighten"
+                      size={14}
+                      color="#6b7280"
+                      style={tw`mr-2`}
+                    />
+                    <Text style={tw`text-gray-800 font-semibold`}>
+                      {values.load.dhalaLength} meters
+                    </Text>
+                  </View>
                 </View>
               )}
             </View>
           </View>
         </View>
 
-        {/* Distance and Duration */}
-        <View style={tw`flex-row justify-between bg-gray-50 p-3 rounded-lg`}>
-          <View style={tw`flex-row items-center`}>
-            <Ionicons
-              name="time-outline"
-              size={16}
-              color="#6b7280"
-              style={tw`mr-2`}
-            />
+        {/* Additional Info Footer */}
+        <View style={tw`bg-white px-6 py-4 border-t border-gray-200`}>
+          <View style={tw`flex-row justify-between items-center`}>
             <View>
-              <Text style={tw`text-gray-500 text-xs`}>Duration</Text>
-              <Text style={tw`text-gray-800 font-medium`}>
-                {distanceInfo?.duration || 'Calculating...'}
+              <Text style={tw`text-gray-500 text-xs font-medium`}>
+                AVAILABLE TIME
+              </Text>
+              <Text style={tw`text-gray-800 font-semibold text-sm`}>
+                {values.load.expectedVehicleAvailability || 'Flexible'}
+              </Text>
+              <Text style={tw`text-gray-600 text-xs`}>
+                {values.schedule.date} at {values.schedule.time}
               </Text>
             </View>
-          </View>
-
-          <View style={tw`flex-row items-center`}>
-            <Ionicons
-              name="speedometer-outline"
-              size={16}
-              color="#6b7280"
-              style={tw`mr-2`}
-            />
-            <View>
-              <Text style={tw`text-gray-500 text-xs`}>Distance</Text>
-              <Text style={tw`text-gray-800 font-medium`}>
-                {distanceInfo?.distance || 'Calculating...'}
+            <View style={tw`items-end`}>
+              <Text style={tw`text-gray-500 text-xs font-medium`}>
+                TOTAL ESTIMATE
               </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Contact Information Card */}
-      {values?.ContactPerson && values.ContactNumber && (
-        <View style={[tw`bg-white rounded-2xl p-6 mb-5`, styles.card]}>
-          <View style={tw`flex-row items-center mb-4`}>
-            <View style={tw`bg-purple-100 p-2 rounded-full mr-3`}>
-              <Ionicons name="person" size={20} color="#8b5cf6" />
-            </View>
-            <Text style={tw`text-xl font-bold text-gray-800`}>
-              Contact Details
-            </Text>
-          </View>
-
-          <View style={tw`flex-row justify-between`}>
-            <View style={tw`flex-1`}>
-              <Text style={tw`text-gray-500 text-sm mb-1`}>Contact Person</Text>
-              <Text style={tw`text-gray-800 font-medium`}>
-                {values.ContactPerson}
-              </Text>
-            </View>
-
-            <View style={tw`flex-1`}>
-              <Text style={tw`text-gray-500 text-sm mb-1`}>Contact Number</Text>
-              <Text style={tw`text-gray-800 font-medium`}>
-                {values.ContactNumber}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* Vehicle Information Card */}
-      <View style={[tw`bg-white rounded-2xl p-6 mb-5`, styles.card]}>
-        <View style={tw`flex-row items-center mb-4`}>
-          <View style={tw`bg-amber-100 p-2 rounded-full mr-3`}>
-            <FontAwesome5 name="truck" size={18} color="#f59e0b" />
-          </View>
-          <Text style={tw`text-xl font-bold text-gray-800`}>
-            Vehicle Details
-          </Text>
-        </View>
-
-        <View style={tw`flex-row items-center`}>
-          <View style={tw`bg-gray-100 p-3 rounded-lg mr-4`}>
-            <Image
-              source={
-                selectedBodyType?.img
-                  ? { uri: selectedBodyType?.img }
-                  : undefined
-              }
-              style={tw`w-16 h-16`}
-              resizeMode="contain"
-            />
-          </View>
-
-          <View style={tw`flex-1`}>
-            <View style={tw`flex-row justify-between mb-2`}>
-              <Text style={tw`text-gray-500`}>Vehicle Type</Text>
-              <Text style={tw`text-gray-800 font-medium`}>
-                {values?.VehicleType}
-              </Text>
-            </View>
-
-            <View style={tw`flex-row justify-between mb-2`}>
-              <Text style={tw`text-gray-500`}>Weight</Text>
-              <Text style={tw`text-gray-800 font-medium`}>{values.Weight}</Text>
-            </View>
-
-            <View style={tw`flex-row justify-between`}>
-              <Text style={tw`text-gray-500`}>Body Type</Text>
-              <Text style={tw`text-gray-800 font-medium`}>
-                {values?.BodyType}
+              <Text style={tw`text-blue-600 font-bold text-lg`}>
+                {distanceInfo ? '₹2,500' : '3,500'}
               </Text>
             </View>
           </View>
         </View>
       </View>
 
-      {/* Cargo Information Card */}
-      <View style={[tw`bg-white rounded-2xl p-6 mb-5`, styles.card]}>
-        <View style={tw`flex-row items-center mb-4`}>
-          <View style={tw`bg-indigo-100 p-2 rounded-full mr-3`}>
-            <MaterialIcons name="inventory" size={20} color="#6366f1" />
-          </View>
-          <Text style={tw`text-xl font-bold text-gray-800`}>Cargo Details</Text>
-        </View>
-
-        <View style={tw`flex-row items-center mb-4`}>
-          <View style={tw`bg-gray-100 p-3 rounded-lg mr-4`}>
-            <Image
-              source={
-                selectedCargoContent?.img
-                  ? { uri: selectedCargoContent?.img }
-                  : undefined
-              }
-              style={tw`w-16 h-16`}
-              resizeMode="contain"
-            />
-          </View>
-          <View style={tw`flex-1`}>
-            <Text style={tw`text-gray-500 text-sm`}>Cargo Type</Text>
-            <Text style={tw`text-gray-800 font-medium`}>
-              {values.CargoContent}
-            </Text>
-          </View>
-        </View>
-
-        <View style={tw`flex-row items-center`}>
-          <View style={tw`bg-gray-100 p-3 rounded-lg mr-4`}>
-            <Image
-              source={
-                selectedPackageType?.img
-                  ? { uri: selectedPackageType?.img }
-                  : undefined
-              }
-              style={tw`w-16 h-16`}
-              resizeMode="contain"
-            />
-          </View>
-          <View style={tw`flex-1`}>
-            <Text style={tw`text-gray-500 text-sm`}>Packaging</Text>
-            <Text style={tw`text-gray-800 font-medium`}>
-              {values?.CargoPackageType}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Additional Information Card */}
-      <View style={[tw`bg-white rounded-2xl p-6 mb-5`, styles.card]}>
-        <View style={tw`flex-row items-center mb-4`}>
-          <View style={tw`bg-pink-100 p-2 rounded-full mr-3`}>
-            <Ionicons name="information-circle" size={20} color="#ec4899" />
-          </View>
-          <Text style={tw`text-xl font-bold text-gray-800`}>
-            Additional Information
-          </Text>
-        </View>
-
-        <View style={tw`flex-row justify-between mb-3`}>
-          <Text style={tw`text-gray-500`}>Consignee Name</Text>
-          <Text style={tw`text-gray-800 font-medium`}>
-            {values.ConsigneeName}
-          </Text>
-        </View>
-
-        <View style={tw`flex-row justify-between mb-3`}>
-          <Text style={tw`text-gray-500`}>Dhala Length</Text>
-          <Text style={tw`text-gray-800 font-medium`}>
-            {values.DhalaLength} meters
-          </Text>
-        </View>
-
-        <View style={tw`flex-row justify-between`}>
-          <Text style={tw`text-gray-500`}>Available Time</Text>
-          <Text style={tw`text-gray-800 font-medium`}>
-            {values.ExpectedAvailableTime}
-          </Text>
-        </View>
-      </View>
+      {/* Additional Notes Card */}
     </Animated.ScrollView>
   );
 };
@@ -369,12 +432,14 @@ const ConfirmationStep: React.FC = () => {
 const styles = StyleSheet.create({
   card: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 3.84,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: '#e5e7eb',
   },
 });
 

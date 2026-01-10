@@ -10,6 +10,8 @@ import { hp, wp } from '@utils/responsive';
 import React, { useMemo, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import Profile from '@screens/ProfileScreen/Profile';
+import MultiStepForm from './../../forms/MultiStepForm';
 
 export type TabParamList = {
   [routeName.HOME]: undefined;
@@ -22,10 +24,11 @@ export type TabParamList = {
 const MyPostScreen = () => <View style={styles.tabScreen} />;
 const HistoryScreen = () => (
   <View style={styles.tabScreen}>
+    <MultiStepForm />
     <FloatingActionButton />
   </View>
 );
-const ProfileScreen = () => <View style={styles.tabScreen} />;
+// const ProfileScreen = () => <View style={styles.tabScreen} />;
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
@@ -110,7 +113,7 @@ const TabNavigator = () => {
         <Tab.Screen name={routeName.HOME} component={Dashboard} />
         <Tab.Screen name="MyPost" component={LoadPostForm} />
         <Tab.Screen name="History" component={HistoryScreen} />
-        <Tab.Screen name="Profile" component={ProfileScreen} />
+        <Tab.Screen name="Profile" component={Profile} />
       </Tab.Navigator>
     </>
   );
@@ -124,7 +127,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     justifyContent: 'center',
-    alignItems: 'center',
+    padding: 2,
+    // alignItems: 'center',
   },
   tabIconContainer: {
     justifyContent: 'center',

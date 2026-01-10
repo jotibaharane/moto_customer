@@ -9,6 +9,7 @@ import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import ActionButton from '@components/common/ActionButton';
 import { SelectList } from '@components/common/Select';
 import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
+import PickupModal from './Pickupdebug';
 import {
   geocodeCoordinates,
   getCurrentLocationWithFallback,
@@ -43,6 +44,12 @@ import Entypo from 'react-native-vector-icons/Entypo';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LocationHistoryModal from './LocationHistoryModal';
+import { useDispatch, useSelector } from 'react-redux';
+import { setDestination } from '@store/slices/mapSlice';
+import { GOOGLE_MAPS_API_KEY } from '@utils/env';
+import Toast from 'react-native-toast-message';
+import { useCustomerhistoryQuery } from '@api/hooks_api';
+import { RootState } from '@store/index';
 
 export interface DropModalRef {
   open: () => void;
@@ -52,13 +59,17 @@ export interface DropModalRef {
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const DropModal = forwardRef<DropModalRef>((props, ref) => {
+  const CustomerID = useSelector(
+    (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
+  );
+
   const bottomModalRef = useRef<BottomModalRef>(null);
   const mapRef = useRef<MapView>(null);
   const [PincodeData] = useGetPincodeDataMutation();
   const [showMap, setShowMap] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const { values, setFieldValue } = useFormikContext<ShipmentData>();
-  const [fieldName, setFieldName] = useState<'origin' | 'destination' | ''>('');
+  const [fieldName, setFieldName] = useState<'pickup' | 'delivery' | ''>('');
   const [activeDestinationButton, setActiveDestinationButton] =
     useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -67,97 +78,118 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
   const [availableDistricts, setAvailableDistricts] = useState<any[]>([]);
   const { currentData } = useGetCurrentAddressQuery<any>();
   const destinationPlaces = useGooglePlacesSelect();
-  const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [mapRegion, setMapRegion] = useState<Region>(INDIA_DEFAULT_REGION);
-  const [selectedLocation, setSelectedLocation] = useState<any>(null);
+
+  type FieldErrors = {
+    consigneeName?: string;
+    contactPerson?: string;
+    contactNumber?: string;
+    pincode?: string;
+    state?: string;
+    district?: string;
+    taluka?: string;
+    plotOrBuilding?: string;
+    streetArea?: string;
+    destination?: string;
+  };
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [pincodeCoords, setPincodeCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+  const dispatch = useDispatch();
 
   // Handle destination select
   const handleDestinationSelect = useCallback(
     async (selected: any) => {
       const location = await destinationPlaces.getPlaceDetails(selected.key);
       if (location) {
-        setFieldValue('destination', location);
-        setMapRegion({
-          latitude: location.coordinates.lat,
-          longitude: location.coordinates.lng,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
+        setFieldValue('delivery.destination', location);
+        // Update map region if needed
       }
     },
     [destinationPlaces, setFieldValue],
   );
+  const { data, isLoading, error } = useCustomerhistoryQuery({
+    CustomerID: CustomerID,
+  });
+
+  console.log(data, 'this is selected location');
 
   // Handle history location select
-  const handleHistoryLocationSelect = useCallback(
-    (location: any) => {
-      setFieldValue('destination', {
-        ...values?.destination,
-        address: location,
-      });
-      setShowHistoryModal(false);
-      setActiveDestinationButton('');
-    },
-    [setFieldValue],
-  );
+  const handleHistoryLocationSelect = (item: any) => {
+    console.log('Selected history item:', item);
 
-  // Handle current location press
-  const handleCurrentLocationPress = useCallback(async () => {
-    if (isGettingLocation) return;
+    // Consignee details
+    setFieldValue('delivery.consigneeName', item.consigneeName || '');
+    setFieldValue('delivery.contactNumber', item.contactNumber || '');
+    setFieldValue('delivery.contactPerson', item.contactPerson || '');
 
-    try {
-      setIsGettingLocation(true);
-      setActiveDestinationButton('current');
+    // Address fields
+    setFieldValue('delivery.plotOrBuilding', item.plotOrBuilding || '');
+    setFieldValue('delivery.streetArea', item.streetArea || '');
 
-      const { latitude, longitude } = await getCurrentLocationWithFallback();
-      const address = await geocodeCoordinates(latitude, longitude);
+    // Extract pincode from item.address or database field
+    const pincode = item.Pincode || item.address?.match(/\b\d{6}\b/)?.[0] || '';
 
-      setFieldValue('destination', address);
-      setMapRegion({
-        latitude,
-        longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-    } catch (error: any) {
-      console.error('Location error:', error);
-      if (
-        error.message.includes('permission') ||
-        error.message.includes('disabled')
-      ) {
-        Alert.alert('Location Required', error.message, [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: openLocationSettings },
-        ]);
-      } else {
-        Alert.alert(
-          'Error',
-          'Could not get current location. Please check your location services and try again.',
-        );
-      }
-    } finally {
-      setIsGettingLocation(false);
-      setActiveDestinationButton('');
-    }
-  }, [setFieldValue, isGettingLocation]);
+    setFieldValue('delivery.pincode', pincode);
 
-  // Handle confirm
+    // Set district + state if present
+    setFieldValue('delivery.district', item.district || '');
+    setFieldValue('delivery.taluka', item.taluka || '');
+    setFieldValue('delivery.state', item.state || '');
+
+    // Google-like structure for destination
+    setFieldValue('delivery.destination', {
+      address: item.address || '',
+      components: {
+        dist: item.district || '',
+        pincode: pincode,
+        place: item.place || item.city || item.district || '',
+        state: item.state || '',
+        tal: item.taluka || '',
+      },
+      coordinates: {
+        lat: item.latitude || 0,
+        lng: item.longitude || 0,
+      },
+    });
+
+    // Close modal
+    setShowHistoryModal(false);
+    setActiveDestinationButton('');
+  };
+
   const handleConfirm = useCallback(() => {
-    if (!values.destination?.address) {
-      Alert.alert('Error', 'Please select a drop-off location');
-      return;
-    }
-    handleModalClose();
-  }, [setFieldValue, values.destination]);
+    const newErrors: any = {};
 
-  // Handle map confirm
-  const handleMapConfirm = useCallback(() => {
-    if (selectedLocation) {
-      setFieldValue('destination', selectedLocation);
-      setShowMap(false);
-      setActiveDestinationButton('');
+    if (!values.delivery.consigneeName && !values.delivery.contactPerson) {
+      newErrors.consigneeName =
+        'Either Consignee/Company Name or Contact Person Name is required';
+      newErrors.contactPerson =
+        'Either Consignee/Company Name or Contact Person Name is required';
     }
-  }, [selectedLocation, setFieldValue]);
+    if (!values.delivery.destination?.address)
+      newErrors.destination = 'Please select a drop-off location';
+    if (!values.delivery.pincode || values.delivery.pincode.length !== 6)
+      newErrors.pincode = 'Please enter a valid 6-digit pincode';
+    if (!values.delivery.state) newErrors.state = 'Please select a state';
+    if (!values.delivery.district)
+      newErrors.district = 'Please select a district';
+
+    if (!values.delivery.plotOrBuilding)
+      newErrors.plotOrBuilding = 'Please enter a valid destination';
+    if (!values.delivery.streetArea)
+      newErrors.streetArea = 'Please enter a valid destination';
+
+    setFieldErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      return; // prevent closing modal
+    }
+
+    handleModalClose();
+  }, [values, handleModalClose]);
 
   // Handle state selection
   const handleState = useCallback(
@@ -166,7 +198,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
         const response = await getDistricts({ state: value }).unwrap();
         const DistrictsList = response?.data || [];
         setAvailableDistricts(DistrictsList);
-        setFieldValue('state', value);
+        setFieldValue('delivery.state', value);
       } catch (error) {
         console.error('Error fetching districts:', error);
       }
@@ -174,17 +206,28 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
     [getDistricts, setFieldValue],
   );
 
-  // Handle pincode change
   const handlePinchange = useCallback(
     async (value: string) => {
-      setFieldValue('Pincode', value);
+      setFieldValue('delivery.pincode', value);
       if (value.length === 6) {
         try {
           const response = await PincodeData({ pincode: value }).unwrap();
           const mapped = response?.data;
           if (mapped) {
-            setFieldValue('state', mapped?.State);
-            setFieldValue('District', mapped?.District);
+            setFieldValue('delivery.state', mapped?.State);
+            setFieldValue('delivery.district', mapped?.District);
+
+            // ✅ Convert Pincode to coordinates using Google API
+            const geocodeRes = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?address=${value}&key=${GOOGLE_MAPS_API_KEY}`,
+            );
+            const geocodeJson = await geocodeRes.json();
+            console.log(geocodeJson);
+            if (geocodeJson?.results?.length) {
+              const { lat, lng } = geocodeJson.results[0]?.geometry?.location;
+              setPincodeCoords({ latitude: lat, longitude: lng });
+            }
+
             const districtResponse = await getDistricts({
               state: mapped?.State,
             }).unwrap();
@@ -200,54 +243,13 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
     [PincodeData, getDistricts, setFieldValue],
   );
 
-  // Handle map location select
-  const handleMapLocationSelect = useCallback(async (region: Region) => {
-    try {
-      setIsGettingLocation(true);
-      const address = await reverseGeocode(region.latitude, region.longitude);
-      if (address) {
-        setSelectedLocation({
-          ...address,
-          coordinates: {
-            lat: region.latitude,
-            lng: region.longitude,
-          },
-        });
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to get address for selected location');
-    } finally {
-      setIsGettingLocation(false);
-    }
-  }, []);
-
-  // Handle map region change
-  const handleMapRegionChange = useCallback((region: Region) => {
-    setMapRegion(region);
-  }, []);
-
-  // Handle map press
-  const handleMapPress = useCallback(
-    (event: any) => {
-      const { coordinate } = event.nativeEvent;
-      handleMapLocationSelect({
-        ...coordinate,
-        latitudeDelta: mapRegion.latitudeDelta,
-        longitudeDelta: mapRegion.longitudeDelta,
-      });
-    },
-    [mapRegion, handleMapLocationSelect],
-  );
-
   // Handle modal close
   const handleModalClose = useCallback(() => {
     setActiveDestinationButton('');
-    setIsGettingLocation(false);
     setShowMap(false);
     setShowHistoryModal(false);
     setFieldName('');
     setIsModalOpen(false);
-    setSelectedLocation(null);
     bottomModalRef.current?.close();
   }, []);
 
@@ -295,79 +297,52 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
           </TouchableOpacity>
         </View>
 
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          provider={PROVIDER_GOOGLE}
-          region={mapRegion}
-          onRegionChangeComplete={handleMapRegionChange}
-          onPress={handleMapPress}
-          showsUserLocation={true}
-          showsMyLocationButton={true}
-          followsUserLocation={true}
-        >
-          {selectedLocation && (
-            <Marker
-              coordinate={{
-                latitude: selectedLocation.coordinates.lat,
-                longitude: selectedLocation.coordinates.lng,
-              }}
-              title="Selected Location"
-              description={selectedLocation.address}
-            />
-          )}
-        </MapView>
+        <PickupModal
+          // Use pincodeCoords if available, otherwise fallback to Formik destination coordinates
+          pincodeCoords={
+            pincodeCoords ||
+            (values.delivery.destination?.coordinates?.lat
+              ? {
+                  latitude: values.delivery.destination.coordinates.lat,
+                  longitude: values.delivery.destination.coordinates.lng,
+                }
+              : null)
+          }
+          onLocationSelected={location => {
+            setFieldValue('delivery.destination', {
+              address: location.address,
+              coordinates: {
+                lat: location.latitude,
+                lng: location.longitude,
+              },
+              components: {
+                state: '',
+                dist: '',
+                place: '',
+                tal: '',
+                pincode: '',
+              },
+            });
 
-        <View style={styles.mapFooter}>
-          <View style={styles.selectedLocationInfo}>
-            {selectedLocation ? (
-              <>
-                <Text style={styles.locationAddress} numberOfLines={2}>
-                  {selectedLocation.address}
-                </Text>
-                <Text style={styles.locationCoordinates}>
-                  {selectedLocation.coordinates.lat.toFixed(6)},{' '}
-                  {selectedLocation.coordinates.lng.toFixed(6)}
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.noLocationText}>
-                Tap on the map to select a location
-              </Text>
-            )}
-          </View>
+            // Update pincodeCoords as well so map stays in sync
+            setPincodeCoords({
+              latitude: location.latitude,
+              longitude: location.longitude,
+            });
 
-          <View style={styles.mapActions}>
-            <TouchableOpacity
-              style={[styles.mapButton, styles.cancelMapButton]}
-              onPress={() => {
-                setShowMap(false);
-                setActiveDestinationButton('');
-              }}
-            >
-              <Text style={styles.cancelMapButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.mapButton,
-                styles.confirmMapButton,
-                !selectedLocation && styles.disabledButton,
-              ]}
-              onPress={handleMapConfirm}
-              disabled={!selectedLocation}
-            >
-              <Text style={styles.confirmMapButtonText}>Select Location</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+            setShowMap(false);
+            setActiveDestinationButton('');
+          }}
+        />
       </View>
+      <Toast />
     </Modal>
   );
 
   return (
     <BottomModal
       ref={bottomModalRef}
-      customHeight="80%"
+      customHeight="98%"
       backdropOpacity={0.8}
       animationDuration={400}
       swipeThreshold={50}
@@ -377,285 +352,339 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <Text style={styles.title}>Drop Location Details</Text>
-          </View>
           <TouchableOpacity
             onPress={handleModalClose}
             style={styles.closeButton}
           >
-            <Icon name="close" size={24} color="#666" />
+            <Icon name="close" size={22} color="#666" />
+          </TouchableOpacity>
+
+          <Text style={styles.title}>Drop Location</Text>
+
+          <TouchableOpacity
+            style={styles.historyButton}
+            onPress={() => {
+              setActiveDestinationButton('history');
+              setShowHistoryModal(true);
+            }}
+          >
+            <FontAwesome name="history" size={18} color="#005FCC" />
+            <Text style={styles.historyText}>History</Text>
           </TouchableOpacity>
         </View>
+        <View style={tw` bg-white p-4 rounded-2xl    border-gray-100`}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Consignee / Company Name *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter consignee name"
+              textTransform="capitalize"
+              value={values.delivery.consigneeName}
+              error={!!fieldErrors.consigneeName}
+              onChangeText={text => {
+                setFieldValue('delivery.consigneeName', text);
 
-        {/* Content */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContent}
-        >
-          <ScrollView
-            style={styles.modalBody}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Consignee Details */}
-            <View
-              style={tw`mb-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-100`}
-            >
-              <View style={tw`flex-row items-center mb-4`}>
-                <View style={tw`w-2 h-6 bg-blue-500 mr-3 rounded-full`} />
-                <Text style={tw`text-lg font-bold text-gray-800`}>
-                  Consignee Details
-                </Text>
-              </View>
+                if (fieldErrors.consigneeName || fieldErrors.contactPerson) {
+                  setFieldErrors(prev => ({
+                    ...prev,
+                    consigneeName: '',
+                    contactPerson: '',
+                  }));
+                }
+              }}
+            />
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Consignee Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter consignee name"
-                  value={values.ConsigneeName}
-                  onChangeText={text => setFieldValue('ConsigneeName', text)}
-                />
-              </View>
-            </View>
+            {fieldErrors.consigneeName && (
+              <Text style={{ color: 'red', fontSize: 12 }}>
+                {fieldErrors.consigneeName}
+              </Text>
+            )}
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Contact Person Name *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter Contact Person name"
+              textTransform="capitalize"
+              value={values.delivery.contactPerson}
+              error={!!fieldErrors.contactPerson}
+              onChangeText={text => {
+                setFieldValue('delivery.contactPerson', text);
 
-            {/* Address Information */}
-            <View
-              style={tw`mb-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-100`}
-            >
-              <View style={tw`flex-row items-center mb-4`}>
-                <View style={tw`w-2 h-6 bg-green-500 mr-3 rounded-full`} />
-                <Text style={tw`text-lg font-bold text-gray-800`}>
-                  Address Information
-                </Text>
-              </View>
+                if (fieldErrors.consigneeName || fieldErrors.contactPerson) {
+                  setFieldErrors(prev => ({
+                    ...prev,
+                    consigneeName: '',
+                    contactPerson: '',
+                  }));
+                }
+              }}
+            />
 
-              <View style={tw`gap-3 mb-4`}>
-                <View style={tw`flex-1`}>
-                  <Text style={styles.label}>Pincode *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter Pincode"
-                    value={values.Pincode}
-                    onChangeText={handlePinchange}
-                    keyboardType="numeric"
-                    maxLength={6}
-                  />
-                </View>
-                <View style={tw`flex-1`}>
-                  <Text style={styles.label}>State *</Text>
-                  <SelectList
-                    data={stateData?.data || []}
-                    displayKey="state"
-                    save="state"
-                    value={values.state}
-                    setSelected={handleState}
-                    placeholder="Select State"
-                    onClear={() => setFieldValue('state', '')}
-                    inputStyles={tw`border-gray-200`}
-                  />
-                </View>
-              </View>
+            {fieldErrors.contactPerson && (
+              <Text style={{ color: 'red', fontSize: 12 }}>
+                {fieldErrors.contactPerson}
+              </Text>
+            )}
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Contact Mobile Number *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter mobile number"
+              value={values.delivery.contactNumber}
+              onChangeText={text => {
+                setFieldValue('delivery.contactNumber', text);
+                if (fieldErrors.contactNumber) {
+                  setFieldErrors(prev => ({
+                    ...prev,
+                    contactNumber: '',
+                  }));
+                }
+              }}
+              keyboardType="numeric"
+              maxLength={10}
+              error={!!fieldErrors.contactNumber}
+            />
+            {fieldErrors.contactNumber && (
+              <Text style={{ color: 'red', fontSize: 12 }}>
+                {fieldErrors.contactNumber}
+              </Text>
+            )}
+          </View>
 
-              <View style={tw`gap-3 mb-4`}>
-                <View style={tw`flex-1`}>
-                  <Text style={styles.label}>District / City *</Text>
-                  <SelectList
-                    data={availableDistricts}
-                    displayKey="region"
-                    save="region"
-                    value={values.District}
-                    setSelected={(val: any) => setFieldValue('District', val)}
-                    placeholder="Select District"
-                    onClear={() => setFieldValue('District', '')}
-                    disabled={!values.state}
-                    inputStyles={tw`border-gray-200`}
-                  />
-                </View>
-                <View style={tw`flex-1`}>
-                  <Text style={styles.label}>Taluka</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter Taluka"
-                    value={values.Taluka}
-                    onChangeText={text => setFieldValue('Taluka', text)}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Delivery Location */}
-            <View
-              style={tw`mb-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-100`}
-            >
-              <View style={tw`flex-row items-center mb-4`}>
-                <View style={tw`w-2 h-6 bg-red-500 mr-3 rounded-full`} />
-                <Text style={tw`text-lg font-bold text-gray-800`}>
-                  Google Location
-                </Text>
-              </View>
-
-              <SelectList
-                data={destinationPlaces.suggestions}
-                displayKey="value"
-                value={values.destination?.address}
-                save="object"
-                setSelected={handleDestinationSelect}
-                placeholder="Search delivery location..."
-                search={true}
-                onSearchChange={destinationPlaces.handleInputChange}
-                searchValue={destinationPlaces.inputValue}
-                onClear={() => {
-                  setFieldValue('destination', {
-                    address: '',
-                    components: {
-                      dist: '',
-                      Pincode: '',
-                      place: '',
-                      state: '',
-                      tal: '',
-                    },
-                    coordinates: {
-                      lat: 0,
-                      lng: 0,
-                    },
-                  });
+          <View style={tw`flex-row gap-3 mb-4`}>
+            <View style={tw`flex-1`}>
+              <Text style={styles.label}>Pincode *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter Pincode"
+                value={values.delivery.pincode}
+                onChangeText={text => {
+                  handlePinchange(text);
+                  if (fieldErrors.pincode) {
+                    setFieldErrors(prev => ({ ...prev, pincode: '' }));
+                  }
                 }}
+                keyboardType="numeric"
+                maxLength={6}
+                error={!!fieldErrors.pincode}
+              />
+              {fieldErrors.pincode && (
+                <Text style={{ color: 'red', fontSize: 12 }}>
+                  {fieldErrors.pincode}
+                </Text>
+              )}
+            </View>
+
+            <View style={tw`flex-1`}>
+              <Text style={styles.label}>State *</Text>
+              <SelectList
+                data={stateData?.data || []}
+                displayKey="state"
+                save="state"
+                value={values.delivery.state}
+                setSelected={value => {
+                  handleState(value);
+                  if (fieldErrors.state) {
+                    setFieldErrors(prev => ({ ...prev, state: '' }));
+                  }
+                }}
+                placeholder="Select State"
+                onClear={() => setFieldValue('delivery.state', '')}
+                inputStyles={tw`border-gray-200`}
+                style={
+                  fieldErrors.state && { borderColor: 'red', borderWidth: 1 }
+                }
+              />
+              {fieldErrors.state && (
+                <Text style={{ color: 'red', fontSize: 12 }}>
+                  {fieldErrors.state}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Address Row 2 — District + Taluka */}
+          <View style={tw`flex-row gap-3 mb-4`}>
+            <View style={tw`flex-1`}>
+              <Text style={styles.label}>District / City *</Text>
+              <SelectList
+                data={availableDistricts}
+                displayKey="region"
+                save="region"
+                value={values.delivery.district}
+                setSelected={val => setFieldValue('delivery.district', val)}
+                placeholder="Select District"
+                onClear={() => setFieldValue('delivery.district', '')}
+                disabled={!values.delivery.state}
                 inputStyles={tw`border-gray-200`}
               />
+            </View>
 
-              <View style={tw`flex-row justify-between mt-4 gap-3`}>
-                <ActionButton
-                  icon={
-                    <Icon
-                      name="my-location"
-                      size={18}
-                      color={
-                        activeDestinationButton === 'current'
-                          ? '#fff'
-                          : tw.color('blue-600')
-                      }
-                    />
+            <View style={tw`flex-1`}>
+              <Text style={styles.label}>Taluka / Town</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter Taluka"
+                value={values.delivery.taluka}
+                error={!!fieldErrors.taluka}
+                onChangeText={text => {
+                  setFieldValue('delivery.taluka', text);
+                  if (fieldErrors.taluka) {
+                    setFieldErrors(prev => ({ ...prev, taluka: '' }));
                   }
-                  text={isGettingLocation ? 'Locating...' : 'Current'}
-                  onPress={handleCurrentLocationPress}
-                  color={
-                    activeDestinationButton === 'current'
-                      ? tw.color('blue-600') || ''
-                      : 'transparent'
+                }}
+              />
+              {fieldErrors.taluka && (
+                <Text style={{ color: 'red', fontSize: 12 }}>
+                  {fieldErrors.taluka}
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+        {/* Address Details */}
+        <View style={tw` bg-white p-4 rounded-2xl    border-gray-100`}>
+          <View style={tw`gap-3`}>
+            {/* plotOrBuilding Field */}
+            <View style={tw`flex-1`}>
+              <Text style={styles.label}>
+                Plot No/ Unit No/ Building / Flat / Company
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter plot/unit number"
+                textTransform="capitalize"
+                value={values.delivery.plotOrBuilding}
+                error={!!fieldErrors.plotOrBuilding}
+                onChangeText={text => {
+                  setFieldValue('delivery.plotOrBuilding', text);
+
+                  // ✅ clear error when user starts typing
+                  if (fieldErrors.plotOrBuilding) {
+                    setFieldErrors(prev => ({
+                      ...prev,
+                      plotOrBuilding: '',
+                    }));
                   }
-                  style={tw`border border-blue-600 ${
-                    isGettingLocation ? 'opacity-70' : ''
-                  }`}
-                />
-                <ActionButton
-                  icon={
-                    <Entypo
-                      name="map"
-                      size={18}
-                      color={
-                        activeDestinationButton === 'map'
-                          ? '#fff'
-                          : tw.color('purple-600')
-                      }
-                    />
+                }}
+              />
+              {fieldErrors.plotOrBuilding && (
+                <Text style={{ color: 'red', fontSize: 12 }}>
+                  {fieldErrors.plotOrBuilding}
+                </Text>
+              )}
+            </View>
+
+            {/* streetArea Field */}
+            <View style={tw`flex-1`}>
+              <Text style={styles.label}>Area/Street/Sector/Village</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter area details"
+                textTransform="capitalize"
+                value={values.delivery.streetArea}
+                error={!!fieldErrors.streetArea}
+                onChangeText={text => {
+                  setFieldValue('delivery.streetArea', text);
+
+                  // ✅ clear error when user starts typing
+                  if (fieldErrors.streetArea) {
+                    setFieldErrors(prev => ({
+                      ...prev,
+                      streetArea: '',
+                    }));
                   }
-                  text="Map"
-                  onPress={() => {
-                    setFieldName('destination');
-                    setActiveDestinationButton('map');
-                    setShowMap(true);
-                  }}
+                }}
+              />
+              {fieldErrors.streetArea && (
+                <Text style={{ color: 'red', fontSize: 12 }}>
+                  {fieldErrors.streetArea}
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+        {/* Delivery Location */}
+        <View
+          style={tw`mb-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100`}
+        >
+          <SelectList
+            data={destinationPlaces?.suggestions}
+            displayKey="value"
+            value={values.delivery.destination?.address}
+            save="object"
+            setSelected={handleDestinationSelect}
+            placeholder="Google Address"
+            search={true}
+            onSearchChange={destinationPlaces.handleInputChange}
+            searchValue={destinationPlaces.inputValue}
+            onClear={() => {
+              setFieldValue('delivery.destination', {
+                address: '',
+                components: {
+                  dist: '',
+                  pincode: '',
+                  place: '',
+                  state: '',
+                  tal: '',
+                },
+                coordinates: {
+                  lat: 0,
+                  lng: 0,
+                },
+              });
+            }}
+            inputStyles={tw`border-gray-200`}
+          />
+          <View style={tw`flex-row justify-between `}>
+            <ActionButton
+              icon={
+                <Entypo
+                  name="map"
+                  size={18}
                   color={
                     activeDestinationButton === 'map'
-                      ? tw.color('purple-600') || ''
-                      : 'transparent'
+                      ? '#fff'
+                      : tw.color('purple-600')
                   }
-                  style={tw`border border-purple-600 `}
                 />
-                <ActionButton
-                  icon={
-                    <FontAwesome
-                      name="history"
-                      size={18}
-                      color={
-                        activeDestinationButton === 'history'
-                          ? '#fff'
-                          : tw.color('gray-600')
-                      }
-                    />
-                  }
-                  text="History"
-                  onPress={() => {
-                    setActiveDestinationButton('history');
-                    setShowHistoryModal(true);
-                  }}
-                  color={
-                    activeDestinationButton === 'history'
-                      ? tw.color('gray-600') || ''
-                      : 'transparent'
-                  }
-                  style={tw`border border-gray-600`}
-                />
-              </View>
-            </View>
-
-            {/* Address Details */}
-            <View
-              style={tw`mb-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-100`}
-            >
-              <View style={tw`flex-row items-center mb-4`}>
-                <View style={tw`w-2 h-6 bg-orange-500 mr-3 rounded-full`} />
-                <Text style={tw`text-lg font-bold text-gray-800`}>
-                  Address Details
-                </Text>
-              </View>
-
-              <View style={tw`gap-3 mb-4`}>
-                <View style={tw`flex-1`}>
-                  <Text style={styles.label}>
-                    Plot No/ Unit No/ Building / Flat / Company
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter plot/unit number"
-                    value={values.Destination_1}
-                    onChangeText={text => setFieldValue('Destination_1', text)}
-                  />
-                </View>
-                <View style={tw`flex-1`}>
-                  <Text style={styles.label}>Area/Street/Sector/Village</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter area details"
-                    value={values.Destination_2}
-                    onChangeText={text => setFieldValue('Destination_2', text)}
-                  />
-                </View>
-              </View>
-            </View>
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.cancelButton, tw`border border-gray-300`]}
-              onPress={handleModalClose}
-            >
-              <Text style={[styles.cancelButtonText, tw`text-gray-700`]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.confirmButton, tw`bg-blue-600`]}
-              onPress={handleConfirm}
-            >
-              <Text style={[styles.confirmButtonText, tw`text-white`]}>
-                Confirm Drop
-              </Text>
-            </TouchableOpacity>
+              }
+              text="Map"
+              onPress={() => {
+                setFieldName('delivery');
+                setActiveDestinationButton('map');
+                setShowMap(true);
+              }}
+              color={
+                activeDestinationButton === 'map'
+                  ? tw.color('purple-600') || ''
+                  : 'transparent'
+              }
+              style={tw`border border-purple-600 `}
+            />
           </View>
-        </KeyboardAvoidingView>
+        </View>
+
+        <View style={styles.modalFooter}>
+          <TouchableOpacity
+            style={[styles.cancelButton, tw`border border-gray-300`]}
+            onPress={handleModalClose}
+          >
+            <Text style={[styles.cancelButtonText, tw`text-gray-700`]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.confirmButton, tw`bg-blue-600`]}
+            onPress={handleConfirm}
+          >
+            <Text style={[styles.confirmButtonText, tw`text-white`]}>
+              Confirm Drop
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Map Modal */}
@@ -670,6 +699,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
         }}
         onSelectLocation={handleHistoryLocationSelect}
         locations={currentData?.Address || []}
+        type="destination"
       />
     </BottomModal>
   );
@@ -689,7 +719,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
     backgroundColor: '#FFF',
@@ -749,16 +779,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 5,
   },
   label: {
-    marginBottom: 6,
     fontWeight: '500',
     color: '#374151',
   },
   input: {
+    height: 45,
     borderWidth: 1,
     borderColor: '#d1d5db',
+    backgroundColor: 'white',
     borderRadius: 8,
     fontSize: 16,
   },
@@ -766,6 +797,7 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     backgroundColor: 'white',
+    padding: 5,
   },
   mapHeader: {
     flexDirection: 'row',
@@ -844,6 +876,52 @@ const styles = StyleSheet.create({
   confirmMapButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+
+  historyButton: {
+    position: 'absolute',
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F0FE',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+
+  historyText: {
+    marginLeft: 4,
+    color: '#005FCC',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderColor: '#E5E7EB',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+  },
+
+  title: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+
+  closeButton: {
+    position: 'absolute',
+    left: 16,
+    padding: 4,
   },
 });
 

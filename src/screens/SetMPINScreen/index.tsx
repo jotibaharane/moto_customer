@@ -67,16 +67,30 @@ const SetMPINScreen: React.FC<any> = () => {
           mpin={firstMpin}
         />
       ) : (
+        // <ConfirmMPIN
+        //   mpin={confirmMpin}
+        //   onConfirm={handleConfirm}
+        //   onNumberPress={num => {
+        //     if (confirmMpin.length < 6) {
+        //       // Changed from 4 to 6
+        //       setConfirmMpin(prev => prev + num);
+        //     }
+        //   }}
+        //   onBackspace={() => setConfirmMpin(prev => prev.slice(0, -1))}
+        // />
         <ConfirmMPIN
           mpin={confirmMpin}
           onConfirm={handleConfirm}
           onNumberPress={num => {
             if (confirmMpin.length < 6) {
-              // Changed from 4 to 6
               setConfirmMpin(prev => prev + num);
             }
           }}
           onBackspace={() => setConfirmMpin(prev => prev.slice(0, -1))}
+          onBack={() => {
+            setStep('enter');
+            setConfirmMpin('');
+          }}
         />
       )}
     </View>

@@ -1,3 +1,4 @@
+import Geolocation from '@react-native-community/geolocation';
 import { Location } from '@store/slices/mapSliceType';
 import { GOOGLE_MAPS_API_KEY } from '@utils/env';
 import { useCallback, useState } from 'react';
@@ -20,7 +21,46 @@ export const useGooglePlacesSelect = () => {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(
     null,
   );
+  const getCurrentLocation = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      Geolocation.getCurrentPosition(
+        async position => {
+          try {
+            const { latitude, longitude } = position.coords;
 
+            // Reverse Geocoding API
+            const response = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`,
+            );
+
+            const data = await response.json();
+
+            if (data.results?.length > 0) {
+              const result = data.results[0];
+
+              const location = {
+                address: result.formatted_address,
+                coordinates: {
+                  lat: latitude,
+                  lng: longitude,
+                },
+                components: extractAddressComponents(result.address_components),
+              };
+
+              setSelectedLocation(location);
+              resolve(location);
+            } else {
+              reject('No address found');
+            }
+          } catch (err) {
+            reject(err);
+          }
+        },
+        error => reject(error),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+      );
+    });
+  }, []);
   const fetchSuggestions = useCallback(async (input: string) => {
     if (input.length < 3) {
       setSuggestions([]);
@@ -35,7 +75,7 @@ export const useGooglePlacesSelect = () => {
         )}&key=${GOOGLE_MAPS_API_KEY}&components=country:IN`,
       );
       const data = await response.json();
-      console.log({ data });
+
       setSuggestions(
         (data.predictions || []).map((item: GooglePlace) => ({
           key: item.place_id,
@@ -43,6 +83,7 @@ export const useGooglePlacesSelect = () => {
           data: item,
         })),
       );
+      // setSuggestions([]);
     } catch (error) {
       console.error('Error fetching suggestions:', error);
       setSuggestions([]);
@@ -62,7 +103,7 @@ export const useGooglePlacesSelect = () => {
 
         if (data?.result) {
           const location = formatLocationResult(data?.result);
-          console.log({ location });
+
           setSelectedLocation(location);
           return location;
         }
@@ -131,11 +172,13 @@ export const useGooglePlacesSelect = () => {
 
   return {
     inputValue,
+    setInputValue,
     suggestions,
     isLoading,
     selectedLocation,
     handleInputChange,
     getPlaceDetails,
     setSelectedLocation,
+    getCurrentLocation,
   };
 };

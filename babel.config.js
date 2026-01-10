@@ -32,6 +32,7 @@ module.exports = {
           '@constants': './src/constants',
           '@api': './src/api',
           '@modal': './src/modal',
+          '@forms': './src/forms',
         },
       },
     ],

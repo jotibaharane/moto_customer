@@ -77,7 +77,6 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
   }));
 
   const callDriver = (phoneNumber: string) => {
-    console.log('Calling driver:', phoneNumber);
     // Implement actual call functionality
   };
 
@@ -165,8 +164,8 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
               <Icon source="map-marker" size={16} color="#5e6bff" />
               <Text style={activeTripStyles.locationLabel}>Pickup</Text>
             </View>
-            <Text style={activeTripStyles.locationText} numberOfLines={1}>
-              {item.Origin_City}
+            <Text style={activeTripStyles.locationText} numberOfLines={3}>
+              {item.Origin}
             </Text>
             <Text style={activeTripStyles.locationSubtext}>
               {item.Origin_State}
@@ -179,8 +178,8 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
               <Icon source="map-marker-check" size={16} color="#FF6B6B" />
               <Text style={activeTripStyles.locationLabel}>Delivery</Text>
             </View>
-            <Text style={activeTripStyles.locationText} numberOfLines={1}>
-              {item.Destination_City}
+            <Text style={activeTripStyles.locationText} numberOfLines={3}>
+              {item.Destination}
             </Text>
             <Text style={activeTripStyles.locationSubtext}>
               {item.Destination_State}

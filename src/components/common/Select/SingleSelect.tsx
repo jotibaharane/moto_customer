@@ -54,7 +54,7 @@ interface SelectListProps {
   searchValue?: string;
   isLoading?: boolean;
   onClear?: () => void;
-  disabled?: boolean; // New disabled prop
+  disabled?: boolean;
 }
 
 const SelectList: React.FC<SelectListProps> = ({
@@ -92,7 +92,7 @@ const SelectList: React.FC<SelectListProps> = ({
   onSearchChange,
   searchValue,
   isLoading = false,
-  disabled = false, // Default to false
+  disabled = false,
 }) => {
   const [_firstRender, _setFirstRender] = React.useState<boolean>(true);
   const [dropdown, setDropdown] = React.useState<boolean>(dropdownShown);
@@ -206,7 +206,7 @@ const SelectList: React.FC<SelectListProps> = ({
   ]);
 
   const slidedown = () => {
-    if (disabled) return; // Don't open dropdown if disabled
+    if (disabled) return;
     setDropdown(true);
     setIsFocused(true);
     Animated.timing(animatedvalue, {
@@ -276,19 +276,30 @@ const SelectList: React.FC<SelectListProps> = ({
   return (
     <View>
       {dropdown && search ? (
-        <View style={[styles.wrapper, boxStyles]}>
+        <View style={[styles.wrapper, boxStyles, { backgroundColor: '#fff' }]}>
           <View style={styles.searchContainer}>
             {!searchicon ? (
-              <Icon name="search" size={20} style={styles.searchIcon} />
+              <Icon
+                name="search"
+                size={20}
+                style={styles.searchIcon}
+                color="#666"
+              />
             ) : (
               searchicon
             )}
 
             <TextInput
               placeholder={searchPlaceholder}
+              placeholderTextColor="#999"
               onChangeText={handleSearchChange}
               value={actualSearchValue}
-              style={[styles.searchInput, { fontFamily }, inputStyles]}
+              style={[
+                styles.searchInput,
+                { fontFamily, color: '#000' },
+                inputStyles,
+              ]}
+              selectionColor="#1976D2"
             />
 
             {isLoading ? (
@@ -296,7 +307,12 @@ const SelectList: React.FC<SelectListProps> = ({
             ) : (
               <TouchableOpacity onPress={handleClearSearch}>
                 {!closeicon ? (
-                  <Icon name="close" size={17} style={styles.closeIcon} />
+                  <Icon
+                    name="close"
+                    size={17}
+                    style={styles.closeIcon}
+                    color="#666"
+                  />
                 ) : (
                   closeicon
                 )}
@@ -318,7 +334,7 @@ const SelectList: React.FC<SelectListProps> = ({
                 },
                 inputStyles,
                 tw`text-primary font-semibold`,
-                disabled && { color: '#c4c5c6' }, // Disabled label color
+                disabled && { color: '#c4c5c6' },
               ]}
             >
               {label}
@@ -328,14 +344,15 @@ const SelectList: React.FC<SelectListProps> = ({
             style={[
               styles.wrapper,
               boxStyles,
+              { backgroundColor: disabled ? '#f5f5f5' : '#fff' }, // Add background color
               label && { paddingTop: 18, paddingBottom: 8 },
               disabled && {
                 backgroundColor: '#f5f5f5',
                 borderColor: '#e0e0e0',
-              }, // Disabled styles
+              },
             ]}
             onPress={() => {
-              if (disabled) return; // Don't respond to presses if disabled
+              if (disabled) return;
               if (!dropdown) {
                 Keyboard.dismiss();
                 slidedown();
@@ -343,7 +360,7 @@ const SelectList: React.FC<SelectListProps> = ({
                 slideup();
               }
             }}
-            activeOpacity={disabled ? 1 : 0.7} // No opacity change when disabled
+            activeOpacity={disabled ? 1 : 0.7}
             disabled={disabled}
           >
             {iconLeft && (
@@ -354,10 +371,10 @@ const SelectList: React.FC<SelectListProps> = ({
             <Text
               numberOfLines={2}
               style={[
-                { fontFamily },
+                { fontFamily, color: disabled ? '#c4c5c6' : '#000' }, // Set text color
                 inputStyles,
                 iconLeft && { marginLeft: 10, flex: 1 },
-                disabled && { color: '#c4c5c6' }, // Disabled text color
+                disabled && { color: '#c4c5c6' },
               ]}
             >
               {getDisplayValue(selectedItem)}
@@ -365,22 +382,22 @@ const SelectList: React.FC<SelectListProps> = ({
 
             {!arrowicon && !onClear ? (
               <Icon
-                name="keyboard-arrow-down"
+                name={dropdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
                 size={20}
-                style={[styles.arrowIcon, disabled && { color: '#c4c5c6' }]} // Disabled arrow color
+                style={[styles.arrowIcon, disabled && { color: '#c4c5c6' }]}
+                color={disabled ? '#c4c5c6' : '#666'}
               />
             ) : (
               arrowicon
             )}
           </TouchableOpacity>
-          {value !== '' &&
-            !disabled && ( // Don't show clear button when disabled
-              <IconButton
-                icon="close"
-                style={tw`absolute right-0 top-0`}
-                onPress={onClear}
-              />
-            )}
+          {value !== '' && !disabled && (
+            <IconButton
+              icon="close"
+              style={tw`absolute right-0 top-0`}
+              onPress={onClear}
+            />
+          )}
         </View>
       )}
 
@@ -388,13 +405,30 @@ const SelectList: React.FC<SelectListProps> = ({
         <Animated.View
           style={[
             styles.dropdown,
-            { maxHeight: animatedvalue },
+            {
+              maxHeight: animatedvalue,
+              position: 'absolute',
+              bottom: '100%',
+              marginBottom: 8,
+              zIndex: 9999,
+              backgroundColor: '#fff', // White background for dropdown
+              elevation: 5,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 4,
+            },
             dropdownStyles,
           ]}
         >
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { backgroundColor: '#fff' },
+            ]}
             nestedScrollEnabled={true}
+            showsVerticalScrollIndicator={true}
+            indicatorStyle="black"
           >
             {filtereddata.length >= 1 ? (
               filtereddata.map((item, index) => {
@@ -415,8 +449,13 @@ const SelectList: React.FC<SelectListProps> = ({
                     style={[
                       styles.option,
                       dropdownItemStyles,
-                      isSelected && { backgroundColor: '#f0f0f0' },
-                      disabled && [styles.disabledoption, disabledItemStyles],
+                      { backgroundColor: '#fff' }, // White background for each option
+                      isSelected && { backgroundColor: '#f0f7ff' }, // Light blue for selected
+                      disabled && [
+                        styles.disabledoption,
+                        disabledItemStyles,
+                        { backgroundColor: '#f9f9f9' },
+                      ],
                     ]}
                     key={index}
                     onPress={() => !disabled && handleItemPress(item)}
@@ -424,10 +463,15 @@ const SelectList: React.FC<SelectListProps> = ({
                   >
                     <Text
                       style={[
-                        { fontFamily },
+                        { fontFamily, color: '#000' }, // Black text
                         dropdownTextStyles,
-                        disabled && [styles.disabledText, disabledTextStyles],
+                        disabled && [
+                          styles.disabledText,
+                          disabledTextStyles,
+                          { color: '#999' },
+                        ],
                       ]}
+                      numberOfLines={2}
                     >
                       {displayValue}
                     </Text>
@@ -437,7 +481,11 @@ const SelectList: React.FC<SelectListProps> = ({
             ) : (
               <View>
                 <TouchableOpacity
-                  style={[styles.option, dropdownItemStyles]}
+                  style={[
+                    styles.option,
+                    dropdownItemStyles,
+                    { backgroundColor: '#fff' },
+                  ]}
                   onPress={() => {
                     const newItem = { [displayKey]: actualSearchValue };
                     setSelectedItem(newItem);
@@ -445,7 +493,9 @@ const SelectList: React.FC<SelectListProps> = ({
                     slideup();
                   }}
                 >
-                  <Text style={[{ fontFamily }, dropdownTextStyles]}>
+                  <Text
+                    style={[{ fontFamily, color: '#000' }, dropdownTextStyles]}
+                  >
                     {notFoundText} min 3 word - Use "{actualSearchValue}"
                   </Text>
                 </TouchableOpacity>
@@ -462,67 +512,81 @@ const styles = StyleSheet.create({
   wrapper: {
     borderWidth: 1,
     borderRadius: 10,
-    borderColor: 'gray',
+    borderColor: '#ddd', // Lighter border color
     paddingHorizontal: 20,
     paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     position: 'relative',
+    backgroundColor: '#fff', // White background
   },
   dropdown: {
     borderWidth: 1,
     borderRadius: 10,
-    borderColor: 'gray',
+    borderColor: '#ddd',
     marginTop: 10,
     overflow: 'hidden',
+    backgroundColor: '#fff', // White background for dropdown
   },
   option: {
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 12,
     overflow: 'hidden',
+    backgroundColor: '#fff', // White background for options
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0', // Separator between options
   },
   disabledoption: {
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'whitesmoke',
+    backgroundColor: '#f9f9f9', // Light gray for disabled
     opacity: 0.9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    backgroundColor: '#fff', // White background for search container
   },
   searchIcon: {
     width: 20,
     height: 20,
-    marginRight: 7,
+    marginRight: 10,
+    color: '#666',
   },
   searchInput: {
     padding: 0,
     height: 20,
     flex: 1,
+    color: '#000', // Black text for search input
+    fontSize: 16,
   },
   closeIcon: {
     width: 17,
     height: 17,
+    color: '#666',
   },
   arrowIcon: {
     width: 20,
     height: 20,
+    color: '#666',
   },
   scrollContent: {
-    paddingVertical: 10,
+    paddingVertical: 0, // No vertical padding
     overflow: 'hidden',
+    backgroundColor: '#fff', // White background for scroll content
   },
   disabledText: {
-    color: '#c4c5c6',
+    color: '#999', // Gray for disabled text
   },
   label: {
     position: 'absolute',
-    backgroundColor: 'white',
+    backgroundColor: '#fff', // White background for label
     paddingHorizontal: 4,
     zIndex: 1,
   },

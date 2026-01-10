@@ -74,6 +74,20 @@ export const motoApi = baseApi.injectEndpoints({
         body: queryArg,
       }),
     }),
+    insertVehicleloadpostdatasheet: builder.mutation<any, any>({
+      query: queryArg => ({
+        url: `/customer_loadpost_master`,
+        method: 'POST',
+        body: queryArg,
+      }),
+    }),
+    UpdateCustomer: builder.mutation<RegisterResponse, RegisterRequest>({
+      query: queryArg => ({
+        url: `/update_Customer`,
+        method: 'POST',
+        body: queryArg,
+      }),
+    }),
     getState: builder.query<StateResponse, void>({
       query: () => ({
         url: '/get_state_region_district',
@@ -94,17 +108,14 @@ export const motoApi = baseApi.injectEndpoints({
         body: queryArg,
       }),
     }),
-    getCustomerPosts: builder.mutation<
-      CustomerPostResponse,
-      CustomerPostRequest
-    >({
+    getCustomerPosts: builder.query<CustomerPostResponse, CustomerPostRequest>({
       query: body => ({
         url: '/get_customer_load_post',
         method: 'POST',
         body,
       }),
     }),
-    getProcessTrips: builder.mutation<
+    getProcessTrips: builder.query<
       CustomerProcessResponse,
       CustomerProcessRequest
     >({
@@ -127,6 +138,21 @@ export const motoApi = baseApi.injectEndpoints({
     >({
       query: queryArg => ({
         url: `/Insert_customer_load_post`,
+        method: 'POST',
+        body: queryArg,
+      }),
+    }),
+
+    InsertEmployee: builder.mutation<any, any>({
+      query: queryArg => ({
+        url: `/Insert_customer_employee`,
+        method: 'POST',
+        body: queryArg,
+      }),
+    }),
+    Updateloadpost: builder.mutation<any, any>({
+      query: queryArg => ({
+        url: `/customer_loadpost_master`,
         method: 'POST',
         body: queryArg,
       }),
@@ -155,22 +181,26 @@ export const motoApi = baseApi.injectEndpoints({
         body: query,
       }),
     }),
-    getTruckType: builder.mutation<TruckResponse, void>({
+    getTruckTypemutation: builder.mutation<TruckResponse, void>({
       query: () => ({
         url: '/get_vehicle_Details',
         method: 'POST',
       }),
     }),
-    getAproximateWeight: builder.query<
-      WeightResponse,
-      ApproximateWeightRequest
-    >({
-      query: body => ({
+    getTruckType: builder.query<TruckResponse, void>({
+      query: () => ({
         url: '/get_vehicle_Details',
-        method: 'POST',
-        body,
+        method: 'POST', // still POST if your API requires it
       }),
     }),
+    getcustomerloadpostdetails: builder.query<any, { CustomerID: string }>({
+      query: ({ CustomerID }) => ({
+        url: '/get_customer_loadpost_master',
+        method: 'POST',
+        body: { CustomerID },
+      }),
+    }),
+
     getPackageType: builder.query<
       CargoPackageTypesResponse,
       PackageTypeRequest
@@ -182,7 +212,7 @@ export const motoApi = baseApi.injectEndpoints({
       }),
     }),
     getCargoContent: builder.query<CargoContentTypesResponse, void>({
-      query: body => ({
+      query: () => ({
         url: '/get_CargoTypes',
         method: 'POST',
       }),
@@ -195,6 +225,45 @@ export const motoApi = baseApi.injectEndpoints({
         url: `/get_Nearest_Drivers`,
         method: 'POST',
         body: queryArg,
+      }),
+    }),
+    CargoType_BodyType_History: builder.query<any, { CustomerID: string }>({
+      query: ({ CustomerID }) => ({
+        url: '/CargoType_BodyType_History',
+        method: 'POST',
+        body: { CustomerID },
+      }),
+    }),
+    Loadpostaddress: builder.mutation<any, { LoadPostID: string }>({
+      query: ({ LoadPostID }) => ({
+        url: '/customer_post_address',
+        method: 'POST',
+        body: { LoadPostID },
+      }),
+    }),
+
+    Customerhistory: builder.query<any, { CustomerID: string }>({
+      query: ({ CustomerID }) => ({
+        url: '/customer_post_address',
+        method: 'POST',
+        body: { CustomerID },
+      }),
+    }),
+    getCustomer: builder.query<any, { CustomerID: string }>({
+      query: ({ CustomerID }) => ({
+        url: '/get_Customer',
+        method: 'POST',
+        body: { CustomerID },
+      }),
+    }),
+    getAproximateWeight: builder.query<
+      WeightResponse,
+      ApproximateWeightRequest
+    >({
+      query: body => ({
+        url: '/get_vehicle_Details',
+        method: 'POST',
+        body,
       }),
     }),
   }),
@@ -210,15 +279,26 @@ export const {
   useSetMpinMutation,
   useMpinLoginMutation,
   useGetActiveTripsMutation,
-  useGetCustomerPostsMutation,
-  useGetProcessTripsMutation,
+  useGetCustomerPostsQuery,
+  useLazyGetCustomerPostsQuery,
+  useGetProcessTripsQuery,
   usePostCustomerRequirementMutation,
+  useGetTruckTypemutationMutation,
   useGetBodyTypeQuery,
   useUpdateCustomerRequirementMutation,
   useGetCurrentAddressQuery,
-  useGetTruckTypeMutation,
+  useGetTruckTypeQuery,
   useGetAproximateWeightQuery,
   useGetPackageTypeQuery,
   useGetCargoContentQuery,
   useGetNearbyDriversQuery,
+  useCargoType_BodyType_HistoryQuery,
+  useLoadpostaddressMutation,
+  useCustomerhistoryQuery,
+  useUpdateCustomerMutation,
+  useGetCustomerQuery,
+  useInsertEmployeeMutation,
+  useGetcustomerloadpostdetailsQuery,
+  useUpdateloadpostMutation,
+  useInsertVehicleloadpostdatasheetMutation,
 } = motoApi;

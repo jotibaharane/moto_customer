@@ -34,7 +34,7 @@ interface SelectionModalProps {
 const SelectionModal = forwardRef<SelectionModalRef, SelectionModalProps>(
   ({ title, options, selectedValue, onSelect, numColumns = 2 }, ref) => {
     const bottomModalRef = useRef<BottomModalRef>(null);
-
+    console.log({ cargoOption: options });
     // Expose methods via ref
     useImperativeHandle(ref, () => ({
       open: () => {
@@ -87,6 +87,7 @@ const SelectionModal = forwardRef<SelectionModalRef, SelectionModalProps>(
         backdropOpacity={0.8}
         animationDuration={400}
         swipeThreshold={50}
+        scrollEnabled={false}
         disableSwipe
       >
         <View style={styles.container}>

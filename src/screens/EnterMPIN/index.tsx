@@ -61,7 +61,6 @@ const EnterMPINScreen: React.FC<any> = () => {
         }
       }
     } catch (error) {
-      console.log('Biometric check error:', error);
       setIsBiometricSupported(false);
     }
   };
@@ -77,7 +76,6 @@ const EnterMPINScreen: React.FC<any> = () => {
       if (success) {
         // Here you would typically send the signature to your backend for verification
         // For this example, we'll assume successful authentication
-        console.log('Biometric authentication successful');
 
         // Navigate to dashboard on successful biometric auth
         navigation.replace(routeName.DASHBOARD, {
@@ -90,7 +88,6 @@ const EnterMPINScreen: React.FC<any> = () => {
         console.log('Biometric authentication failed or was cancelled');
       }
     } catch (error) {
-      console.log('Biometric authentication error:', error);
       Alert.alert(
         'Error',
         'Biometric authentication failed. Please try again or use MPIN.',
@@ -119,7 +116,7 @@ const EnterMPINScreen: React.FC<any> = () => {
         ContactNo: customerDetails?.ContactNo || '',
         Customer_MPIN: mpin,
       });
-      console.log({ response });
+
       if (response?.data?.status_code === '00') {
         navigation.replace(routeName.DASHBOARD, {
           screen: routeName.HOMESTACK,

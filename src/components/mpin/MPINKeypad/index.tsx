@@ -2,6 +2,7 @@ import colors from '@utils/colors';
 import { fontSize, hp, wp } from '@utils/responsive';
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Button, Icon } from 'react-native-paper';
 
 interface MPINKeypadProps {
   onNumberPress: (num: string) => void;
@@ -30,7 +31,7 @@ const MPINKeypad: React.FC<MPINKeypadProps> = ({
           disabled={num === ''}
         >
           {num === 'backspace' ? (
-            <Image source={undefined} style={styles.backspaceIcon} />
+            <Icon source="close" size={28} color={colors.textPrimary} />
           ) : (
             <Text style={styles.keyText}>{num}</Text>
           )}

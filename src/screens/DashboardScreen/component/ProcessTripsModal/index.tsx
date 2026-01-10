@@ -1,5 +1,6 @@
-import { useGetProcessTripsMutation } from '@api/hooks_api';
+import { useGetProcessTripsQuery } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
+import { useRefreshOnFocus } from '@hooks/onFocusevent';
 import { RootState } from '@store/index';
 import {
   addOrUpdateDriver,
@@ -32,49 +33,216 @@ import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
 interface CustomerProcess {
   LoadPostID: string;
   CustomerID: string;
-  Origin: string;
-  Destination: string;
+
+  DriverLat?: number;
+  DriverLng?: number;
+  // Pickup Details
+  PickupContactPerson: string;
+  PickupCompanyName: string;
+  PickupContactNumber: string;
+  PickupPlotBuilding: string;
+  PickupStreetArea: string;
+  PickupAddress: string;
+
+  // Delivery Details
+  DeliveryContactPerson: string;
+  DeliveryCompanyName: string;
+  DeliveryContactNumber: string;
+  DeliveryPlotBuilding: string;
+  DeliveryStreetArea: string;
+  DeliveryAddress: string;
+
+  // Vehicle & Cargo
   VehicleType: string;
   Weight: string;
-  DhalaLength: string;
+  Approximate_weight: number;
+  cargo_type: string;
   BodyType: string;
   CargoContent: string;
   CargoPackageType: string;
+
+  // Schedule & Flags
   ExpectedAvailableTime: string;
-  PostInsertDate: string;
-  PostUpdateDate: string | null;
-  Origin_Lat: number;
-  Origin_Lng: number;
-  Origin_City: string;
-  Origin_District: string;
-  Origin_Taluka: string;
-  Origin_State: string;
-  Origin_Pincode: string;
-  Destination_Lat: number;
-  Destination_Lng: number;
-  Destination_City: string;
-  Destination_District: string;
-  Destination_Taluka: string;
-  Destination_State: string;
-  Destination_Pincode: string;
-  AddressInsertDate: string;
-  AddressUpdateDate: string | null;
+  ScheduleDate: string | null;
+  ScheduleTime: string | null;
+  isVolumetric: boolean;
+  DhalaLength: number | null;
+  cost: number;
+  master_status: string;
+
+  // Verification
+  verification_code: string;
+  verify_flag: boolean;
+
+  // Dates
+  LoadPost_InsertDate: string | null;
+  LoadPost_UpdateDate: string | null;
+  Address_InsertDate: string | null;
+  Address_UpdateDate: string | null;
+
+  // Pickup Location
+  PickupCity: string;
+  PickupDistrict: string;
+  PickupTaluka: string;
+  PickupState: string;
+  PickupPincode: string;
+  PickupLat: number;
+  PickupLng: number;
+
+  // Delivery Location
+  DeliveryCity: string;
+  DeliveryDistrict: string;
+  DeliveryTaluka: string;
+  DeliveryState: string;
+  DeliveryPincode: string;
+  DeliveryLat: number;
+  DeliveryLng: number;
+
+  // Status & Relations
   CustomerPostID: string;
-  cpsCustomerID: string;
   VendorID: string | null;
   DriverID: string | null;
   CustomerStatus: string;
   VendorStatus: string | null;
   DriverStatus: string | null;
-  tripStatus: string;
-  DriverLat: number | null;
-  DriverLng: number | null;
-  dllDriverID: string | null;
-  MobileNo: string;
-  verify_flag: string;
-  verification_code: string;
-  trip_status: string;
+  LP_Status: string;
 }
+// ===== MULTIPLE DUMMY PROCESS TRIPS =====
+const DUMMY_PROCESS_TRIPS: CustomerProcess[] = [
+  {
+    LoadPostID: 'PROC-001',
+    CustomerID: 'CUST-001',
+
+    PickupContactPerson: 'Ravi Kumar',
+    PickupCompanyName: 'ABC Electronics',
+    PickupContactNumber: '9876543210',
+    PickupPlotBuilding: 'Plot 21',
+    PickupStreetArea: 'Industrial Area',
+    PickupAddress: 'Okhla Phase 2, New Delhi',
+
+    DeliveryContactPerson: 'Amit Shah',
+    DeliveryCompanyName: 'XYZ Warehousing',
+    DeliveryContactNumber: '9123456789',
+    DeliveryPlotBuilding: 'Warehouse 7',
+    DeliveryStreetArea: 'MIDC',
+    DeliveryAddress: 'Andheri East, Mumbai',
+
+    VehicleType: 'Container',
+    Weight: '10 MT',
+    Approximate_weight: 9.8,
+    cargo_type: 'General',
+    BodyType: 'Closed',
+    CargoContent: 'Electronics',
+    CargoPackageType: 'Box',
+
+    ExpectedAvailableTime: '',
+    ScheduleDate: null,
+    ScheduleTime: null,
+    isVolumetric: false,
+    DhalaLength: null,
+    cost: 45000,
+    master_status: 'PROCESS',
+
+    verification_code: '4589',
+    verify_flag: 'N',
+
+    LoadPost_InsertDate: new Date().toISOString(),
+    LoadPost_UpdateDate: null,
+    Address_InsertDate: null,
+    Address_UpdateDate: null,
+
+    PickupCity: 'New Delhi',
+    PickupDistrict: 'Delhi',
+    PickupTaluka: '',
+    PickupState: 'Delhi',
+    PickupPincode: '110020',
+    PickupLat: 28.5244,
+    PickupLng: 77.2606,
+
+    DeliveryCity: 'Mumbai',
+    DeliveryDistrict: 'Mumbai',
+    DeliveryTaluka: '',
+    DeliveryState: 'Maharashtra',
+    DeliveryPincode: '400069',
+    DeliveryLat: 19.076,
+    DeliveryLng: 72.8777,
+
+    CustomerPostID: 'CP-001',
+    VendorID: null,
+    DriverID: null,
+    CustomerStatus: 'PROCESS',
+    VendorStatus: null,
+    DriverStatus: null,
+    LP_Status: 'PROCESS',
+  },
+
+  {
+    LoadPostID: 'PROC-002',
+    CustomerID: 'CUST-001',
+
+    PickupContactPerson: 'Suresh Patel',
+    PickupCompanyName: 'Steel Works Ltd',
+    PickupContactNumber: '9000000001',
+    PickupPlotBuilding: 'Plot 88',
+    PickupStreetArea: 'GIDC',
+    PickupAddress: 'Vatva GIDC, Ahmedabad',
+
+    DeliveryContactPerson: 'Nikhil Jain',
+    DeliveryCompanyName: 'Metro Infra',
+    DeliveryContactNumber: '9000000002',
+    DeliveryPlotBuilding: 'Yard 3',
+    DeliveryStreetArea: 'Industrial Zone',
+    DeliveryAddress: 'Bhiwandi Logistics Hub',
+
+    VehicleType: 'Trailer',
+    Weight: '18 MT',
+    Approximate_weight: 17.5,
+    cargo_type: 'Heavy',
+    BodyType: 'Open',
+    CargoContent: 'Steel Rods',
+    CargoPackageType: 'Loose',
+
+    ExpectedAvailableTime: '',
+    ScheduleDate: null,
+    ScheduleTime: null,
+    isVolumetric: false,
+    DhalaLength: null,
+    cost: 68000,
+    master_status: 'PROCESS',
+
+    verification_code: '',
+    verify_flag: 'Y',
+
+    LoadPost_InsertDate: new Date(Date.now() - 86400000).toISOString(),
+    LoadPost_UpdateDate: null,
+    Address_InsertDate: null,
+    Address_UpdateDate: null,
+
+    PickupCity: 'Ahmedabad',
+    PickupDistrict: 'Ahmedabad',
+    PickupTaluka: '',
+    PickupState: 'Gujarat',
+    PickupPincode: '382445',
+    PickupLat: 22.966,
+    PickupLng: 72.633,
+
+    DeliveryCity: 'Bhiwandi',
+    DeliveryDistrict: 'Thane',
+    DeliveryTaluka: '',
+    DeliveryState: 'Maharashtra',
+    DeliveryPincode: '421302',
+    DeliveryLat: 19.2813,
+    DeliveryLng: 73.0483,
+
+    CustomerPostID: 'CP-002',
+    VendorID: 'VEND-01',
+    DriverID: null,
+    CustomerStatus: 'PROCESS',
+    VendorStatus: 'ASSIGNED',
+    DriverStatus: null,
+    LP_Status: 'PROCESS',
+  },
+];
 
 interface ProcessTripsModalRef {
   open: () => void;
@@ -86,9 +254,24 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
   const dispatch = useDispatch();
-  const [getProcesTrips, { data: processTrips, isLoading }] =
-    useGetProcessTripsMutation();
-  console.log({ processTrips });
+  const {
+    data: processTrips,
+    isLoading,
+    refetch,
+  } = useGetProcessTripsQuery(
+    { CustomerID },
+    {
+      skip: !CustomerID, // Skip until CustomerID is available
+      refetchOnMountOrArgChange: true, // optional
+    },
+  );
+
+  const tripsData: CustomerProcess[] =
+    Array.isArray(processTrips?.data) && processTrips.data.length > 0
+      ? processTrips.data
+      : DUMMY_PROCESS_TRIPS;
+  // useRefreshOnFocus(() => getProcesTrips({ CustomerID }), true);
+
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -99,16 +282,33 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await getProcesTrips({ CustomerID });
+    await refetch(); // ⬅️ RTK Query refetch
     setRefreshing(false);
   };
 
-  useLayoutEffect(() => {
-    handleRefresh();
-  }, [ref]);
+  useRefreshOnFocus(refetch, true);
   const handleModalClose = () => {
     bottomModalRef.current?.close();
   };
+
+  useLayoutEffect(() => {
+    // const interval = setInterval(() => {
+    dispatch(
+      selectDriver({
+        id: 'DRV-101',
+        driver: 'DRV-101',
+        latitude: 28.5355 + Math.random() * 0.01,
+        longitude: 77.391 + Math.random() * 0.01,
+        available: true,
+        licensePlate: 'DRV-101',
+        type: 'medium',
+        rotation: 0,
+      }),
+    );
+    // }, 3000);
+
+    // return () => clearInterval(interval);
+  }, []);
 
   const handleTripPress = (item: CustomerProcess) => {
     dispatch(addOrUpdateDriver([]));
@@ -116,21 +316,22 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
     dispatch(setPostId(item?.LoadPostID));
     dispatch(
       setOrigin({
-        latitude: item?.Origin_Lat,
-        longitude: item?.Origin_Lng,
+        latitude: item?.PickupLat,
+        longitude: item?.PickupLng,
       }),
     );
-    dispatch(setOriginAddress(item?.Origin_City));
-    dispatch(setDestinationAddress(item?.Destination_City));
-    if (item.DriverLat && item.DriverLng) {
+    dispatch(setOriginAddress(item?.PickupAddress));
+    dispatch(setDestinationAddress(item?.DeliveryAddress));
+
+    if (item.DriverID) {
       dispatch(
         selectDriver({
-          latitude: item.DriverLat,
-          longitude: item.DriverLng,
+          id: item.DriverID,
+          driver: item.DriverID,
+          latitude: item.DriverLat ?? 0,
+          longitude: item.DriverLng ?? 0,
           available: true,
-          driver: item.DriverID || '',
-          id: item.DriverID || '',
-          licensePlate: item.DriverID || '',
+          licensePlate: item.DriverID,
           type: 'medium',
           rotation: 0,
         }),
@@ -138,8 +339,8 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
     }
     dispatch(
       setDestination({
-        latitude: item?.Destination_Lat,
-        longitude: item?.Destination_Lng,
+        latitude: item?.DeliveryLat,
+        longitude: item?.DeliveryLng,
       }),
     );
     handleModalClose();
@@ -156,14 +357,17 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
           <Icon source="identifier" size={14} color="#666" />
           <Text style={processTripStyles.cardId}>ID: {item.LoadPostID}</Text>
         </View>
+        <View>
+          <Text> {formatDate(item?.LoadPost_InsertDate || '')}</Text>
+        </View>
         <View
           style={[
             processTripStyles.statusBadge,
-            { backgroundColor: getStatusColor(item.tripStatus) },
+            { backgroundColor: getStatusColor(item?.LP_Status) },
           ]}
         >
           <Text style={processTripStyles.statusText}>
-            {item.tripStatus?.toUpperCase() || 'UNKNOWN'}
+            {item?.LP_Status?.toUpperCase() || 'UNKNOWN'}
           </Text>
         </View>
       </View>
@@ -184,10 +388,10 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
               <Text style={processTripStyles.locationLabel}>From</Text>
             </View>
             <Text style={processTripStyles.locationText} numberOfLines={2}>
-              {item.Origin_City}
+              {item.PickupAddress}
             </Text>
             <Text style={processTripStyles.locationSubtext}>
-              {item.Origin_State} • {item.Origin_Pincode}
+              {item.PickupState} • {item.PickupPincode}
             </Text>
           </View>
 
@@ -198,10 +402,10 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
               <Text style={processTripStyles.locationLabel}>To</Text>
             </View>
             <Text style={processTripStyles.locationText} numberOfLines={2}>
-              {item.Destination_City}
+              {item.DeliveryAddress}
             </Text>
             <Text style={processTripStyles.locationSubtext}>
-              {item.Destination_State} • {item.Destination_Pincode}
+              {item.DeliveryState} • {item.DeliveryPincode}
             </Text>
           </View>
         </View>
@@ -230,7 +434,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
           <View style={processTripStyles.detailItem}>
             <Icon source="calendar" size={16} color="#5e6bff" />
             <Text style={processTripStyles.detailText}>
-              {formatDate(item.PostInsertDate)}
+              {item?.Approximate_weight}
             </Text>
           </View>
         </View>
@@ -251,7 +455,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
       </View>
 
       {/* Verification Code Section */}
-      {item.verify_flag === 'N' && item.verification_code && (
+      {item?.verify_flag === 'N' && item.verification_code && (
         <View style={processTripStyles.verificationContainer}>
           <View style={processTripStyles.verificationHeader}>
             <Icon source="shield-alert" size={16} color="#FF9800" />
@@ -277,12 +481,9 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
       <View style={processTripStyles.listHeader}>
         <View style={processTripStyles.titleContainer}>
           <Text style={processTripStyles.listTitle}>Process Trips</Text>
-          {processTrips?.data && processTrips.data.length > 0 && (
-            <Text style={processTripStyles.tripCount}>
-              {processTrips.data.length} trip
-              {processTrips.data.length !== 1 ? 's' : ''}
-            </Text>
-          )}
+          <Text style={processTripStyles.tripCount}>
+            {tripsData.length} trip{tripsData.length !== 1 ? 's' : ''}
+          </Text>
         </View>
         <View style={processTripStyles.headerActions}>
           <TouchableOpacity
@@ -305,7 +506,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
           <ActivityIndicator size="large" color="#5e6bff" />
           <Text style={processTripStyles.loadingText}>Loading trips...</Text>
         </View>
-      ) : processTrips?.data?.length === 0 ? (
+      ) : tripsData.length === 0 ? (
         <View style={processTripStyles.emptyContainer}>
           <View style={processTripStyles.emptyContent}>
             <Icon source="truck" size={64} color="#E0E0E0" />
@@ -319,7 +520,7 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
         </View>
       ) : (
         <FlatList
-          data={processTrips?.data || []}
+          data={tripsData}
           renderItem={renderTripCard}
           keyExtractor={item => item.CustomerPostID}
           contentContainerStyle={processTripStyles.listContent}
@@ -340,6 +541,9 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
       animationDuration={400}
       swipeThreshold={50}
       disableSwipe
+      onOpen={() => {
+        if (CustomerID) refetch(); // Ensure latest data
+      }}
     >
       <View style={processTripStyles.container}>{renderListView()}</View>
     </BottomModal>

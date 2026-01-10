@@ -1,18 +1,13 @@
-import { RegisterRequest } from '@api/api.type';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  useGetDistrictMutation,
-  useGetPincodeDataMutation,
-  useGetStateQuery,
-  useInsertCustomerMutation,
-} from '@api/hooks_api';
-
-import { SelectList } from '@components/common/Select';
-import { useNavigation } from '@react-navigation/native';
-import { RootState } from '@store/index';
-import { setCustomerDetails } from '@store/slices/authSlice';
-import { routeName } from '@utils/navigationHelpers';
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {
   Button,
   Card,
@@ -21,157 +16,445 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Toast from 'react-native-toast-message';
-import { useDispatch, useSelector } from 'react-redux';
-import { styles } from './style';
 
-const RegistrationScreen = () => {
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useDispatch, useSelector } from 'react-redux';
+
+import { RegisterRequest } from '@api/api.type';
+import {
+  useGetDistrictMutation,
+  useGetPincodeDataMutation,
+  useGetStateQuery,
+  useInsertCustomerMutation,
+} from '@api/hooks_api';
+
+import { BottomModalRef } from '@components/BottomModal';
+import { SelectList } from '@components/common/Select';
+import AddressSearch from '@screens/LoadPostScreen/components/AddressSearch';
+import { Snackbar } from 'react-native-paper';
+
+import { RootState } from '@store/index';
+import {
+  setCustomerDetails,
+  setRegisteredAddress,
+} from '@store/slices/authSlice';
+
+import { useGooglePlacesSelect } from '@hooks/useGooglePlaces';
+import { routeName } from '@utils/navigationHelpers';
+import { styles as screenStyles } from './style';
+
+/* ---------------------------------------------------------------
+ * CONSTANTS & INITIAL FORM STATE
+ * --------------------------------------------------------------- */
+
+const initialForm: RegisterRequest = {
+  CompanyType: '',
+  CompanyName: '',
+  ContactPerson: '',
+  ContactNo: '',
+  EmailID: '',
+  Address1: '',
+  Address2: '',
+  Pincode: '',
+  Factory: 'N',
+  Warehouse: 'N',
+  Office: 'N',
+
+  State: '',
+  Destination: '',
+  City: '',
+};
+
+/* ---------------------------------------------------------------
+ * REUSABLE UI COMPONENTS
+ * --------------------------------------------------------------- */
+
+/** Company Type Selection Buttons */
+const CompanyTypeSelector = ({
+  selected,
+  onSelect,
+}: {
+  selected: string;
+  onSelect: (type: 'Individual' | 'Organization') => void;
+}) => (
+  <View style={localStyles.companyTypeRow}>
+    {['Individual', 'Organization'].map(type => (
+      <Button
+        key={type}
+        mode={selected === type ? 'contained' : 'outlined'}
+        style={localStyles.companyTypeButton}
+        onPress={() => onSelect(type as any)}
+      >
+        {type}
+      </Button>
+    ))}
+  </View>
+);
+
+const AddressTypeSelector = ({
+  value,
+  onChange,
+  error,
+}: {
+  value: Pick<RegisterRequest, 'Factory' | 'Warehouse' | 'Office'>;
+  onChange: (v: Partial<RegisterRequest>) => void;
+  error?: string;
+}) => {
+  const toggle = (key: 'Factory' | 'Warehouse' | 'Office') => {
+    onChange({
+      [key]: value[key] === 'Y' ? 'N' : 'Y',
+    });
+  };
+
+  return (
+    <View style={{ marginTop: 12 }}>
+      <Text style={localStyles.businessTypeLabel}>Pickup Location *</Text>
+
+      <View style={localStyles.businessTypeContainer}>
+        {(['Factory', 'Warehouse', 'Office'] as const).map(item => (
+          <TouchableOpacity
+            key={item}
+            style={localStyles.businessTypeItem}
+            onPress={() => toggle(item)}
+          >
+            <Icon
+              name={
+                value[item] === 'Y'
+                  ? 'checkbox-marked'
+                  : 'checkbox-blank-outline'
+              }
+              size={22}
+            />
+            <Text>{item}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <HelperText type="error" visible={!!error}>
+        {error}
+      </HelperText>
+    </View>
+  );
+};
+
+/* ---------------------------------------------------------------
+ * MAIN COMPONENT
+ * --------------------------------------------------------------- */
+
+const RegistrationScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
-  const res = useSelector((state: RootState) => state?.auth);
-  const mobilenumber = res?.mobileNumber;
-  const [Registration] = useInsertCustomerMutation();
-  const [pincodeData] = useGetPincodeDataMutation();
+
+  const [snack, setSnack] = useState({
+    visible: false,
+    message: '',
+  });
+  const authState = useSelector((s: RootState) => s.auth);
+
+  const mobilenumber = authState?.mobileNumber ?? '';
+
+  const modalRef = useRef<BottomModalRef>(null);
+
+  const [registrationMutation] = useInsertCustomerMutation();
+  const [pincodeLookup] = useGetPincodeDataMutation();
   const { data: stateData } = useGetStateQuery();
   const [getDistricts] = useGetDistrictMutation();
-  const [formData, setFormData] = useState<RegisterRequest>({
-    CompanyType: '',
-    CompanyName: '',
-    ContactPerson: '',
-    ContactNo: '',
-    EmailID: '',
-    Address1: '',
-    Address2: '',
-    Pincode: '',
-    State: '',
-    Destination: '',
-    AadharNo: '',
-    GstNo: '',
-    PancardNo: '',
-    City: '',
-  });
-  console.log({ stateData });
+
+  const [formData, setFormData] = useState<RegisterRequest>(initialForm);
   const [errors, setErrors] = useState<Partial<RegisterRequest>>({});
   const [availableDistricts, setAvailableDistricts] = useState<any[]>([]);
+  const originPlaces = useGooglePlacesSelect();
+  const [addressTypeUI, setAddressTypeUI] = useState({
+    Factory: 'N',
+    Warehouse: 'N',
+    Office: 'N',
+  });
 
-  const handleChange = async (name: keyof RegisterRequest, value: string) => {
+  /* -------------------------------------------------------------
+   * EFFECT: Clear company name when switching to Individual
+   * ------------------------------------------------------------- */
+  useEffect(() => {
+    if (formData.CompanyType === 'Individual' && formData.CompanyName) {
+      setFormData(prev => ({ ...prev, CompanyName: '' }));
+      setErrors(prev => {
+        const updated = { ...prev };
+        delete updated.CompanyName;
+        return updated;
+      });
+    }
+  }, [formData.CompanyType]);
+  useEffect(() => {
+    if (mobilenumber) {
+      setFormData(prev => ({
+        ...prev,
+        ContactNo: mobilenumber,
+      }));
+    }
+  }, [mobilenumber]);
+  const showSnack = (message: string) => {
+    setSnack({ visible: true, message });
+  };
+
+  const hideSnack = () => {
+    setSnack(prev => ({ ...prev, visible: false }));
+  };
+
+  /* -------------------------------------------------------------
+   * HANDLERS
+   * ------------------------------------------------------------- */
+
+  const handleChange = async (
+    name: keyof RegisterRequest,
+    value: string,
+  ): Promise<void> => {
     setFormData(prev => ({ ...prev, [name]: value }));
 
+    // Auto-load districts when state changes
     if (name === 'State') {
-      const response = await getDistricts({ state: value }).unwrap();
-
-      const districtsList = response?.data || [];
-      setAvailableDistricts(districtsList);
-      setFormData(prev => ({ ...prev, Destination: '' }));
+      try {
+        const response = await getDistricts({ state: value }).unwrap();
+        setAvailableDistricts(response?.data || []);
+        setFormData(prev => ({ ...prev, Destination: '' }));
+      } catch (err) {
+        console.warn('District fetch error', err);
+      }
     }
 
+    // Auto-fill state & district from pincode
     if (name === 'Pincode' && value.length === 6) {
-      const response = await pincodeData({ pincode: value }).unwrap();
+      try {
+        const response = await pincodeLookup({ pincode: value }).unwrap();
+        const mapped = response?.data;
 
-      const mapped = response?.data;
-      if (mapped) {
+        if (!mapped) return setAvailableDistricts([]);
+
         setFormData(prev => ({
           ...prev,
           Pincode: value,
-          State: mapped?.State,
-          Destination: mapped?.District,
+          State: mapped.State || prev.State,
+          Destination: mapped.District || prev.Destination,
         }));
-        const response = await getDistricts({ state: mapped?.State }).unwrap();
 
-        setAvailableDistricts(response?.data ? response?.data : []);
+        const districtRes = await getDistricts({
+          state: mapped.State,
+        }).unwrap();
+
+        setAvailableDistricts(districtRes?.data ?? []);
+      } catch (err) {
+        console.warn('Pincode lookup error', err);
       }
     }
   };
 
+  const handleOriginSelect = useCallback(
+    async (placeId: string, description: string) => {
+      try {
+        const location = await originPlaces.getPlaceDetails(placeId);
+
+        if (!location) return;
+
+        const { place, pincode, state, dist, tal } = location.components;
+
+        const registeredAddressObj = {
+          id: placeId,
+          fullAddress: location.address,
+          latitude: location.coordinates.lat,
+          longitude: location.coordinates.lng,
+          addressComponents: {
+            place: place || '',
+            dist: dist || '',
+            tal: tal || '',
+            state: state || '',
+            pincode: pincode || '',
+          },
+        };
+
+        // ---- UPDATE FORM DATA ----
+        setFormData(prev => ({
+          ...prev,
+
+          Pincode: pincode || prev.Pincode,
+          State: state || prev.State,
+          Destination: dist || prev.Destination,
+          City: tal || prev.City,
+
+          // ⭐ store FULL location object
+          RegisteredAddress: registeredAddressObj,
+        }));
+
+        // ---- SAVE TO REDUX ----zz
+        dispatch(setRegisteredAddress(registeredAddressObj));
+      } catch (error) {
+        console.log('Location Fetch Error:', error);
+        showSnack('Failed to fetch location details');
+      }
+    },
+    [originPlaces, dispatch],
+  );
+  /* -------------------------------------------------------------
+   * VALIDATION
+   * ------------------------------------------------------------- */
+
   const validateForm = (): boolean => {
     const newErrors: Partial<RegisterRequest> = {};
-    const requiredFields: Array<keyof RegisterRequest> = [
-      'ContactPerson',
-      'EmailID',
-      'Address1',
-      'Pincode',
-      'State',
-      'Destination',
-    ];
 
-    requiredFields.forEach(field => {
-      if (!formData[field]) {
-        newErrors[field] = 'This field is required';
-      }
-    });
+    if (!formData.CompanyType) {
+      newErrors.CompanyType = 'Company type is required';
+    }
 
-    if (formData.EmailID && !/^\S+@\S+\.\S+$/.test(formData.EmailID)) {
+    if (!formData.ContactPerson) {
+      newErrors.ContactPerson = 'Full name is required';
+    }
+
+    if (!formData.EmailID) {
+      newErrors.EmailID = 'Email is required';
+    } else if (!/^\S+@\S+\.\S+$/.test(formData.EmailID)) {
       newErrors.EmailID = 'Invalid email format';
     }
 
-    if (formData.Pincode && !/^\d{6}$/.test(formData.Pincode)) {
-      newErrors.Pincode = 'Pincode must be 6 digits';
+    if (!formData.Address1) {
+      newErrors.Address1 = 'Address is required';
+    }
+
+    if (!formData.Pincode || !/^\d{6}$/.test(formData.Pincode)) {
+      newErrors.Pincode = 'Valid 6-digit pincode required';
+    }
+
+    if (!formData.State) {
+      newErrors.State = 'State is required';
+    }
+
+    if (!formData.Destination) {
+      newErrors.Destination = 'District is required';
+    }
+
+    // ✅ CORRECT Address Type validation
+    if (
+      formData.Factory === 'N' &&
+      formData.Warehouse === 'N' &&
+      formData.Office === 'N'
+    ) {
+      setErrors(prev => ({
+        ...prev,
+        Factory: 'Select at least one pickup location',
+      }));
+      return false;
+    }
+
+    if (formData.CompanyType === 'Organization' && !formData.CompanyName) {
+      newErrors.CompanyName = 'Company name is required';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  /* -------------------------------------------------------------
+   * SUBMIT
+   * ------------------------------------------------------------- */
+
   const handleSubmit = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
     try {
-      if (validateForm()) {
-        console.log('Submitting:', formData);
-        const response = await Registration({
-          ...formData,
-          ContactNo: mobilenumber || '',
-        });
-        console.log({ response });
-        if (response?.data?.status === '00') {
-          dispatch(
-            setCustomerDetails({
-              CustomerID: response?.data?.Customer_Details?.CustomerID || '',
-              CompanyName: response?.data?.Customer_Details?.CompanyName || '',
-              ContactPerson:
-                response?.data?.Customer_Details?.ContactPerson || '',
-              EmailID: response?.data?.Customer_Details?.EmailID || '',
-              ContactNo: response?.data?.Customer_Details?.ContactNo || '',
-              MPIN_Flag: 'N',
-            }),
-          );
-          navigation.replace(routeName.SET_MPIN);
-        } else {
-          Toast.show({ type: 'error', text1: response?.data?.message });
-        }
+      const payload: RegisterRequest = {
+        ...formData,
+        ContactNo: mobilenumber || '',
+      };
+
+      console.log('FINAL PAYLOAD 👉', payload);
+
+      const response = await registrationMutation(payload).unwrap();
+
+      if (response?.status === '00') {
+        dispatch(
+          setCustomerDetails({
+            CustomerID: response.Customer_Details?.CustomerID || '',
+            CompanyName: response.Customer_Details?.CompanyName || '',
+            ContactPerson: response.Customer_Details?.ContactPerson || '',
+            EmailID: response.Customer_Details?.EmailID || '',
+            ContactNo: response.Customer_Details?.ContactNo || '',
+            MPIN_Flag: 'N',
+          }),
+        );
+
+        navigation.replace(
+          formData.CompanyType === 'Individual'
+            ? routeName.INDIVIDUAL
+            : routeName.ADD_EMPLOYEE,
+        );
+      } else {
+        Alert.alert(
+          'Registration Failed',
+          response?.message || 'Please try again later',
+        );
       }
-    } catch (error) {
-      console.log(error);
+    } catch (err: any) {
+      Alert.alert(
+        'Registration Failed',
+        err?.data?.message || 'Internal server error',
+      );
     }
   };
+
+  /* -------------------------------------------------------------
+   * RENDER
+   * ------------------------------------------------------------- */
 
   return (
     <PaperProvider>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={[
-          styles.container,
-          { paddingTop: Platform.OS === 'android' ? insets.top : 0 },
-        ]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={[screenStyles.container, { paddingTop: insets.top }]}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContainer}
+          contentContainerStyle={screenStyles.scrollContainer}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.header}>Customer Registration</Text>
+          <Text style={screenStyles.header}>Customer Registration</Text>
 
-          {/* ------- Personal Information -------- */}
-          <Card style={styles.card}>
+          {/* Personal Information */}
+          <Card style={screenStyles.card}>
             <Card.Content>
-              <Text style={styles.sectionTitle}>Personal Information</Text>
+              {/* Company Type */}
+              <CompanyTypeSelector
+                selected={formData.CompanyType}
+                onSelect={type => {
+                  setFormData(prev => ({
+                    ...prev,
+                    CompanyType: type,
+                    ...(type === 'Individual' && { CompanyName: '' }),
+                  }));
+                  setErrors(prev => {
+                    const updated = { ...prev };
+                    delete updated.CompanyType;
+                    delete updated.CompanyName;
+                    return updated;
+                  });
+                }}
+              />
 
+              <HelperText type="error" visible={!!errors.CompanyType}>
+                {errors.CompanyType}
+              </HelperText>
+
+              <Text style={screenStyles.sectionTitle}>
+                Personal Information
+              </Text>
+
+              {/* Full Name */}
               <TextInput
                 mode="outlined"
                 label="Full Name *"
                 value={formData.ContactPerson}
                 onChangeText={text => handleChange('ContactPerson', text)}
                 error={!!errors.ContactPerson}
-                style={styles.input}
+                style={screenStyles.input}
                 theme={{ roundness: 8 }}
                 left={<TextInput.Icon icon="account" />}
               />
@@ -179,31 +462,40 @@ const RegistrationScreen = () => {
                 {errors.ContactPerson}
               </HelperText>
 
-              <TextInput
-                mode="outlined"
-                label="Company Name"
-                value={formData.CompanyName}
-                onChangeText={text => handleChange('CompanyName', text)}
-                style={styles.input}
-                theme={{ roundness: 8 }}
-                left={<TextInput.Icon icon="office-building" />}
-              />
+              {/* Company Name */}
+              {formData.CompanyType === 'Organization' && (
+                <>
+                  <TextInput
+                    mode="outlined"
+                    label="Organization Name *"
+                    value={formData.CompanyName}
+                    onChangeText={text => handleChange('CompanyName', text)}
+                    error={!!errors.CompanyName}
+                    style={screenStyles.input}
+                    theme={{ roundness: 8 }}
+                    left={<TextInput.Icon icon="office-building" />}
+                  />
+                  <HelperText type="error" visible={!!errors.CompanyName}>
+                    {errors.CompanyName}
+                  </HelperText>
+                </>
+              )}
 
+              {/* Contact Number */}
               <TextInput
                 mode="outlined"
                 label="Contact Number *"
-                value={mobilenumber || ''}
-                keyboardType="phone-pad"
-                error={!!errors.ContactNo}
-                style={styles.input}
-                theme={{ roundness: 8 }}
+                value={formData.ContactNo}
                 editable={false}
+                style={screenStyles.input}
+                theme={{ roundness: 8 }}
                 left={<TextInput.Icon icon="phone" />}
               />
               <HelperText type="error" visible={!!errors.ContactNo}>
                 {errors.ContactNo}
               </HelperText>
 
+              {/* Email */}
               <TextInput
                 mode="outlined"
                 label="Email Address *"
@@ -211,7 +503,7 @@ const RegistrationScreen = () => {
                 onChangeText={text => handleChange('EmailID', text)}
                 keyboardType="email-address"
                 error={!!errors.EmailID}
-                style={styles.input}
+                style={screenStyles.input}
                 theme={{ roundness: 8 }}
                 left={<TextInput.Icon icon="email" />}
               />
@@ -221,18 +513,37 @@ const RegistrationScreen = () => {
             </Card.Content>
           </Card>
 
-          {/* ------- Address Section -------- */}
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text style={styles.sectionTitle}>Address Details</Text>
+          {/* Business Type (Only for Organization) */}
+          {/*  {formData.CompanyType === 'Organization' && (
+            <AddressTypeSelector
+              value={{
+                Factory: formData.Factory,
+                Warehouse: formData.Warehouse,
+                Office: formData.Office,
+              }}
+              onChange={val =>
+                setFormData(prev => ({
+                  ...prev,
+                  ...val,
+                }))
+              }
+              error={errors.Factory}
+            />
+          )}
 
+          {/* ADDRESS SECTION */}
+          <Card style={screenStyles.card}>
+            <Card.Content>
+              <Text style={screenStyles.sectionTitle}>Address Details</Text>
+
+              {/* Address Line 1 */}
               <TextInput
                 mode="outlined"
                 label="Building, Apartment, Plot Number *"
                 value={formData.Address1}
                 onChangeText={text => handleChange('Address1', text)}
                 error={!!errors.Address1}
-                style={styles.input}
+                style={screenStyles.input}
                 theme={{ roundness: 8 }}
                 multiline
                 numberOfLines={2}
@@ -242,20 +553,22 @@ const RegistrationScreen = () => {
                 {errors.Address1}
               </HelperText>
 
+              {/* Address Line 2 */}
               <TextInput
                 mode="outlined"
-                label="Area, Street, Sector, Village *"
+                label="Street,Area,Sector,Village"
                 value={formData.Address2}
                 onChangeText={text => handleChange('Address2', text)}
-                style={styles.input}
+                style={screenStyles.input}
                 theme={{ roundness: 8 }}
                 multiline
                 numberOfLines={2}
-                left={<TextInput.Icon icon="map-marker" />}
+                left={<TextInput.Icon icon="home" />}
               />
 
-              <View style={styles.row}>
-                <View style={styles.halfInput}>
+              {/* Pincode + City */}
+              <View style={screenStyles.row}>
+                <View style={screenStyles.halfInput}>
                   <TextInput
                     mode="outlined"
                     label="Pincode *"
@@ -263,28 +576,26 @@ const RegistrationScreen = () => {
                     onChangeText={text => handleChange('Pincode', text)}
                     keyboardType="number-pad"
                     error={!!errors.Pincode}
-                    style={styles.input}
-                    theme={{ roundness: 8 }}
-                    left={<TextInput.Icon icon="pin" />}
+                    style={screenStyles.input}
                   />
                   <HelperText type="error" visible={!!errors.Pincode}>
                     {errors.Pincode}
                   </HelperText>
                 </View>
-                <View style={styles.halfInput}>
+
+                <View style={screenStyles.halfInput}>
                   <TextInput
                     mode="outlined"
                     label="Town/Tahsil"
                     value={formData.City}
                     onChangeText={text => handleChange('City', text)}
-                    style={styles.input}
+                    style={screenStyles.input}
                     theme={{ roundness: 8 }}
-                    left={<TextInput.Icon icon="city" />}
                   />
                 </View>
               </View>
 
-              {/* ✅ State SelectList */}
+              {/* State */}
               <SelectList
                 label="State *"
                 data={stateData?.data || []}
@@ -299,7 +610,7 @@ const RegistrationScreen = () => {
                 {errors.State}
               </HelperText>
 
-              {/* ✅ District SelectList */}
+              {/* District */}
               <SelectList
                 label="District / City *"
                 data={availableDistricts}
@@ -314,22 +625,75 @@ const RegistrationScreen = () => {
               <HelperText type="error" visible={!!errors.Destination}>
                 {errors.Destination}
               </HelperText>
+
+              <AddressSearch onSelect={handleOriginSelect} />
             </Card.Content>
           </Card>
 
+          {/* SUBMIT BUTTON */}
           <Button
             mode="contained"
             onPress={handleSubmit}
-            style={styles.submitButton}
-            labelStyle={styles.submitButtonText}
-            contentStyle={styles.submitButtonContent}
+            style={screenStyles.submitButton}
+            labelStyle={screenStyles.submitButtonText}
+            contentStyle={screenStyles.submitButtonContent}
           >
             Register Now
           </Button>
         </ScrollView>
       </KeyboardAvoidingView>
+      <Snackbar visible={snack.visible} onDismiss={hideSnack} duration={3000}>
+        {snack.message}
+      </Snackbar>
     </PaperProvider>
   );
 };
 
 export default RegistrationScreen;
+
+/* ---------------------------------------------------------------
+ * LOCAL STYLES
+ * --------------------------------------------------------------- */
+
+const localStyles = StyleSheet.create({
+  businessTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  businessTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  companyTypeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 8,
+  },
+  companyTypeButton: {
+    flex: 1,
+  },
+
+  businessTypeLabel: {
+    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  businessTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // EVEN SPACING
+    alignItems: 'center',
+    paddingVertical: 5,
+  },
+
+  businessTypeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4, // SPACE BETWEEN ICON & TEXT
+  },
+
+  businessTypeText: {
+    fontSize: 15,
+  },
+});

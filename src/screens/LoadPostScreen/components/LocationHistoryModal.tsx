@@ -16,6 +16,7 @@ interface LocationHistoryModalProps {
   onClose: () => void;
   onSelectLocation: (location: any) => void;
   locations: any[];
+  type: 'origin' | 'destination';
 }
 
 const LocationHistoryModal: React.FC<LocationHistoryModalProps> = ({
@@ -23,11 +24,20 @@ const LocationHistoryModal: React.FC<LocationHistoryModalProps> = ({
   onClose,
   onSelectLocation,
   locations,
+  type,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState('');
 
-  const filteredLocations = locations.filter(location =>
-    location.address.toLowerCase().includes(searchQuery.toLowerCase()),
+  const filteredList = locations.filter(item => {
+    if (type === 'origin') {
+      return item.address === item.Origin; // only origin
+    } else if (type === 'destination') {
+      return item.address === item.Destination; // only destination
+    }
+    return true;
+  });
+  const filteredLocations = filteredList.filter(location =>
+    location?.address?.toLowerCase()?.includes(searchQuery?.toLowerCase()),
   );
 
   return (
