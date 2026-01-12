@@ -1,5 +1,5 @@
 import { store } from '@store/index';
-
+import { addDriversFromSocket } from '@store/slices/mapSlice';
 import { SOCKET_EVENTS } from './socket.events';
 import { getSocket } from './socket.service';
 
@@ -26,11 +26,15 @@ export const registerSocketListeners = () => {
         postId
       }
     */
-
+      // DriverID: "DR17496"
+      // Speed: "3.5"
+      // Status: "Online"
+      // lat: "19.1417604"
+      // lng: "72.9314767"
       console.log('🚚 DRIVER UPDATE:', data);
 
       // 🔥 Redux (अगर mapSlice है)
-      // dispatch(addOrUpdateDriver(data));
+      store.dispatch(addDriversFromSocket(data));
     });
 
     // socket.on(SOCKET_EVENTS.CUSTOMER_NEARBY_DRIVERS, loads => {
