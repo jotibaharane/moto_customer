@@ -74,7 +74,22 @@ const mapSlice = createSlice({
     addOrUpdateDriver: (state, action: PayloadAction<Driver[]>) => {
       state.drivers = action.payload;
     },
-
+    addDriversFromSocket: (state, action: PayloadAction<any[]>) => {
+      state.drivers =
+        action?.payload?.drivers?.map((state: any) => {
+          return {
+            available: '',
+            driver: state?.DriverID,
+            id: state?.DriverID,
+            latitude: Number(state?.lat) || 0,
+            licensePlate: state?.DriverID,
+            longitude: Number(state?.lng) || 0,
+            rotation: 0,
+            type: '',
+          };
+        }) || [];
+    },
+    // Remove a driver
     removeDriver: (state, action: PayloadAction<string>) => {
       state.drivers = state.drivers.filter(d => d.id !== action.payload);
       if (state.selectedDriver?.id === action.payload) {
@@ -108,6 +123,7 @@ export const {
   setOriginAddress,
   setPostId,
   setCustomerMap,
+  addDriversFromSocket,
 } = mapSlice.actions;
 
 export default mapSlice.reducer;

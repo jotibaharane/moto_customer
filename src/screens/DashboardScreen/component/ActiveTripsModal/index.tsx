@@ -1,16 +1,7 @@
 import { useGetActiveTripsMutation } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import { RootState } from '@store/index';
-import {
-  addOrUpdateDriver,
-  selectDriver,
-  setCustomerMap,
-  setDestination,
-  setDestinationAddress,
-  setOrigin,
-  setOriginAddress,
-  setPostId,
-} from '@store/slices/mapSlice';
+import { setLocatation } from '@store/slices/map.slice';
 import {
   forwardRef,
   useImperativeHandle,
@@ -94,33 +85,24 @@ const ActiveTripsModal = forwardRef<ActiveTripsModalRef>((_, ref) => {
   };
 
   const handleTripPress = (item: ActiveTrip) => {
-    dispatch(addOrUpdateDriver([]));
-    dispatch(setCustomerMap('Active'));
-    dispatch(setPostId(item?.LoadPostID));
     dispatch(
-      setOrigin({
-        latitude: item?.Origin_Lat,
-        longitude: item?.Origin_Lng,
-      }),
-    );
-    dispatch(setOriginAddress(item?.Origin));
-    dispatch(setDestinationAddress(item?.Destination));
-    dispatch(
-      selectDriver({
-        latitude: item?.DriverLat,
-        longitude: item?.DriverLng,
-        available: true,
-        driver: item?.DriverID,
-        id: item?.DriverID,
-        licensePlate: item?.VehicleNumber,
-        type: 'medium',
-        rotation: 0,
-      }),
-    );
-    dispatch(
-      setDestination({
-        latitude: item?.Destination_Lat,
-        longitude: item?.Destination_Lng,
+      setLocatation({
+        map_state: 'active',
+        selectedDriver: {
+          latitude: item?.DriverLat,
+          longitude: item?.DriverLng,
+          rotation: 0,
+        },
+        destinationLocation: {
+          latitude: item?.Destination_Lat,
+          longitude: item?.Destination_Lng,
+          rotation: 0,
+        },
+        pickupLocation: {
+          latitude: item?.Origin_Lat,
+          longitude: item?.Origin_Lng,
+          rotation: 0,
+        },
       }),
     );
     handleModalClose();

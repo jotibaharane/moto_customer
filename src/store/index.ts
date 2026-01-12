@@ -17,10 +17,12 @@ import {
 } from 'redux-persist';
 import authReducer from './slices/authSlice';
 import loadPostFormReducer from './slices/loadPostFormSlice';
+import newMapSlice from './slices/map.slice';
 import mapReducer from './slices/mapSlice';
 const rootReducer = combineReducers({
   auth: authReducer,
   map: mapReducer,
+  new: newMapSlice,
   loadPostForm: loadPostFormReducer,
   [baseApi.reducerPath]: baseApi.reducer,
 });

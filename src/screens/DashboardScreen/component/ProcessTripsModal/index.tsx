@@ -2,16 +2,8 @@ import { useGetProcessTripsQuery } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import { useRefreshOnFocus } from '@hooks/onFocusevent';
 import { RootState } from '@store/index';
-import {
-  addOrUpdateDriver,
-  selectDriver,
-  setCustomerMap,
-  setDestination,
-  setDestinationAddress,
-  setOrigin,
-  setOriginAddress,
-  setPostId,
-} from '@store/slices/mapSlice';
+import { setLocatation } from '@store/slices/map.slice';
+import { selectDriver } from '@store/slices/mapSlice';
 import {
   forwardRef,
   useImperativeHandle,
@@ -311,38 +303,27 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
   }, []);
 
   const handleTripPress = (item: CustomerProcess) => {
-    dispatch(addOrUpdateDriver([]));
-    dispatch(setCustomerMap('Process'));
-    dispatch(setPostId(item?.LoadPostID));
     dispatch(
-      setOrigin({
-        latitude: item?.PickupLat,
-        longitude: item?.PickupLng,
-      }),
-    );
-    dispatch(setOriginAddress(item?.PickupAddress));
-    dispatch(setDestinationAddress(item?.DeliveryAddress));
-
-    if (item.DriverID) {
-      dispatch(
-        selectDriver({
-          id: item.DriverID,
-          driver: item.DriverID,
+      setLocatation({
+        map_state: 'process',
+        selectedDriver: {
           latitude: item.DriverLat ?? 0,
           longitude: item.DriverLng ?? 0,
-          available: true,
-          licensePlate: item.DriverID,
-          type: 'medium',
           rotation: 0,
-        }),
-      );
-    }
-    dispatch(
-      setDestination({
-        latitude: item?.DeliveryLat,
-        longitude: item?.DeliveryLng,
+        },
+        destinationLocation: {
+          latitude: item?.DeliveryLat,
+          longitude: item?.DeliveryLng,
+          rotation: 0,
+        },
+        pickupLocation: {
+          latitude: item?.PickupLat,
+          longitude: item?.PickupLng,
+          rotation: 0,
+        },
       }),
     );
+
     handleModalClose();
   };
 
