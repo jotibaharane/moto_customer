@@ -34,6 +34,7 @@ export interface MapState {
   destination: Location | null;
   drivers: Driver[];
   selectedDriver: Driver | null;
+  currentlocation: string;
   currentMap: MapCurrentState;
   originAddress: string;
   destinationAddress: string;

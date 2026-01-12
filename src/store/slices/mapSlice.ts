@@ -2,54 +2,75 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Region } from 'react-native-maps';
 import { Driver, Location, MapCurrentState, MapState } from './mapSliceType';
 
-// Initial state
 const initialState: MapState = {
   currentMap: 'Load',
   originAddress: '',
-  postId: '',
   destinationAddress: '',
+  postId: '',
+
   region: {
     latitude: 19.076,
     longitude: 72.8777,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   },
+
+  // Selected locations
   origin: null,
   destination: null,
+
+  // ✅ Live GPS location
+  currentlocation: null,
+
   drivers: [],
   selectedDriver: null,
 };
 
-// Create the slice
 const mapSlice = createSlice({
   name: 'map',
   initialState,
   reducers: {
-    // Update the map region (e.g., when user pans/zooms)
     setCustomerMap: (state, action: PayloadAction<MapCurrentState>) => {
       state.currentMap = action.payload;
     },
+
     setPostId: (state, action: PayloadAction<string>) => {
       state.postId = action.payload;
     },
+
     setOriginAddress: (state, action: PayloadAction<string>) => {
       state.originAddress = action.payload;
     },
+
     setDestinationAddress: (state, action: PayloadAction<string>) => {
       state.destinationAddress = action.payload;
     },
+
     setRegion: (state, action: PayloadAction<Region>) => {
       state.region = action.payload;
     },
-    // Set origin location
-    setOrigin: (state, action: PayloadAction<Location>) => {
+
+    // Pickup location
+    setOrigin: (state, action: PayloadAction<Location | null>) => {
       state.origin = action.payload;
     },
-    // Set destination location
+
+    // Drop location
     setDestination: (state, action: PayloadAction<Location | null>) => {
       state.destination = action.payload;
     },
-    // Add or update a driver
+
+    // ✅ Set live current GPS location
+    setCurrentLocation: (
+      state,
+      action: PayloadAction<{
+        latitude: number;
+        longitude: number;
+      }>,
+    ) => {
+      state.currentlocation = action.payload;
+    },
+
     addOrUpdateDriver: (state, action: PayloadAction<Driver[]>) => {
       state.drivers = action.payload;
     },
@@ -75,24 +96,24 @@ const mapSlice = createSlice({
         state.selectedDriver = null;
       }
     },
-    // Select a driver and update region to focus on their location
+
     selectDriver: (state, action: PayloadAction<Driver | null>) => {
       state.selectedDriver = action.payload;
     },
-    // Clear selected driver
+
     clearSelectedDriver: state => {
       state.selectedDriver = null;
     },
-    // Reset map to initial state
+
     resetMap: () => initialState,
   },
 });
 
-// Export actions
 export const {
   setRegion,
   setOrigin,
   setDestination,
+  setCurrentLocation, // ✅ EXPORT
   addOrUpdateDriver,
   removeDriver,
   selectDriver,
@@ -105,5 +126,4 @@ export const {
   addDriversFromSocket,
 } = mapSlice.actions;
 
-// Export reducer
 export default mapSlice.reducer;
