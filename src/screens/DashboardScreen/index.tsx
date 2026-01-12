@@ -1,6 +1,7 @@
 import { useGetCustomerPostsQuery } from '@api/hooks_api';
 import { useNavigation } from '@react-navigation/native';
 import { RootState } from '@store/index';
+import { setLocatation } from '@store/slices/map.slice';
 import {
   selectDriver,
   setCustomerMap,
@@ -28,6 +29,7 @@ import {
 import { Icon } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
+import { emitSelectLoad } from '../../sockets';
 import DriverArrivalModal from './component/DriverArrivalModal';
 import { FloatingActionButton } from './component/FloatingButtons';
 import LoadingStatusModalUI from './component/LoadpostImage/LoadingStatusModalUI';
@@ -559,14 +561,25 @@ const Dashboard: React.FC = () => {
 
       // Update Redux store with selected load
       if (activeLoad) {
-        dispatch(setPostId(activeLoad.LoadPostID));
         dispatch(
-          setOrigin({
-            latitude: activeLoad.PickupLat,
-            longitude: activeLoad.PickupLng,
+          setLocatation({
+            map_state: 'pending',
+            selectedDriver: null,
+            destinationLocation: null,
+            pickupLocation: {
+              latitude: activeLoad.PickupLat,
+              longitude: activeLoad.PickupLng,
+              rotation: 0,
+            },
           }),
         );
-        dispatch(setOriginAddress(activeLoad.PickupAddress));
+
+        emitSelectLoad({
+          customerId: CustomerID,
+          postId: activeLoad.LoadPostID,
+          pickupLat: activeLoad.PickupLat,
+          pickupLng: activeLoad.PickupLng,
+        });
       }
     }
   }, [loads]);

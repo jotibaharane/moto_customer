@@ -4,14 +4,7 @@ import { useGetCustomerPostsQuery } from '@api/hooks_api';
 import BottomModal, { BottomModalRef } from '@components/BottomModal';
 import { useRefreshOnFocus } from '@hooks/useRefreshOnFocus';
 import { RootState } from '@store/index';
-import {
-  addOrUpdateDriver,
-  setDestination,
-  setDestinationAddress,
-  setOrigin,
-  setOriginAddress,
-  setPostId,
-} from '@store/slices/mapSlice';
+import { setLocatation } from '@store/slices/map.slice';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -155,14 +148,19 @@ const LoadPostModal = React.forwardRef<BottomModalRef>((_, ref) => {
       pickupLat: item.PickupLat,
       pickupLng: item.PickupLng,
     });
-    dispatch(addOrUpdateDriver([]));
-    dispatch(setPostId(item?.LoadPostID));
+
     dispatch(
-      setOrigin({ latitude: item?.PickupLat, longitude: item?.PickupLng }),
+      setLocatation({
+        map_state: 'pending',
+        selectedDriver: null,
+        destinationLocation: null,
+        pickupLocation: {
+          latitude: item?.PickupLat,
+          longitude: item?.PickupLng,
+          rotation: 0,
+        },
+      }),
     );
-    dispatch(setOriginAddress(item?.PickupAddress));
-    dispatch(setDestinationAddress(item?.DeliveryAddress));
-    dispatch(setDestination(null));
     if (ref && typeof ref !== 'function' && ref.current) {
       ref.current.close();
     }

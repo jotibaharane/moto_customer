@@ -1,543 +1,749 @@
-import { useGetNearbyDriversQuery } from '@api/hooks_api';
+// import { useGetNearbyDriversQuery } from '@api/hooks_api';
+// import { RootState } from '@store/index';
+// import { addOrUpdateDriver } from '@store/slices/mapSlice';
+// import colors from '@utils/colors';
+// import { GOOGLE_MAPS_API_KEY } from '@utils/env';
+// import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+// import { PermissionsAndroid, Platform, View } from 'react-native';
+// import GetLocation from 'react-native-get-location';
+// import MapView, {
+//   AnimatedRegion,
+//   Marker,
+//   MarkerAnimated,
+//   PROVIDER_GOOGLE,
+// } from 'react-native-maps';
+// import MapViewDirections from 'react-native-maps-directions';
+// import { useDispatch, useSelector } from 'react-redux';
+// import DropMarker from '../icon/DropMarker';
+// import Parcel from '../icon/Parcel';
+// import Truck from '../icon/Truck';
+// import { MAP_STYLE } from './helper';
+
+// interface Coordinate {
+//   latitude: number;
+//   longitude: number;
+// }
+
+// interface Driver {
+//   id: string;
+//   latitude: number;
+//   longitude: number;
+//   rotation: number;
+//   driver: string;
+//   available: boolean;
+//   licensePlate: string;
+//   type: string;
+// }
+
+// interface MapComponentProps {
+//   liveDriverLocation?: {
+//     latitude: number;
+//     longitude: number;
+//   };
+// }
+
+// const ICON_SIZES = {
+//   origin: { width: 35, height: 35 },
+//   destination: { width: 35, height: 35 },
+//   truck: { width: 45, height: 45 },
+// };
+
+// // Throttle function to limit function calls
+// const throttle = (func: Function, limit: number) => {
+//   let inThrottle: boolean;
+//   return function (this: any, ...args: any[]) {
+//     if (!inThrottle) {
+//       func.apply(this, args);
+//       inThrottle = true;
+//       setTimeout(() => (inThrottle = false), limit);
+//     }
+//   };
+// };
+
+// const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
+//   const CustomerID = useSelector(
+//     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
+//   );
+//   const [selectedDriver, setSelectedDriver] = React.useState({
+//     latitude: 19.1453,
+//     longitude: 72.936,
+//     rotation: 0,
+//   });
+//   const dispatch = useDispatch();
+//   const { origin, destination, drivers, currentMap, region, postId } =
+//     useSelector((state: RootState) => state.map);
+
+//   console.log({ drivers });
+
+//   const mapRef = useRef<MapView | null>(null);
+//   const lastFitCoordinatesRef = useRef<Coordinate[]>([]);
+//   const lastDriverUpdateRef = useRef<number>(0);
+//   const driverAnimatedPosition = useRef(
+//     new AnimatedRegion({
+//       latitude: selectedDriver?.latitude ?? origin?.latitude ?? 0,
+//       longitude: selectedDriver?.longitude ?? origin?.longitude ?? 0,
+//       latitudeDelta: 0,
+//       longitudeDelta: 0,
+//     }),
+//   ).current;
+
+//   useEffect(() => {
+//     if (
+//       liveDriverLocation?.latitude == null ||
+//       liveDriverLocation?.longitude == null
+//     )
+//       return;
+
+//     driverAnimatedPosition
+//       .timing({
+//         toValue: {
+//           latitude: liveDriverLocation.latitude,
+//           longitude: liveDriverLocation.longitude,
+//           latitudeDelta: 0,
+//           longitudeDelta: 0,
+//         },
+//         duration: 1000,
+//         useNativeDriver: false,
+//       })
+//       .start();
+//   }, [liveDriverLocation]);
+
+//   const reverseGeocode = async (lat: number, lng: number) => {
+//     try {
+//       const response = await fetch(
+//         `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`,
+//       );
+
+//       const data = await response.json();
+
+//       if (data.results?.length > 0) {
+//         const result = data.results[0];
+
+//         return {
+//           address: result.formatted_address,
+//           components: result.address_components,
+//         };
+//       }
+//       return null;
+//     } catch (err) {
+//       console.log('Reverse geocode error', err);
+//       return null;
+//     }
+//   };
+
+//   useEffect(() => {
+//     if (postId) return;
+//     // ✅ DO NOT override origin if it already exists (LoadPost location)
+//     if (origin?.latitude && origin?.longitude) return;
+
+//     const requestLocationPermission = async () => {
+//       try {
+//         if (Platform.OS === 'android') {
+//           const granted = await PermissionsAndroid.request(
+//             PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+//           );
+//           if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+//         }
+
+//         const location = await GetLocation.getCurrentPosition({
+//           enableHighAccuracy: true,
+//           timeout: 10000,
+//         });
+
+//         const geoData = await reverseGeocode(
+//           location.latitude,
+//           location.longitude,
+//         );
+
+//         // dispatch(
+//         //   setOrigin({
+//         //     latitude: location.latitude,
+//         //     longitude: location.longitude,
+//         //     address: geoData?.address,
+//         //   }),
+//         // );
+//       } catch (error) {
+//         console.warn('Error fetching location:', error);
+//       }
+//     };
+
+//     requestLocationPermission();
+//   }, [dispatch, origin]);
+
+//   // Clear map when currentMap changes to prevent stale markers
+//   useEffect(() => {
+//     if (postId) return;
+//     lastFitCoordinatesRef.current = [];
+//     if (mapRef.current) {
+//       mapRef.current.animateToRegion(region, 350);
+//     }
+//   }, [currentMap, region]);
+
+//   // Optimized driver query with conditional polling
+//   const shouldPoll = useMemo(
+//     () => postId && currentMap === 'Load',
+//     [postId, currentMap],
+//   );
+
+//   const { data: driverLocations } = useGetNearbyDriversQuery(
+//     { CustomerID, LoadPostID: postId },
+//     {
+//       skip: !shouldPoll,
+//       refetchOnFocus: true,
+//       refetchOnReconnect: true,
+//       // pollingInterval: shouldPoll ? 5000 : 0,
+//     },
+//   );
+
+//   useEffect(() => {
+//     if (!driverLocations || !Array.isArray(driverLocations)) return;
+
+//     const valid = driverLocations.filter(d => d?.latitude && d?.longitude);
+
+//     dispatch(addOrUpdateDriver(valid));
+//   }, [driverLocations]);
+
+//   const getMapCoordinates = useCallback((): Coordinate[] => {
+//     const coords: Coordinate[] = [];
+
+//     // Origin
+//     if (origin?.latitude && origin?.longitude) {
+//       coords.push({
+//         latitude: origin.latitude,
+//         longitude: origin.longitude,
+//       });
+//     }
+
+//     // Destination (Active)
+//     if (
+//       currentMap === 'Active' &&
+//       destination?.latitude &&
+//       destination?.longitude
+//     ) {
+//       coords.push({
+//         latitude: destination.latitude,
+//         longitude: destination.longitude,
+//       });
+//     }
+
+//     // Selected Driver (Process / Active)
+//     if (
+//       (currentMap === 'Process' || currentMap === 'Active') &&
+//       selectedDriver?.latitude &&
+//       selectedDriver?.longitude
+//     ) {
+//       coords.push({
+//         latitude: selectedDriver.latitude,
+//         longitude: selectedDriver.longitude,
+//       });
+//     }
+
+//     // Nearby Drivers (Load)
+//     if (currentMap === 'Load' && drivers.length > 0) {
+//       drivers.forEach(driver => {
+//         if (driver.latitude && driver.longitude) {
+//           coords.push({
+//             latitude: driver.latitude,
+//             longitude: driver.longitude,
+//           });
+//         }
+//       });
+//     }
+
+//     return coords;
+//   }, [currentMap, origin, destination, drivers, selectedDriver]);
+
+//   const fitMapToCoordinates = useCallback(
+//     throttle((coordinates: Coordinate[]) => {
+//       if (mapRef.current && coordinates.length > 0) {
+//         const hasSignificantChange = coordinates.some((coord, index) => {
+//           const lastCoord = lastFitCoordinatesRef.current[index];
+//           if (!lastCoord) return true;
+
+//           const latDiff = Math.abs(coord.latitude - lastCoord.latitude);
+//           const lngDiff = Math.abs(coord.longitude - lastCoord.longitude);
+//           return latDiff > 0.0001 || lngDiff > 0.0001;
+//         });
+
+//         if (
+//           hasSignificantChange ||
+//           coordinates.length !== lastFitCoordinatesRef.current.length
+//         ) {
+//           // Save current coordinates for comparison
+//           lastFitCoordinatesRef.current = [...coordinates];
+
+//           // Calculate bounding box
+//           const latitudes = coordinates.map(c => c.latitude);
+//           const longitudes = coordinates.map(c => c.longitude);
+
+//           const minLat = Math.min(...latitudes);
+//           const maxLat = Math.max(...latitudes);
+//           const minLng = Math.min(...longitudes);
+//           const maxLng = Math.max(...longitudes);
+
+//           // Calculate center
+//           const centerLat = (minLat + maxLat) / 2;
+//           const centerLng = (minLng + maxLng) / 2;
+
+//           // Calculate deltas with padding
+//           const latDelta = (maxLat - minLat) * 1.5; // 1.5x for padding
+//           const lngDelta = (maxLng - minLng) * 1.5;
+
+//           // Ensure minimum deltas for visibility
+//           const minDelta = 0.01;
+//           const finalLatDelta = Math.max(latDelta, minDelta);
+//           const finalLngDelta = Math.max(lngDelta, minDelta);
+
+//           // Create region
+//           const regionToAnimate = {
+//             latitude: centerLat,
+//             longitude: centerLng,
+//             latitudeDelta: finalLatDelta,
+//             longitudeDelta: finalLngDelta,
+//           };
+
+//           // Animate to the region
+//           mapRef.current.animateToRegion(regionToAnimate, 1000);
+
+//           // Also fit to coordinates as fallback
+//           mapRef.current.fitToCoordinates(coordinates, {
+//             edgePadding: {
+//               top: 100,
+//               right: 100,
+//               bottom: 100,
+//               left: 100,
+//             },
+//             animated: true,
+//           });
+//         }
+//       } else if (mapRef.current && coordinates.length === 0) {
+//         // If no coordinates, animate to default region
+//         mapRef.current.animateToRegion(region, 1000);
+//       }
+//     }, 1000),
+//     [region],
+//   );
+
+//   useEffect(() => {
+//     const coordinates = getMapCoordinates();
+//     fitMapToCoordinates(coordinates);
+//   }, [getMapCoordinates, fitMapToCoordinates]);
+
+//   useEffect(() => {
+//     if (driverLocations?.data?.length) {
+//       const now = Date.now();
+//       if (now - lastDriverUpdateRef.current < 1500) return;
+
+//       const newDrivers: Driver[] = driverLocations.data
+//         .map(item => ({
+//           latitude: item?.Driver_Origin_Lat,
+//           longitude: item?.Driver_Origin_Lng,
+//           rotation: 0,
+//           driver: item?.DriverID,
+//           available: true,
+//           id: item?.DriverID,
+//           licensePlate: item?.VehicleNumber,
+//           type: item?.VehicleType || 'medium',
+//         }))
+//         .filter(
+//           (driver): driver is Driver => !!driver.latitude && !!driver.longitude,
+//         );
+
+//       if (newDrivers.length > 0) {
+//         dispatch(addOrUpdateDriver(newDrivers as any));
+//         lastDriverUpdateRef.current = now;
+//       }
+//     }
+//   }, [driverLocations, dispatch]);
+
+//   const renderOriginMarker = useMemo(() => {
+//     if (!origin?.latitude) return null;
+
+//     return (
+//       <Marker
+//         key={`origin-${origin.latitude}-${origin.longitude}-${currentMap}`}
+//         coordinate={origin}
+//         flat
+//         anchor={{ x: 0.5, y: 0.5 }}
+//         zIndex={700}
+//         tracksViewChanges={false}
+//       >
+//         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+//           <Parcel width={50} height={50} />
+//         </View>
+//       </Marker>
+//     );
+//   }, [origin, currentMap]);
+
+//   const renderDestinationMarker = useMemo(() => {
+//     if (currentMap !== 'Active' || !destination?.latitude) return null;
+
+//     return (
+//       <Marker
+//         key={`destination-${destination.latitude}-${destination.longitude}-${currentMap}`}
+//         coordinate={destination}
+//         flat
+//         anchor={{ x: 0.5, y: 0.5 }}
+//         zIndex={800}
+//         tracksViewChanges={false}
+//       >
+//         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+//           <DropMarker size={45} />
+//         </View>
+//       </Marker>
+//     );
+//   }, [destination, currentMap]);
+
+//   const renderSelectedDriverMarker = useMemo(() => {
+//     if (currentMap !== 'Process' && currentMap !== 'Active') return null;
+
+//     if (selectedDriver?.latitude == null || selectedDriver?.longitude == null)
+//       return null;
+
+//     return (
+//       <MarkerAnimated
+//         coordinate={driverAnimatedPosition}
+//         anchor={{ x: 0.5, y: 0.5 }}
+//         flat
+//         zIndex={999}
+//         tracksViewChanges={false}
+//       >
+//         <View
+//           style={{
+//             transform: [
+//               {
+//                 rotate: `${selectedDriver.rotation || 0}deg`,
+//               },
+//             ],
+//           }}
+//         >
+//           <Truck height={90} width={90} />
+//         </View>
+//       </MarkerAnimated>
+//     );
+//   }, [currentMap, selectedDriver]);
+
+//   const renderNearbyDrivers = useMemo(() => {
+//     if (currentMap !== 'Load') return null;
+
+//     return drivers.map(driver => (
+//       <Marker
+//         key={`driver-${driver.id}-${currentMap}`}
+//         coordinate={{
+//           latitude: driver.latitude,
+//           longitude: driver.longitude,
+//         }}
+//         title={driver.driver}
+//         description={`License: ${driver.licensePlate}`}
+//         anchor={{ x: 0.5, y: 0.5 }}
+//         zIndex={800}
+//         tracksViewChanges={false}
+//       >
+//         <View style={{ transform: [{ rotate: `${180}deg` }] }}>
+//           <Truck height={100} width={100} />
+//         </View>
+//       </Marker>
+//     ));
+//   }, [drivers, currentMap]);
+
+//   const renderRoutes = useMemo(() => {
+//     if (currentMap === 'Active' && origin?.latitude && destination?.latitude) {
+//       return (
+//         <MapViewDirections
+//           origin={origin}
+//           destination={destination}
+//           apikey={GOOGLE_MAPS_API_KEY}
+//           strokeWidth={8}
+//           strokeColor={colors.primary}
+//         />
+//       );
+//     }
+
+//     if (
+//       currentMap === 'Process' &&
+//       selectedDriver?.latitude &&
+//       origin?.latitude
+//     ) {
+//       return (
+//         <MapViewDirections
+//           origin={selectedDriver}
+//           destination={origin}
+//           apikey={GOOGLE_MAPS_API_KEY}
+//           strokeWidth={6}
+//           strokeColor="#4a90e2"
+//         />
+//       );
+//     }
+
+//     return null;
+//   }, [currentMap, origin, destination, selectedDriver]);
+
+//   const renderMapContent = useMemo(() => {
+//     switch (currentMap) {
+//       case 'Load':
+//         return (
+//           <>
+//             {renderOriginMarker}
+//             {renderNearbyDrivers}
+//           </>
+//         );
+//       case 'Active':
+//         return (
+//           <>
+//             {renderOriginMarker}
+//             {renderDestinationMarker}
+//             {renderSelectedDriverMarker}
+//             {renderRoutes}
+//           </>
+//         );
+//       case 'Process':
+//         return (
+//           <>
+//             {renderOriginMarker}
+//             {renderSelectedDriverMarker}
+//             {renderRoutes}
+//           </>
+//         );
+//       default:
+//         return null;
+//     }
+//   }, [
+//     currentMap,
+//     renderOriginMarker,
+//     renderNearbyDrivers,
+//     renderDestinationMarker,
+//     renderSelectedDriverMarker,
+//     renderRoutes,
+//   ]);
+
+//   return (
+//     <MapView
+//       ref={mapRef}
+//       style={{ flex: 1 }}
+//       provider={PROVIDER_GOOGLE}
+//       customMapStyle={MAP_STYLE}
+//       showsUserLocation={true}
+//       showsMyLocationButton={true}
+//       showsCompass={true}
+//       pitchEnabled={true}
+//       initialRegion={region}
+//       onLayout={() => {
+//         // Initial fit when map loads
+//         const coordinates = getMapCoordinates();
+//         if (coordinates.length > 0) {
+//           fitMapToCoordinates(coordinates);
+//         }
+//       }}
+//     >
+//       {renderMapContent}
+//     </MapView>
+//   );
+// };
+
+// export default React.memo(MapComponent);
+
 import { RootState } from '@store/index';
-import { addOrUpdateDriver } from '@store/slices/mapSlice';
-import colors from '@utils/colors';
 import { GOOGLE_MAPS_API_KEY } from '@utils/env';
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { PermissionsAndroid, Platform, View } from 'react-native';
-import GetLocation from 'react-native-get-location';
-import MapView, {
-  AnimatedRegion,
-  Marker,
-  MarkerAnimated,
-  PROVIDER_GOOGLE,
-} from 'react-native-maps';
+import { INDIA_DEFAULT_REGION } from '@utils/locationUtils';
+import React, { FC, useEffect, useRef } from 'react';
+import { View } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import DropMarker from '../icon/DropMarker';
-import Parcel from '../icon/Parcel';
+import OriginMarker from '../icon/OriginMarker';
 import Truck from '../icon/Truck';
 import { MAP_STYLE } from './helper';
 
-interface Coordinate {
-  latitude: number;
-  longitude: number;
-}
-
-interface Driver {
-  id: string;
-  latitude: number;
-  longitude: number;
-  rotation: number;
-  driver: string;
-  available: boolean;
-  licensePlate: string;
-  type: string;
-}
-
-interface MapComponentProps {
-  liveDriverLocation?: {
-    latitude: number;
-    longitude: number;
-  };
-}
-
-const ICON_SIZES = {
-  origin: { width: 35, height: 35 },
-  destination: { width: 35, height: 35 },
-  truck: { width: 45, height: 45 },
-};
-
-// Throttle function to limit function calls
-const throttle = (func: Function, limit: number) => {
-  let inThrottle: boolean;
-  return function (this: any, ...args: any[]) {
-    if (!inThrottle) {
-      func.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  };
-};
-
-const MapComponent: React.FC<MapComponentProps> = ({ liveDriverLocation }) => {
-  const CustomerID = useSelector(
-    (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
-  );
-  const [selectedDriver, setSelectedDriver] = React.useState({
-    latitude: 19.1453,
-    longitude: 72.936,
-    rotation: 0,
+const MapComponent: FC = () => {
+  const mapRef = useRef<MapView>(null);
+  const {
+    map_state,
+    selectedDriver,
+    driverLocations,
+    pickupLocation,
+    destinationLocation,
+  } = useSelector((state: RootState) => state.new);
+  console.log({
+    map_state,
+    selectedDriver,
+    driverLocations,
+    pickupLocation,
+    destinationLocation,
   });
-  const dispatch = useDispatch();
-  const { origin, destination, drivers, currentMap, region, postId } =
-    useSelector((state: RootState) => state.map);
-
-  console.log({ drivers });
-
-  const mapRef = useRef<MapView | null>(null);
-  const lastFitCoordinatesRef = useRef<Coordinate[]>([]);
-  const lastDriverUpdateRef = useRef<number>(0);
-  const driverAnimatedPosition = useRef(
-    new AnimatedRegion({
-      latitude: selectedDriver?.latitude ?? origin?.latitude ?? 0,
-      longitude: selectedDriver?.longitude ?? origin?.longitude ?? 0,
-      latitudeDelta: 0,
-      longitudeDelta: 0,
-    }),
-  ).current;
-
+  // AUTO FIT MAP TO DRIVER LOCATION
   useEffect(() => {
-    if (
-      liveDriverLocation?.latitude == null ||
-      liveDriverLocation?.longitude == null
-    )
-      return;
+    if (!mapRef.current) return;
 
-    driverAnimatedPosition
-      .timing({
-        toValue: {
-          latitude: liveDriverLocation.latitude,
-          longitude: liveDriverLocation.longitude,
-          latitudeDelta: 0,
-          longitudeDelta: 0,
-        },
-        duration: 1000,
-        useNativeDriver: false,
-      })
-      .start();
-  }, [liveDriverLocation]);
-
-  const reverseGeocode = async (lat: number, lng: number) => {
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`,
-      );
-
-      const data = await response.json();
-
-      if (data.results?.length > 0) {
-        const result = data.results[0];
-
-        return {
-          address: result.formatted_address,
-          components: result.address_components,
-        };
-      }
-      return null;
-    } catch (err) {
-      console.log('Reverse geocode error', err);
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    if (postId) return;
-    // ✅ DO NOT override origin if it already exists (LoadPost location)
-    if (origin?.latitude && origin?.longitude) return;
-
-    const requestLocationPermission = async () => {
-      try {
-        if (Platform.OS === 'android') {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          );
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
-        }
-
-        const location = await GetLocation.getCurrentPosition({
-          enableHighAccuracy: true,
-          timeout: 10000,
-        });
-
-        const geoData = await reverseGeocode(
-          location.latitude,
-          location.longitude,
-        );
-
-        // dispatch(
-        //   setOrigin({
-        //     latitude: location.latitude,
-        //     longitude: location.longitude,
-        //     address: geoData?.address,
-        //   }),
-        // );
-      } catch (error) {
-        console.warn('Error fetching location:', error);
-      }
-    };
-
-    requestLocationPermission();
-  }, [dispatch, origin]);
-
-  // Clear map when currentMap changes to prevent stale markers
-  useEffect(() => {
-    if (postId) return;
-    lastFitCoordinatesRef.current = [];
-    if (mapRef.current) {
-      mapRef.current.animateToRegion(region, 350);
-    }
-  }, [currentMap, region]);
-
-  // Optimized driver query with conditional polling
-  const shouldPoll = useMemo(
-    () => postId && currentMap === 'Load',
-    [postId, currentMap],
-  );
-
-  const { data: driverLocations } = useGetNearbyDriversQuery(
-    { CustomerID, LoadPostID: postId },
-    {
-      skip: !shouldPoll,
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
-      // pollingInterval: shouldPoll ? 5000 : 0,
-    },
-  );
-
-  useEffect(() => {
-    if (!driverLocations || !Array.isArray(driverLocations)) return;
-
-    const valid = driverLocations.filter(d => d?.latitude && d?.longitude);
-
-    dispatch(addOrUpdateDriver(valid));
-  }, [driverLocations]);
-
-  const getMapCoordinates = useCallback((): Coordinate[] => {
-    const coords: Coordinate[] = [];
-
-    // Origin
-    if (origin?.latitude && origin?.longitude) {
-      coords.push({
-        latitude: origin.latitude,
-        longitude: origin.longitude,
+    const coordinates: { latitude: number; longitude: number }[] = [];
+    if (pickupLocation?.latitude) {
+      coordinates.push({
+        latitude: pickupLocation.latitude,
+        longitude: pickupLocation.longitude,
       });
     }
-
-    // Destination (Active)
-    if (
-      currentMap === 'Active' &&
-      destination?.latitude &&
-      destination?.longitude
-    ) {
-      coords.push({
-        latitude: destination.latitude,
-        longitude: destination.longitude,
-      });
-    }
-
-    // Selected Driver (Process / Active)
-    if (
-      (currentMap === 'Process' || currentMap === 'Active') &&
-      selectedDriver?.latitude &&
-      selectedDriver?.longitude
-    ) {
-      coords.push({
+    // Driver location
+    if (selectedDriver?.latitude && selectedDriver?.longitude) {
+      coordinates.push({
         latitude: selectedDriver.latitude,
         longitude: selectedDriver.longitude,
       });
     }
 
-    // Nearby Drivers (Load)
-    if (currentMap === 'Load' && drivers.length > 0) {
-      drivers.forEach(driver => {
-        if (driver.latitude && driver.longitude) {
-          coords.push({
-            latitude: driver.latitude,
-            longitude: driver.longitude,
+    // Load nearby drivers
+    if (driverLocations?.length) {
+      driverLocations.forEach(item => {
+        if (item?.latitude && item?.longitude) {
+          coordinates.push({
+            latitude: Number(item.latitude),
+            longitude: Number(item.longitude),
           });
         }
       });
     }
 
-    return coords;
-  }, [currentMap, origin, destination, drivers, selectedDriver]);
-
-  const fitMapToCoordinates = useCallback(
-    throttle((coordinates: Coordinate[]) => {
-      if (mapRef.current && coordinates.length > 0) {
-        const hasSignificantChange = coordinates.some((coord, index) => {
-          const lastCoord = lastFitCoordinatesRef.current[index];
-          if (!lastCoord) return true;
-
-          const latDiff = Math.abs(coord.latitude - lastCoord.latitude);
-          const lngDiff = Math.abs(coord.longitude - lastCoord.longitude);
-          return latDiff > 0.0001 || lngDiff > 0.0001;
-        });
-
-        if (
-          hasSignificantChange ||
-          coordinates.length !== lastFitCoordinatesRef.current.length
-        ) {
-          // Save current coordinates for comparison
-          lastFitCoordinatesRef.current = [...coordinates];
-
-          // Calculate bounding box
-          const latitudes = coordinates.map(c => c.latitude);
-          const longitudes = coordinates.map(c => c.longitude);
-
-          const minLat = Math.min(...latitudes);
-          const maxLat = Math.max(...latitudes);
-          const minLng = Math.min(...longitudes);
-          const maxLng = Math.max(...longitudes);
-
-          // Calculate center
-          const centerLat = (minLat + maxLat) / 2;
-          const centerLng = (minLng + maxLng) / 2;
-
-          // Calculate deltas with padding
-          const latDelta = (maxLat - minLat) * 1.5; // 1.5x for padding
-          const lngDelta = (maxLng - minLng) * 1.5;
-
-          // Ensure minimum deltas for visibility
-          const minDelta = 0.01;
-          const finalLatDelta = Math.max(latDelta, minDelta);
-          const finalLngDelta = Math.max(lngDelta, minDelta);
-
-          // Create region
-          const regionToAnimate = {
-            latitude: centerLat,
-            longitude: centerLng,
-            latitudeDelta: finalLatDelta,
-            longitudeDelta: finalLngDelta,
-          };
-
-          // Animate to the region
-          mapRef.current.animateToRegion(regionToAnimate, 1000);
-
-          // Also fit to coordinates as fallback
-          mapRef.current.fitToCoordinates(coordinates, {
-            edgePadding: {
-              top: 100,
-              right: 100,
-              bottom: 100,
-              left: 100,
-            },
-            animated: true,
-          });
-        }
-      } else if (mapRef.current && coordinates.length === 0) {
-        // If no coordinates, animate to default region
-        mapRef.current.animateToRegion(region, 1000);
-      }
-    }, 1000),
-    [region],
-  );
-
-  useEffect(() => {
-    const coordinates = getMapCoordinates();
-    fitMapToCoordinates(coordinates);
-  }, [getMapCoordinates, fitMapToCoordinates]);
-
-  useEffect(() => {
-    if (driverLocations?.data?.length) {
-      const now = Date.now();
-      if (now - lastDriverUpdateRef.current < 1500) return;
-
-      const newDrivers: Driver[] = driverLocations.data
-        .map(item => ({
-          latitude: item?.Driver_Origin_Lat,
-          longitude: item?.Driver_Origin_Lng,
-          rotation: 0,
-          driver: item?.DriverID,
-          available: true,
-          id: item?.DriverID,
-          licensePlate: item?.VehicleNumber,
-          type: item?.VehicleType || 'medium',
-        }))
-        .filter(
-          (driver): driver is Driver => !!driver.latitude && !!driver.longitude,
-        );
-
-      if (newDrivers.length > 0) {
-        dispatch(addOrUpdateDriver(newDrivers as any));
-        lastDriverUpdateRef.current = now;
-      }
+    if (destinationLocation?.latitude) {
+      coordinates.push({
+        latitude: destinationLocation.latitude,
+        longitude: destinationLocation.longitude,
+      });
     }
-  }, [driverLocations, dispatch]);
 
-  const renderOriginMarker = useMemo(() => {
-    if (!origin?.latitude) return null;
-
-    return (
-      <Marker
-        key={`origin-${origin.latitude}-${origin.longitude}-${currentMap}`}
-        coordinate={origin}
-        flat
-        anchor={{ x: 0.5, y: 0.5 }}
-        zIndex={700}
-        tracksViewChanges={false}
-      >
-        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <Parcel width={50} height={50} />
-        </View>
-      </Marker>
-    );
-  }, [origin, currentMap]);
-
-  const renderDestinationMarker = useMemo(() => {
-    if (currentMap !== 'Active' || !destination?.latitude) return null;
-
-    return (
-      <Marker
-        key={`destination-${destination.latitude}-${destination.longitude}-${currentMap}`}
-        coordinate={destination}
-        flat
-        anchor={{ x: 0.5, y: 0.5 }}
-        zIndex={800}
-        tracksViewChanges={false}
-      >
-        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <DropMarker size={45} />
-        </View>
-      </Marker>
-    );
-  }, [destination, currentMap]);
-
-  const renderSelectedDriverMarker = useMemo(() => {
-    if (currentMap !== 'Process' && currentMap !== 'Active') return null;
-
-    if (selectedDriver?.latitude == null || selectedDriver?.longitude == null)
-      return null;
-
-    return (
-      <MarkerAnimated
-        coordinate={driverAnimatedPosition}
-        anchor={{ x: 0.5, y: 0.5 }}
-        flat
-        zIndex={999}
-        tracksViewChanges={false}
-      >
-        <View
-          style={{
-            transform: [
-              {
-                rotate: `${selectedDriver.rotation || 0}deg`,
-              },
-            ],
-          }}
-        >
-          <Truck height={90} width={90} />
-        </View>
-      </MarkerAnimated>
-    );
-  }, [currentMap, selectedDriver]);
-
-  const renderNearbyDrivers = useMemo(() => {
-    if (currentMap !== 'Load') return null;
-
-    return drivers.map(driver => (
-      <Marker
-        key={`driver-${driver.id}-${currentMap}`}
-        coordinate={{
-          latitude: driver.latitude,
-          longitude: driver.longitude,
-        }}
-        title={driver.driver}
-        description={`License: ${driver.licensePlate}`}
-        anchor={{ x: 0.5, y: 0.5 }}
-        zIndex={800}
-        tracksViewChanges={false}
-      >
-        <View style={{ transform: [{ rotate: `${180}deg` }] }}>
-          <Truck height={100} width={100} />
-        </View>
-      </Marker>
-    ));
-  }, [drivers, currentMap]);
-
-  const renderRoutes = useMemo(() => {
-    if (currentMap === 'Active' && origin?.latitude && destination?.latitude) {
-      return (
-        <MapViewDirections
-          origin={origin}
-          destination={destination}
-          apikey={GOOGLE_MAPS_API_KEY}
-          strokeWidth={8}
-          strokeColor={colors.primary}
-        />
+    // Fit map only if we have at least one coordinate
+    if (coordinates.length === 1) {
+      // Single marker → normal zoom
+      mapRef.current.animateCamera(
+        {
+          center: coordinates[0],
+          zoom: 15,
+        },
+        { duration: 800 },
       );
+    } else if (coordinates.length > 1) {
+      // Multiple markers → fit all
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: {
+          top: 80,
+          right: 80,
+          bottom: 200,
+          left: 80,
+        },
+        animated: true,
+      });
     }
-
-    if (
-      currentMap === 'Process' &&
-      selectedDriver?.latitude &&
-      origin?.latitude
-    ) {
-      return (
-        <MapViewDirections
-          origin={selectedDriver}
-          destination={origin}
-          apikey={GOOGLE_MAPS_API_KEY}
-          strokeWidth={6}
-          strokeColor="#4a90e2"
-        />
-      );
-    }
-
-    return null;
-  }, [currentMap, origin, destination, selectedDriver]);
-
-  const renderMapContent = useMemo(() => {
-    switch (currentMap) {
-      case 'Load':
-        return (
-          <>
-            {renderOriginMarker}
-            {renderNearbyDrivers}
-          </>
-        );
-      case 'Active':
-        return (
-          <>
-            {renderOriginMarker}
-            {renderDestinationMarker}
-            {renderSelectedDriverMarker}
-            {renderRoutes}
-          </>
-        );
-      case 'Process':
-        return (
-          <>
-            {renderOriginMarker}
-            {renderSelectedDriverMarker}
-            {renderRoutes}
-          </>
-        );
-      default:
-        return null;
-    }
-  }, [
-    currentMap,
-    renderOriginMarker,
-    renderNearbyDrivers,
-    renderDestinationMarker,
-    renderSelectedDriverMarker,
-    renderRoutes,
-  ]);
+  }, [selectedDriver, driverLocations, pickupLocation, destinationLocation]);
 
   return (
-    <MapView
-      ref={mapRef}
-      style={{ flex: 1 }}
-      provider={PROVIDER_GOOGLE}
-      customMapStyle={MAP_STYLE}
-      showsUserLocation={true}
-      showsMyLocationButton={true}
-      showsCompass={true}
-      pitchEnabled={true}
-      initialRegion={region}
-      onLayout={() => {
-        // Initial fit when map loads
-        const coordinates = getMapCoordinates();
-        if (coordinates.length > 0) {
-          fitMapToCoordinates(coordinates);
-        }
-      }}
-    >
-      {renderMapContent}
-    </MapView>
+    <>
+      <View style={{ flex: 1, position: 'relative' }}>
+        <MapView
+          ref={mapRef}
+          initialRegion={INDIA_DEFAULT_REGION}
+          style={{ flex: 1 }}
+          provider={PROVIDER_GOOGLE}
+          mapType="standard"
+          customMapStyle={MAP_STYLE}
+          showsUserLocation={false}
+          toolbarEnabled={false}
+          moveOnMarkerPress={false}
+          zoomEnabled
+          zoomControlEnabled
+          maxZoomLevel={18}
+          minZoomLevel={4}
+        >
+          {selectedDriver?.latitude && (
+            <Marker
+              coordinate={selectedDriver || { latitude: 0, longitude: 0 }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              flat
+              tracksViewChanges={false}
+              rotation={Number(selectedDriver.rotation)}
+            >
+              <Truck height={50} width={50} />
+            </Marker>
+          )}
+          {pickupLocation?.latitude && (
+            <Marker
+              coordinate={{
+                latitude: pickupLocation?.latitude! || 0,
+                longitude: pickupLocation?.longitude! || 0,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              flat
+              tracksViewChanges={false}
+            >
+              <OriginMarker size={30} />
+            </Marker>
+          )}
+          {map_state === 'pending' &&
+            driverLocations?.map((item, index) => (
+              <Marker
+                coordinate={{
+                  latitude: Number(item?.latitude) || 0,
+                  longitude: Number(item?.longitude) || 0,
+                }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                flat
+                tracksViewChanges={false}
+                key={index}
+              >
+                {/* <Parcel height={50} width={50} /> */}
+                <Truck height={50} width={50} />
+              </Marker>
+            ))}
+
+          {destinationLocation?.latitude && (
+            <Marker
+              coordinate={{
+                latitude: destinationLocation?.latitude! || 0,
+                longitude: destinationLocation?.longitude! || 0,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              flat
+              tracksViewChanges={false}
+            >
+              <DropMarker size={20} />
+            </Marker>
+          )}
+          {selectedDriver?.latitude &&
+            map_state === 'process' &&
+            pickupLocation?.latitude && (
+              <MapViewDirections
+                origin={{
+                  latitude: selectedDriver?.latitude! || 0,
+                  longitude: selectedDriver?.longitude! || 0,
+                }}
+                destination={{
+                  latitude: pickupLocation?.latitude!,
+                  longitude: pickupLocation?.longitude!,
+                }}
+                apikey={GOOGLE_MAPS_API_KEY}
+                strokeWidth={5}
+                strokeColor="hotpink"
+              />
+            )}
+
+          {pickupLocation?.latitude &&
+            map_state === 'active' &&
+            destinationLocation?.latitude && (
+              <MapViewDirections
+                origin={{
+                  latitude: pickupLocation?.latitude! || 0,
+                  longitude: pickupLocation?.longitude! || 0,
+                }}
+                destination={{
+                  latitude: destinationLocation?.latitude! || 0,
+                  longitude: destinationLocation?.longitude! || 0,
+                }}
+                apikey={GOOGLE_MAPS_API_KEY}
+                strokeWidth={5}
+                strokeColor="hotpink"
+              />
+            )}
+        </MapView>
+      </View>
+    </>
   );
 };
 
-export default React.memo(MapComponent);
+export default MapComponent;

@@ -4,17 +4,7 @@ import {
   useGetProcessTripsQuery,
 } from '@api/hooks_api';
 import { RootState } from '@store/index';
-import {
-  addOrUpdateDriver,
-  resetMap,
-  selectDriver,
-  setCustomerMap,
-  setDestination,
-  setDestinationAddress,
-  setOrigin,
-  setOriginAddress,
-  setPostId,
-} from '@store/slices/mapSlice';
+import { setLocatation } from '@store/slices/map.slice';
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -25,6 +15,7 @@ import {
 } from 'react-native';
 import { IconButton, Text } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
+import { emitSelectLoad } from '../../../../sockets';
 import ActiveTripsModal from '../ActiveTripsModal';
 import LoadPostModal from '../LoadPostModal';
 import ProcessTripsModal from '../ProcessTripsModal';
@@ -201,177 +192,100 @@ export const FloatingActionButton = () => {
 
   const handleButtonPress = (button: DashboardButtonProp) => {
     toggleMenu();
-    dispatch(resetMap());
-
     if (button?.id === 'load-posts') {
-      dispatch(setCustomerMap('Load'));
-
-      dispatch(addOrUpdateDriver([]));
+      emitSelectLoad({
+        customerId: CustomerID,
+        postId: customerPosts?.data?.[0]?.LoadPostID || '',
+        pickupLat:
+          customerPosts?.data?.[0]?.PickupLat ||
+          loadPostData?.data?.[0]?.PickupLat,
+        pickupLng:
+          customerPosts?.data?.[0]?.PickupLng ||
+          loadPostData?.data?.[0]?.PickupLng,
+      });
       dispatch(
-        setPostId(
-          customerPosts?.data?.[0]?.LoadPostID ||
-            loadPostData?.data?.[0]?.LoadPostID ||
-            '',
-        ),
-      );
-      dispatch(
-        setOrigin({
-          latitude:
-            customerPosts?.data?.[0]?.PickupLat ||
-            loadPostData?.data?.[0]?.PickupLat,
-          longitude:
-            customerPosts?.data?.[0]?.PickupLng ||
-            loadPostData?.data?.[0]?.PickupLng,
+        setLocatation({
+          map_state: 'pending',
+          selectedDriver: null,
+          destinationLocation: null,
+          pickupLocation: {
+            latitude:
+              customerPosts?.data?.[0]?.PickupLat ||
+              loadPostData?.data?.[0]?.PickupLat,
+            longitude:
+              customerPosts?.data?.[0]?.PickupLng ||
+              loadPostData?.data?.[0]?.PickupLng,
+            rotation: 0,
+          },
         }),
       );
-      dispatch(
-        setOriginAddress(
-          customerPosts?.data?.[0]?.PickupAddress ||
-            loadPostData?.data?.[0]?.PickupAddress ||
-            '',
-        ),
-      );
-      dispatch(
-        setDestinationAddress(
-          customerPosts?.data?.[0]?.DeliveryAddress ||
-            loadPostData?.data?.[0]?.DeliveryAddress ||
-            '',
-        ),
-      );
-      dispatch(setDestination(null));
 
       modalRef.current?.open();
     } else if (button?.id === 'active-trips') {
-      dispatch(addOrUpdateDriver([]));
-      dispatch(setCustomerMap('Active'));
       dispatch(
-        setPostId(
-          activeTrips?.data?.[0]?.LoadPostID ||
-            activeTripsData?.data?.[0]?.LoadPostID,
-        ),
-      );
-      dispatch(
-        setOrigin({
-          latitude:
-            activeTrips?.data?.[0]?.PickupLat ||
-            activeTripsData?.data?.[0]?.PickupLat,
-          longitude:
-            activeTrips?.data?.[0]?.PickupLng ||
-            activeTripsData?.data?.[0]?.PickupLng,
-        }),
-      );
-      dispatch(
-        setOriginAddress(
-          activeTrips?.data?.[0]?.PickupAddress ||
-            activeTripsData?.data?.[0]?.PickupAddress,
-        ),
-      );
-      dispatch(
-        setDestinationAddress(
-          activeTrips?.data?.[0]?.DeliveryAddress ||
-            activeTripsData?.data?.[0]?.DeliveryAddress,
-        ),
-      );
-      dispatch(
-        selectDriver({
-          latitude:
-            activeTrips?.data?.[0]?.DriverLat ||
-            activeTripsData?.data?.[0]?.DriverLat,
-          longitude:
-            activeTrips?.data?.[0]?.DriverLng ||
-            activeTripsData?.data?.[0]?.DriverLng,
-          available: true,
-          driver:
-            activeTrips?.data?.[0]?.DriverID ||
-            activeTripsData?.data?.[0]?.DriverID,
-          id:
-            activeTrips?.data?.[0]?.DriverID ||
-            activeTripsData?.data?.[0]?.DriverID,
-          licensePlate:
-            activeTrips?.data?.[0]?.VehicleNumber ||
-            activeTripsData?.data?.[0]?.VehicleNumbe,
-          type: 'medium',
-          rotation: 0,
-        }),
-      );
-      dispatch(
-        setDestination({
-          latitude: activeTrips?.data?.[0]?.Destination_Lat || 0,
-          longitude: activeTrips?.data?.[0]?.Destination_Lng || 0,
+        setLocatation({
+          map_state: 'active',
+          selectedDriver: {
+            latitude:
+              activeTrips?.data?.[0]?.DriverLat ||
+              activeTripsData?.data?.[0]?.DriverLat,
+            longitude:
+              activeTrips?.data?.[0]?.DriverLng ||
+              activeTripsData?.data?.[0]?.DriverLng,
+            rotation: 0,
+          },
+          destinationLocation: {
+            latitude: activeTrips?.data?.[0]?.Destination_Lat || 0,
+            longitude: activeTrips?.data?.[0]?.Destination_Lng || 0,
+            rotation: 0,
+          },
+          pickupLocation: {
+            latitude:
+              activeTrips?.data?.[0]?.PickupLat ||
+              activeTripsData?.data?.[0]?.PickupLat,
+            longitude:
+              activeTrips?.data?.[0]?.PickupLng ||
+              activeTripsData?.data?.[0]?.PickupLng,
+            rotation: 0,
+          },
         }),
       );
 
       activeTripsModalRef.current?.open();
     } else if (button?.id === 'process-trips') {
-      dispatch(addOrUpdateDriver([]));
-      dispatch(setCustomerMap('Process'));
+      console.log({ processTrips });
       dispatch(
-        setPostId(
-          processTrips?.data?.[0]?.LoadPostID ||
-            processTripsData?.data?.[0]?.LoadPostID,
-        ),
-      );
-      dispatch(
-        setOrigin({
-          latitude:
-            processTrips?.data?.[0]?.Origin_Lat ||
-            processTripsData?.data?.[0]?.Origin_Lat,
-          longitude:
-            processTrips?.data?.[0]?.Origin_Lng ||
-            processTripsData?.data?.[0]?.Origin_Lng,
-        }),
-      );
-      dispatch(
-        setOriginAddress(
-          processTrips?.data?.[0]?.Origin ||
-            processTripsData?.data?.[0]?.Origin ||
-            '',
-        ),
-      );
-      dispatch(
-        setDestinationAddress(
-          processTrips?.data?.[0]?.Destination ||
-            processTripsData?.data?.[0]?.Destination ||
-            '',
-        ),
-      );
-      if (
-        (processTrips?.data?.[0]?.DriverLat &&
-          processTrips?.data?.[0]?.DriverLng) ||
-        (processTripsData?.data?.[0]?.DriverLat &&
-          processTripsData?.data?.[0]?.DriverLng)
-      ) {
-        dispatch(
-          selectDriver({
+        setLocatation({
+          map_state: 'process',
+          selectedDriver: {
             latitude:
-              processTrips?.data?.[0].DriverLat ||
-              processTripsData?.data?.[0].DriverLat,
+              processTrips?.data?.[0]?.DriverLat ||
+              processTripsData?.data?.[0]?.DriverLat ||
+              0,
             longitude:
-              processTrips?.data?.[0].DriverLng ||
-              processTripsData?.data?.[0].DriverLng,
-            available: true,
-            driver:
-              processTrips?.data?.[0].DriverID ||
-              processTripsData?.data?.[0].DriverID,
-            id:
-              processTrips?.data?.[0].DriverID ||
-              processTripsData?.data?.[0].DriverID,
-            licensePlate:
-              processTrips?.data?.[0].VehicleNumber ||
-              processTripsData?.data?.[0].VehicleNumber,
-            type: 'medium',
+              processTrips?.data?.[0]?.DriverLng ||
+              processTripsData?.data?.[0]?.DriverLng ||
+              0,
             rotation: 0,
-          }),
-        );
-      }
-      dispatch(
-        setDestination({
-          latitude:
-            processTrips?.data?.[0]?.Destination_Lat ||
-            processTripsData?.data?.[0]?.Destination_Lat,
-          longitude:
-            processTrips?.data?.[0]?.Destination_Lng ||
-            processTripsData?.data?.[0]?.Destination_Lng,
+          },
+          destinationLocation: {
+            latitude:
+              processTrips?.data?.[0]?.Destination_Lat ||
+              processTripsData?.data?.[0]?.Destination_Lat,
+            longitude:
+              processTrips?.data?.[0]?.Destination_Lng ||
+              processTripsData?.data?.[0]?.Destination_Lng,
+            rotation: 0,
+          },
+          pickupLocation: {
+            latitude:
+              processTrips?.data?.[0]?.Origin_Lat ||
+              processTripsData?.data?.[0]?.Origin_Lat,
+            longitude:
+              processTrips?.data?.[0]?.Origin_Lng ||
+              processTripsData?.data?.[0]?.Origin_Lng,
+            rotation: 0,
+          },
         }),
       );
 
