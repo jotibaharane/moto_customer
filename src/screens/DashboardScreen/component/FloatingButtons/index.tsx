@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { IconButton, Text } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
-import { emitSelectLoad } from '../../../../sockets';
+import { emitProcessLoad, emitSelectLoad } from '../../../../sockets';
 import ActiveTripsModal from '../ActiveTripsModal';
 import LoadPostModal from '../LoadPostModal';
 import ProcessTripsModal from '../ProcessTripsModal';
@@ -254,6 +254,7 @@ export const FloatingActionButton = () => {
       activeTripsModalRef.current?.open();
     } else if (button?.id === 'process-trips') {
       console.log({ processTrips });
+      emitProcessLoad({ postId: processTrips?.data?.[0]?.LoadPostID || '' });
       dispatch(
         setLocatation({
           map_state: 'process',

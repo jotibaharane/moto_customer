@@ -1,5 +1,3 @@
-import CustomDrawer from '@navigation/drawer/CustomDrawer';
-
 export const SOCKET_EVENTS = {
   // DRIVER_LOCATION: 'driverLiveLocation',
   CREATE_CUSTOMER_LOAD: 'customer:new_load',
@@ -10,6 +8,12 @@ export const SOCKET_EVENTS = {
   CUSTOMER_DRIVER_ACCEPTED: 'customer:driver_accepted',
   CUSTOMER_DRIVER_LOCATION: 'driver:live_location',
   CUSTOMER_DRIVER_UPDATE: 'customer:drivers_update',
+
+  //loacl
+  LOAD_ACCEPT_STATUS: 'customer:load_accepted',
+  SINGLE_DRIVER_LOCATION: 'customer:driver_location',
+  NEARBY_DRIVER_REACH: 'customer:driver_nearby',
+  CUSTOMER_PROCESS_LOAD: 'customer:process_load',
   // DRIVER_LP_STATUS: 'driverLPStatus',
   // NEARBY_CUSTOMER_LOAD: 'nearestCustomerpost',
   // NEARBY_CUSTOMER_LOAD: 'NearbyCustomerLoadPost',

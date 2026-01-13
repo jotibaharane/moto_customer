@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Icon, Text } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
+import { emitProcessLoad } from '../../../../sockets';
 import { formatDate, getStatusColor, SCREEN_HEIGHT } from './helper';
 
 interface CustomerProcess {
@@ -303,6 +304,8 @@ const ProcessTripsModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
   }, []);
 
   const handleTripPress = (item: CustomerProcess) => {
+    console.log({ item });
+    emitProcessLoad({ postId: item?.LoadPostID || '' });
     dispatch(
       setLocatation({
         map_state: 'process',

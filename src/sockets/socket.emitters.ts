@@ -87,6 +87,21 @@ export const emitSelectLoad = (payload: {
   }
 };
 
+export const emitProcessLoad = (payload: { postId: string }) => {
+  const socket = getSocket();
+
+  const emit = () => {
+    socket.emit(SOCKET_EVENTS.CUSTOMER_PROCESS_LOAD, {
+      loadId: payload?.postId,
+    });
+  };
+
+  if (socket.connected) {
+    emit();
+  } else {
+    socket.once('connect', emit);
+  }
+};
 export const emitCustomerJoin = (CUSTOMER_ID: string) => {
   const socket = getSocket();
 

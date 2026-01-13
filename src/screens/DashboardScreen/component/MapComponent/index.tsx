@@ -20,13 +20,7 @@ const MapComponent: FC = () => {
     pickupLocation,
     destinationLocation,
   } = useSelector((state: RootState) => state.new);
-  console.log({
-    map_state,
-    selectedDriver,
-    driverLocations,
-    pickupLocation,
-    destinationLocation,
-  });
+
   // AUTO FIT MAP TO DRIVER LOCATION
   useEffect(() => {
     if (!mapRef.current) return;
@@ -58,7 +52,7 @@ const MapComponent: FC = () => {
       });
     }
 
-    if (destinationLocation?.latitude) {
+    if (destinationLocation?.latitude && map_state !== 'process') {
       coordinates.push({
         latitude: destinationLocation.latitude,
         longitude: destinationLocation.longitude,
