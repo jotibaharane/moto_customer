@@ -548,7 +548,7 @@ const Dashboard: React.FC = () => {
       setLoads(customerPosts.data);
     } else {
       // Use dummy data when no real data
-      setLoads(DUMMY_LOADS);
+      // setLoads(DUMMY_LOADS);
     }
   }, [customerPosts]);
 
@@ -583,56 +583,6 @@ const Dashboard: React.FC = () => {
       }
     }
   }, [loads]);
-
-  // Handle incoming socket event
-  // const handleDriverNearbyAlert = (data: any) => {
-  //   if (data?.driver?.Lat && data?.driver?.Lng) {
-  //     setDriverLocation({
-  //       latitude: data.driver.Lat,
-  //       longitude: data.driver.Lng,
-  //     });
-  //   }
-  // };
-
-  // useEffect(() => {
-  //   if (!CustomerID || !selectedLoad || !origin) return;
-
-  //   socket.off('driverNearbyAlert');
-
-  //   socket.on('driverNearbyAlert', data => {
-  //     // 🔐 Ignore other loads
-  //     if (data?.LoadPostID !== selectedLoad.LoadPostID) return;
-
-  //     if (!data?.driver?.Lat || !data?.driver?.Lng) return;
-
-  //     const driverLoc = {
-  //       latitude: data.driver.Lat,
-  //       longitude: data.driver.Lng,
-  //     };
-
-  //     setDriverLocation(driverLoc);
-  //     setDriverAlertData(data);
-
-  //     const distance = getDistanceInMeters(origin, driverLoc);
-
-  //     if (distance <= ARRIVAL_DISTANCE && !arrivalTriggered.current) {
-  //       arrivalTriggered.current = true;
-
-  //       setDriverDetails(data.driver);
-  //       setShowDriverArrivedDialog(true);
-  //     }
-  //   });
-
-  //   socket.emit('CustomerDetails', {
-  //     customerId: CustomerID,
-  //     loadPostId: selectedLoad.LoadPostID,
-  //   });
-
-  //   return () => {
-  //     socket.off('driverNearbyAlert');
-  //     arrivalTriggered.current = false;
-  //   };
-  // }, [CustomerID, selectedLoad, origin]);
 
   // Animation effect
   useEffect(() => {
@@ -680,12 +630,7 @@ const Dashboard: React.FC = () => {
       }),
     );
     dispatch(setOriginAddress(load.PickupAddress));
-    // dispatch(
-    //   setDriverLocation({
-    //     latitude: load.Driverlat,
-    //     longitude: load.Driverlng,
-    //   }),
-    // );
+
     dispatch(
       setDestination({
         latitude: load.DestinationLat,
@@ -693,17 +638,6 @@ const Dashboard: React.FC = () => {
       }),
     );
     dispatch(setDestinationAddress(load.DestinationAddress));
-
-    // Navigate to Load Detail Screen (replace 'LoadDetail' with your actual screen name)
-    // Example: navigation.navigate('LoadDetail', { load });
-    // Example: navigation.navigate(routeName.LOAD_DETAIL, { loadId: load.LoadPostID });
-
-    // For now, let's assume we navigate to a screen called 'LoadDetail'
-    // You can comment this out if you don't want navigation
-    // navigation.navigate('LoadDetail', {
-    //   loadData: load,
-    //   loadId: load.LoadPostID,
-    // });
 
     // Close the bottom sheet
     setShowLoadsBottomSheet(false);
