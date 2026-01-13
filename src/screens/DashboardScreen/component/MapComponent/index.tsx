@@ -12,6 +12,8 @@ import Truck from '../icon/Truck';
 import { MAP_STYLE } from './helper';
 
 const MapComponent: FC = () => {
+ 
+
   const mapRef = useRef<MapView>(null);
   const {
     map_state,
@@ -170,6 +172,9 @@ const MapComponent: FC = () => {
                 apikey={GOOGLE_MAPS_API_KEY}
                 strokeWidth={5}
                 strokeColor="hotpink"
+                mode='TRANSIT'
+                resetOnChange
+                
               />
             )}
 
