@@ -12,7 +12,13 @@ import {
   CustomerProcessResponse,
   DistrictRequest,
   DistrictResponse,
+  GetLoadPostLoaded,
+  GetLoadPostReached,
+  GetLoadPostRequest,
   InsertCustomerResponse,
+  LoadPostApiLoadedResponse,
+  LoadPostApiReachedResponse,
+  LoadPostApiResponse,
   MpinLoginRequest,
   MpinLoginResponse,
   MpinRequest,
@@ -227,6 +233,33 @@ export const motoApi = baseApi.injectEndpoints({
         body: queryArg,
       }),
     }),
+    getCustomerReached: builder.query<
+      GetLoadPostReached,
+      LoadPostApiReachedResponse
+    >({
+      query: body => ({
+        url: '/customer_LP_Reached',
+        method: 'Post',
+        body,
+      }),
+    }),
+    getCustomerLoading: builder.query<GetLoadPostRequest, LoadPostApiResponse>({
+      query: body => ({
+        url: '/customer_LP_Loading',
+        method: 'POST',
+        body,
+      }),
+    }),
+    getCustomerLoaded: builder.query<
+      LoadPostApiLoadedResponse,
+      GetLoadPostLoaded
+    >({
+      query: body => ({
+        url: '/customer_LP_Loaded',
+        method: 'POST',
+        body,
+      }),
+    }),
     CargoType_BodyType_History: builder.query<any, { CustomerID: string }>({
       query: ({ CustomerID }) => ({
         url: '/CargoType_BodyType_History',
@@ -301,4 +334,7 @@ export const {
   useGetcustomerloadpostdetailsQuery,
   useUpdateloadpostMutation,
   useInsertVehicleloadpostdatasheetMutation,
+  useGetCustomerLoadedQuery,
+  useGetCustomerLoadingQuery,
+  useGetCustomerReachedQuery,
 } = motoApi;

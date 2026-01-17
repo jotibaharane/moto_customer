@@ -28,6 +28,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import DropModal, { DropModalRef } from '../DropModal';
 import PickupModal, { PickupModalRef } from '../PickupModal';
 import SelectionModal, { SelectionModalRef } from '../SelectionModal';
+import { Checkbox } from 'react-native-paper';
 
 const FirstStep: React.FC = () => {
   const navigation = useNavigation();
@@ -62,7 +63,10 @@ const FirstStep: React.FC = () => {
       color: '#EF476F',
     })) || [];
   console.log(truckTypes, 'trucktype in first');
-
+  const showVoluminousCheckbox = useMemo(() => {
+    const type = values.vehicle.vehicleType?.toLowerCase();
+    return type === 'medium' || type === 'multiaxle' || type === 'multi axle';
+  }, [values.vehicle.vehicleType]);
   const selectedTruckType = useMemo(
     () =>
       truckTypesData?.data.find(
@@ -157,7 +161,7 @@ const FirstStep: React.FC = () => {
           <View style={tw`flex-row items-center mb-2`}>
             <View style={tw`w-2 h-4 bg-blue-500 mr-2 rounded-full`} />
             <Text style={tw`text-base font-bold text-gray-800`}>
-              Pickup Location
+              Pickup Deails
             </Text>
           </View>
 
@@ -186,6 +190,14 @@ const FirstStep: React.FC = () => {
                       {values.pickup.contactNumber}
                     </Text>
                   )}
+                  {values.pickup.companyName && (
+                    <Text
+                      style={tw`text-sm text-gray-800 font-medium`}
+                      numberOfLines={1}
+                    >
+                      Company: {values.pickup.companyName}
+                    </Text>
+                  )}
                   {(values.pickup.plotOrBuilding ||
                     values.pickup.streetArea) && (
                     <Text
@@ -203,20 +215,13 @@ const FirstStep: React.FC = () => {
                   >
                     {values.pickup.origin.address}
                   </Text>
-                  {values.pickup.companyName && (
-                    <Text
-                      style={tw`text-xs text-gray-500 mt-1`}
-                      numberOfLines={1}
-                    >
-                      Company: {values.pickup.companyName}
-                    </Text>
-                  )}
+
                   {(values.pickup.pincode ||
                     values.pickup.state ||
                     values.pickup.district ||
                     values.pickup.taluka) && (
                     <Text
-                      style={tw`text-xs text-gray-500 mt-1`}
+                      style={tw`text-sm text-gray-800 mt-1 font-medium`}
                       numberOfLines={2}
                     >
                       {[
@@ -261,7 +266,7 @@ const FirstStep: React.FC = () => {
           <View style={tw`flex-row items-center mb-2`}>
             <View style={tw`w-2 h-4 bg-red-500 mr-2 rounded-full`} />
             <Text style={tw`text-base font-bold text-gray-800`}>
-              Delivery Location
+              Delivery Details
             </Text>
           </View>
 
@@ -277,15 +282,15 @@ const FirstStep: React.FC = () => {
               <View style={tw`flex-row rounded-lg`}>
                 <View style={tw` flex-1`}>
                   <Text style={tw`text-sm text-gray-800 font-medium`}>
-                    {values.delivery.consigneeName || 'Consignee'}{' '}
+                    {values.delivery.consigneeName || 'Consignee'} {'*'}
                     {values.delivery.contactNumber || 'Consignee'}
                   </Text>
 
-                  <Text style={tw`text-sm text-gray-800 font-small`}>
+                  <Text style={tw`text-sm text-gray-800 font-Medium`}>
                     {values.delivery.plotOrBuilding},{' '}
                     {values.delivery.streetArea}
                   </Text>
-                  <Text style={tw`text-sm text-gray-600 `}>
+                  <Text style={tw`text-sm text-gray-800 font-medium `}>
                     {values.delivery.destination.address}
                   </Text>
 
@@ -318,81 +323,6 @@ const FirstStep: React.FC = () => {
             </Text>
           )}
         </View>
-
-        {/* Vehicle Type */}
-        <View
-          style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
-        >
-          <View style={tw`flex-row items-center mb-2`}>
-            <View style={tw`w-2 h-2 bg-green-500 mr-2 rounded-full`} />
-            <Text style={tw`text-base font-bold text-gray-800`}>
-              Vehicle Requirement
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              tw`p-3 border-2  rounded-lg`,
-              {
-                borderColor: vehicleBorderColor,
-                backgroundColor: values.vehicle.vehicleType
-                  ? '#EF476F20'
-                  : '#f9fafb',
-              },
-            ]}
-            onPress={handleOpenVehicleModal}
-            activeOpacity={0.7}
-          >
-            {values.vehicle.vehicleType ? (
-              <View style={tw`flex-row items-center gap-2`}>
-                <Image
-                  source={
-                    selectedTruckType?.img
-                      ? { uri: selectedTruckType?.img }
-                      : undefined
-                  }
-                  style={tw`w-12 h-12`}
-                  resizeMode="contain"
-                />
-                <View style={tw`flex-1`}>
-                  <Text style={tw`text-sm font-bold text-gray-800`}>
-                    {selectedTruckType?.VehicleType}
-                  </Text>
-                  <Text style={tw`text-xs text-gray-600 mt-1`}>
-                    {selectedTruckType?.WeightRange}
-                  </Text>
-                </View>
-                <Icon
-                  name="keyboard-arrow-down"
-                  size={20}
-                  color={tw.color('gray-500')}
-                />
-              </View>
-            ) : (
-              <View style={tw`flex-row items-center gap-2`}>
-                <View style={tw`bg-gray-200 p-2 rounded-full`}>
-                  <Icon name="directions-car" size={16} color="#6B7280" />
-                </View>
-                <Text style={tw`text-gray-500 text-sm flex-1`}>
-                  Select vehicle type
-                </Text>
-                <Icon
-                  name="keyboard-arrow-down"
-                  size={20}
-                  color={tw.color('gray-500')}
-                />
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {errors.vehicle?.vehicleType && touched.vehicle?.vehicleType && (
-            <Text style={styles.errorText}>
-              {errors.vehicle.vehicleType as string}
-            </Text>
-          )}
-        </View>
-
-        {/* Weight Range Selection */}
         <View
           style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
         >
@@ -468,6 +398,102 @@ const FirstStep: React.FC = () => {
             </Text>
           )}
         </View>
+        {/* Vehicle Type */}
+        <View
+          style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
+        >
+          <View style={tw`flex-row items-center mb-2`}>
+            <View style={tw`w-2 h-2 bg-green-500 mr-2 rounded-full`} />
+            <Text style={tw`text-base font-bold text-gray-800`}>
+              Vehicle Segment
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              tw`p-3 border-2  rounded-lg`,
+              {
+                borderColor: vehicleBorderColor,
+                backgroundColor: values.vehicle.vehicleType
+                  ? '#EF476F20'
+                  : '#f9fafb',
+              },
+            ]}
+            onPress={handleOpenVehicleModal}
+            activeOpacity={0.7}
+          >
+            {values.vehicle.vehicleType ? (
+              <View style={tw`flex-row items-center gap-2`}>
+                <Image
+                  source={
+                    selectedTruckType?.img
+                      ? { uri: selectedTruckType?.img }
+                      : undefined
+                  }
+                  style={tw`w-12 h-12`}
+                  resizeMode="contain"
+                />
+                <View style={tw`flex-1`}>
+                  <Text style={tw`text-sm font-bold text-gray-800`}>
+                    {selectedTruckType?.VehicleType}
+                  </Text>
+                  <Text style={tw`text-xs text-gray-600 mt-1`}>
+                    {selectedTruckType?.WeightRange}
+                  </Text>
+                </View>
+                <Icon
+                  name="keyboard-arrow-down"
+                  size={20}
+                  color={tw.color('gray-500')}
+                />
+              </View>
+            ) : (
+              <View style={tw`flex-row items-center gap-2`}>
+                <View style={tw`bg-gray-200 p-2 rounded-full`}>
+                  <Icon name="directions-car" size={16} color="#6B7280" />
+                </View>
+                <Text style={tw`text-gray-500 text-sm flex-1`}>
+                  Select vehicle type
+                </Text>
+                <Icon
+                  name="keyboard-arrow-down"
+                  size={20}
+                  color={tw.color('gray-500')}
+                />
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {errors.vehicle?.vehicleType && touched.vehicle?.vehicleType && (
+            <Text style={styles.errorText}>
+              {errors.vehicle.vehicleType as string}
+            </Text>
+          )}
+        </View>
+
+        {/* Weight Range Selection */}
+
+        {showVoluminousCheckbox && (
+          <View
+            style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
+          >
+            <View style={tw`flex-row items-center justify-between`}>
+              <Text style={tw`text-sm font-medium text-gray-800`}>
+                Is Voluminous?
+              </Text>
+
+              <Checkbox
+                status={values?.vehicle?.isVoluminous ? 'checked' : 'unchecked'}
+                onPress={() =>
+                  setFieldValue(
+                    'values.vehicle.isVoluminous',
+                    !values.vehicle.isVoluminous,
+                  )
+                }
+              />
+            </View>
+          </View>
+        )}
 
         {/* Exact Weight Input */}
         <View
@@ -526,6 +552,7 @@ const FirstStep: React.FC = () => {
         onSelect={(vehicleType: any) => {
           setFieldValue('vehicle.vehicleType', vehicleType);
           setFieldValue('vehicle.weightRange', '');
+          setFieldValue('isVoluminous', false);
         }}
         numColumns={2}
       />

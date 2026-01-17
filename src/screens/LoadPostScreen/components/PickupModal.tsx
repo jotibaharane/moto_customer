@@ -16,7 +16,15 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
-import { RadioButton, TextInput } from 'react-native-paper';
+import {
+  RadioButton,
+  TextInput,
+  HelperText,
+  Button,
+  Chip,
+  Card,
+  Divider,
+} from 'react-native-paper';
 import Toast from 'react-native-toast-message';
 import Entypo from 'react-native-vector-icons/Entypo';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
@@ -64,14 +72,14 @@ interface LocalPickupData {
   taluka: string;
   pincode: string;
   companyName: string;
-  addressType: 'Office' | 'Factory' | 'Warehouse' | 'Personal' | 'Other' | null;
+  addressType: 'Office' | 'Factory' | 'Warehouse' | 'Other' | null;
 }
 
 const ADDRESS_TYPES = [
   { label: 'Office', value: 'Office' },
   { label: 'Factory', value: 'Factory' },
   { label: 'Warehouse', value: 'Warehouse' },
-  { label: 'Personal', value: 'Personal' },
+  // { label: 'Personal', value: 'Personal' },
   { label: 'Other', value: 'Other' },
 ];
 
@@ -85,11 +93,14 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const CustomerDetail = useSelector(
     (state: RootState) => state?.auth?.customerDetails,
   );
+  console.log({ CustomerDetail });
   const currentlocation = useSelector(
     (state: RootState) => state?.map?.currentlocation,
   );
 
+  console.log({ CustomerDetail });
   console.log('current location', { currentlocation });
+
   const {
     getCurrentLocation,
     selectedLocation,
@@ -104,6 +115,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const [activeOriginButton, setActiveOriginButton] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [isConfirmStep, setIsConfirmStep] = useState(false);
 
   const { data: stateData } = useGetStateQuery();
   const [availableDistricts, setAvailableDistricts] = useState<any[]>([]);
@@ -117,8 +129,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     longitude: number;
   } | null>(null);
 
-  const { values, setFieldValue, errors, touched, setFieldTouched } =
-    useFormikContext<ShipmentData>();
+  const { values, setFieldValue } = useFormikContext<ShipmentData>();
   const { currentData } = useGetCurrentAddressQuery<any>();
   const originPlaces = useGooglePlacesSelect();
 
@@ -214,14 +225,131 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     [PincodeData, getDistricts],
   );
 
+  // Handle pickup type change
+  const handlePickupTypeChange = useCallback(
+    (type: LocalPickupData['pickupType']) => {
+      setLocalValues(prev => ({ ...prev, pickupType: type }));
+      setFieldErrors({}); // Clear previous errors
+
+      if (type === 'Registered' && GoogleAddress) {
+        setLocalValues(prev => ({
+          ...prev,
+          pickupType: type,
+          origin: {
+            address: GoogleAddress.fullAddress,
+            coordinates: {
+              lat: GoogleAddress.latitude,
+              lng: GoogleAddress.longitude,
+            },
+            components: GoogleAddress.addressComponents,
+          },
+          contactName: CustomerDetail?.CompanyName || '',
+          contactNumber: CustomerDetail?.ContactNo || '',
+          companyName: CustomerDetail?.CompanyName || '',
+          addressType: null,
+          plotOrBuilding: '',
+          streetArea: '',
+        }));
+      } else if (type === 'self' && currentlocation) {
+        setLocalValues(prev => ({
+          ...prev,
+          pickupType: type,
+          origin: {
+            address: currentlocation?.address,
+            coordinates: {
+              lat: currentlocation?.latitude,
+              lng: currentlocation?.longitude,
+            },
+            components: currentlocation?.components ?? {},
+          },
+          contactName: CustomerDetail?.CompanyName || '',
+          contactNumber: CustomerDetail?.ContactNo || '',
+          addressType: null,
+          companyName: CustomerDetail?.CompanyName || '',
+          plotOrBuilding: '',
+          streetArea: '',
+        }));
+      } else if (type === 'other') {
+        // Clear fields for other type
+        setLocalValues(prev => ({
+          ...prev,
+          pickupType: type,
+          origin: null,
+          contactName: '',
+          contactNumber: '',
+          plotOrBuilding: '',
+          streetArea: '',
+          companyName: '',
+          addressType: null,
+        }));
+      }
+    },
+    [GoogleAddress, CustomerDetail, currentlocation],
+  );
+
+  const handleAddressTypeSelect = useCallback(
+    (type: LocalPickupData['addressType']) => {
+      const updatedValues = {
+        ...localValues,
+        addressType: type,
+      };
+
+      // Auto-fill based on address type
+      if (type === 'Personal') {
+        updatedValues.companyName = '';
+        updatedValues.contactName = CustomerDetail?.FullName || '';
+      } else {
+        updatedValues.companyName = CustomerDetail?.CompanyName || '';
+        updatedValues.contactName = CustomerDetail?.CompanyName || '';
+      }
+
+      updatedValues.contactNumber = CustomerDetail?.ContactNo || '';
+
+      setLocalValues(updatedValues);
+      setShowAddressTypeModal(false);
+      setFieldErrors(prev => ({ ...prev, addressType: '' })); // Clear error
+
+      // If this was triggered from confirm step, complete the confirmation
+      if (isConfirmStep) {
+        completeConfirmation(updatedValues);
+      }
+    },
+    [localValues, CustomerDetail, isConfirmStep],
+  );
+
+  const completeConfirmation = useCallback(
+    (valuesToConfirm: LocalPickupData) => {
+      // ✅ Set all values to Formik at once
+      setFieldValue('pickup.pickupType', valuesToConfirm.pickupType);
+      setFieldValue('pickup.origin', valuesToConfirm.origin);
+      setFieldValue('pickup.contactName', valuesToConfirm.contactName);
+      setFieldValue('pickup.contactNumber', valuesToConfirm.contactNumber);
+      setFieldValue('pickup.plotOrBuilding', valuesToConfirm.plotOrBuilding);
+      setFieldValue('pickup.streetArea', valuesToConfirm.streetArea);
+      setFieldValue('pickup.state', valuesToConfirm.state);
+      setFieldValue('pickup.district', valuesToConfirm.district);
+      setFieldValue('pickup.taluka', valuesToConfirm.taluka);
+      setFieldValue('pickup.pincode', valuesToConfirm.pincode);
+      setFieldValue('pickup.companyName', valuesToConfirm.companyName);
+      setFieldValue('pickup.addressType', valuesToConfirm.addressType);
+
+      setFieldErrors({});
+      setIsConfirmStep(false);
+      handleModalClose();
+    },
+    [setFieldValue, handleModalClose],
+  );
+
   const handleConfirm = useCallback(() => {
     const errors: any = {};
 
+    // Always validate these fields regardless of pickup type
     if (!localValues.origin?.address) {
       errors.origin = 'Please select a pickup location';
     }
 
-    if (isOtherPickupType) {
+    // Validate based on pickup type
+    if (localValues.pickupType === 'other') {
       if (!localValues.contactName?.trim()) {
         errors.contactName = 'Please enter contact person name';
       }
@@ -230,18 +358,64 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       } else if (localValues.contactNumber.length !== 10) {
         errors.contactNumber = 'Please enter a valid 10-digit number';
       }
-      if (!localValues.addressType) {
-        errors.addressType = 'Please select address type';
+      if (!localValues.companyName?.trim()) {
+        errors.companyName = 'Please enter company/warehouse name';
       }
-    }
-
-    if (localValues.pickupType !== 'Registered') {
       if (!localValues.plotOrBuilding?.trim()) {
         errors.plotOrBuilding = 'Please enter plot/unit/building details';
       }
       if (!localValues.streetArea?.trim()) {
         errors.streetArea = 'Please enter area/street details';
       }
+      if (!localValues.pincode?.trim()) {
+        errors.pincode = 'Please enter pincode';
+      } else if (localValues.pincode.length !== 6) {
+        errors.pincode = 'Please enter a valid 6-digit pincode';
+      }
+      if (!localValues.state?.trim()) {
+        errors.state = 'Please select state';
+      }
+
+      // Check if address type is needed (for other pickup type)
+      if (!localValues.addressType) {
+        // Set confirm step and show address type modal
+        setIsConfirmStep(true);
+        setShowAddressTypeModal(true);
+        return; // Don't complete confirmation yet
+      }
+    } else if (localValues.pickupType === 'self') {
+      if (!localValues.contactName?.trim()) {
+        errors.contactName = 'Please enter contact person name';
+      }
+      if (!localValues.contactNumber?.trim()) {
+        errors.contactNumber = 'Please enter contact number';
+      } else if (localValues.contactNumber.length !== 10) {
+        errors.contactNumber = 'Please enter a valid 10-digit number';
+      }
+      if (!localValues.plotOrBuilding?.trim()) {
+        errors.plotOrBuilding = 'Please enter plot/unit/building details';
+      }
+      if (!localValues.streetArea?.trim()) {
+        errors.streetArea = 'Please enter area/street details';
+      }
+
+      // Check if address type is needed (for self pickup type)
+      if (!localValues.addressType) {
+        // Set confirm step and show address type modal
+        setIsConfirmStep(true);
+        setShowAddressTypeModal(true);
+        return; // Don't complete confirmation yet
+      }
+    } else if (localValues.pickupType === 'Registered') {
+      if (!localValues.contactName?.trim()) {
+        errors.contactName = 'Please enter contact person name';
+      }
+      if (!localValues.contactNumber?.trim()) {
+        errors.contactNumber = 'Please enter contact number';
+      } else if (localValues.contactNumber.length !== 10) {
+        errors.contactNumber = 'Please enter a valid 10-digit number';
+      }
+      // For Registered pickup type, we can confirm immediately
     }
 
     if (Object.keys(errors).length > 0) {
@@ -249,23 +423,9 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       return;
     }
 
-    // ✅ Set all values to Formik at once
-    setFieldValue('pickup.pickupType', localValues.pickupType);
-    setFieldValue('pickup.origin', localValues.origin);
-    setFieldValue('pickup.contactName', localValues.contactName);
-    setFieldValue('pickup.contactNumber', localValues.contactNumber);
-    setFieldValue('pickup.plotOrBuilding', localValues.plotOrBuilding);
-    setFieldValue('pickup.streetArea', localValues.streetArea);
-    setFieldValue('pickup.state', localValues.state);
-    setFieldValue('pickup.district', localValues.district);
-    setFieldValue('pickup.taluka', localValues.taluka);
-    setFieldValue('pickup.pincode', localValues.pincode);
-    setFieldValue('pickup.companyName', localValues.companyName);
-    setFieldValue('pickup.addressType', localValues.addressType);
-
-    setFieldErrors({});
-    handleModalClose();
-  }, [localValues, isOtherPickupType, setFieldValue, handleModalClose]);
+    // If we reach here, all validations passed and address type is set (for self/other)
+    completeConfirmation(localValues);
+  }, [localValues, completeConfirmation]);
 
   const handleLocationSelected = useCallback(
     (location: { latitude: number; longitude: number; address: string }) => {
@@ -305,6 +465,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         const location = await originPlaces.getPlaceDetails(selected.key);
         if (location) {
           setLocalValues(prev => ({ ...prev, origin: location }));
+          setFieldErrors(prev => ({ ...prev, origin: '' }));
         }
       } catch (error) {
         Alert.alert('Error', 'Failed to fetch location details');
@@ -313,101 +474,38 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     [originPlaces],
   );
 
-  // Handle pickup type changes
-  useEffect(() => {
-    if (localValues.pickupType === 'Registered' && GoogleAddress) {
+  const handleHistoryLocationSelect = useCallback(
+    (item: {
+      Origin: any;
+      plotOrBuilding: any;
+      streetArea: any;
+      State: any;
+      contactName: any;
+      contactNumber: any;
+      addressType: any;
+    }) => {
       setLocalValues(prev => ({
         ...prev,
+        pickupType: 'other',
         origin: {
-          address: GoogleAddress.fullAddress,
-          coordinates: {
-            lat: GoogleAddress.latitude,
-            lng: GoogleAddress.longitude,
-          },
-          components: GoogleAddress.addressComponents,
+          address: item?.Origin,
+          coordinates: {},
+          components: {},
         },
-        contactName: CustomerDetail?.CompanyName || '',
-        contactNumber: CustomerDetail?.ContactNo || '',
-        plotOrBuilding: '',
-        streetArea: '',
-        addressType: null,
+        plotOrBuilding: item.plotOrBuilding,
+        streetArea: item.streetArea,
+        state: item.State,
+        contactName: item.contactName,
+        contactNumber: item.contactNumber,
+        addressType: item.addressType || null,
+        companyName:
+          item.addressType === 'Personal'
+            ? ''
+            : CustomerDetail?.CompanyName || '',
       }));
-    } else if (localValues.pickupType === 'self' && currentlocation) {
-      setLocalValues(prev => ({
-        ...prev,
-        origin: {
-          address: currentlocation?.address,
-          coordinates: {
-            lat: currentlocation?.latitude,
-            lng: currentlocation?.longitude,
-          },
-          components: currentlocation?.components ?? {},
-        },
-        contactName: CustomerDetail?.CompanyName || '',
-        contactNumber: CustomerDetail?.ContactNo || '',
-        addressType: null,
-      }));
-    } else if (localValues.pickupType === 'other') {
-      // Clear fields for other type
-      setLocalValues(prev => ({
-        ...prev,
-        origin: null,
-        contactName: '',
-        contactNumber: '',
-        plotOrBuilding: '',
-        streetArea: '',
-        addressType: null,
-      }));
-      // Show address type modal for other pickup type
-      setShowAddressTypeModal(true);
-    }
-  }, [localValues.pickupType, GoogleAddress, CustomerDetail, currentlocation]);
 
-  const handleHistoryLocationSelect = useCallback(item => {
-    setLocalValues(prev => ({
-      ...prev,
-      pickupType: 'other',
-      origin: {
-        address: item?.Origin,
-        coordinates: {},
-        components: {},
-      },
-      plotOrBuilding: item.plotOrBuilding,
-      streetArea: item.streetArea,
-      state: item.State,
-      contactName: item.contactName,
-      contactNumber: item.contactNumber,
-      addressType: item.addressType || null,
-    }));
-
-    setShowHistoryModal(false);
-  }, []);
-
-  const handleAddressTypeSelect = useCallback(
-    (type: LocalPickupData['addressType']) => {
-      setLocalValues(prev => ({ ...prev, addressType: type }));
-      setShowAddressTypeModal(false);
-
-      // Auto-fill company name based on address type
-      if (type === 'Personal') {
-        setLocalValues(prev => ({
-          ...prev,
-          companyName: '',
-          contactName: CustomerDetail?.FullName || '',
-          contactNumber: CustomerDetail?.ContactNo || '',
-        }));
-      } else if (
-        type === 'Office' ||
-        type === 'Factory' ||
-        type === 'Warehouse'
-      ) {
-        setLocalValues(prev => ({
-          ...prev,
-          companyName: CustomerDetail?.CompanyName || '',
-          contactName: CustomerDetail?.FullName || '',
-          contactNumber: CustomerDetail?.ContactNo || '',
-        }));
-      }
+      setShowHistoryModal(false);
+      setFieldErrors({}); // Clear errors when selecting from history
     },
     [CustomerDetail],
   );
@@ -418,11 +516,18 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     setShowMapModal(false);
     setShowAddressTypeModal(false);
     setIsModalOpen(false);
+    setIsConfirmStep(false);
     bottomModalRef.current?.close();
   }, []);
 
   const handleBottomModalClose = useCallback(() => {
     setIsModalOpen(false);
+    setIsConfirmStep(false);
+  }, []);
+
+  const handleAddressTypeModalClose = useCallback(() => {
+    setShowAddressTypeModal(false);
+    setIsConfirmStep(false);
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -465,80 +570,73 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         visible={showAddressTypeModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowAddressTypeModal(false)}
+        onRequestClose={handleAddressTypeModalClose}
       >
         <View style={styles.overlay}>
-          <View style={styles.addressTypeModal}>
-            <View style={styles.addressTypeHeader}>
-              <Text style={styles.addressTypeTitle}>Select Address Type</Text>
-              <TouchableOpacity
-                onPress={() => setShowAddressTypeModal(false)}
-                style={styles.addressTypeCloseButton}
-              >
-                <Icon name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.addressTypeSubtitle}>
-              Please select the type of address for pickup location
-            </Text>
-
-            <View style={styles.addressTypeList}>
-              {ADDRESS_TYPES.map(type => (
+          <Card style={styles.addressTypeModal}>
+            <Card.Content>
+              <View style={styles.addressTypeHeader}>
+                <Text style={styles.addressTypeTitle}>Select Address Type</Text>
                 <TouchableOpacity
-                  key={type.value}
-                  style={[
-                    styles.addressTypeButton,
-                    localValues.addressType === type.value &&
-                      styles.addressTypeButtonSelected,
-                  ]}
-                  onPress={() =>
-                    handleAddressTypeSelect(
-                      type.value as LocalPickupData['addressType'],
-                    )
-                  }
+                  onPress={handleAddressTypeModalClose}
+                  style={styles.addressTypeCloseButton}
                 >
-                  <Text
-                    style={[
-                      styles.addressTypeText,
-                      localValues.addressType === type.value &&
-                        styles.addressTypeTextSelected,
-                    ]}
-                  >
-                    {type.label}
-                  </Text>
+                  <Icon name="close" size={24} color="#666" />
                 </TouchableOpacity>
-              ))}
-            </View>
+              </View>
 
-            {fieldErrors.addressType && (
-              <Text style={styles.errorText}>{fieldErrors.addressType}</Text>
-            )}
+              <Text style={styles.addressTypeSubtitle}>
+                {isConfirmStep
+                  ? 'Please select address type to complete pickup confirmation'
+                  : 'Please select the type of address for pickup location'}
+              </Text>
 
-            <TouchableOpacity
-              style={styles.addressTypeConfirmButton}
-              onPress={() => {
-                if (localValues.addressType) {
-                  setShowAddressTypeModal(false);
-                } else {
-                  setFieldErrors(prev => ({
-                    ...prev,
-                    addressType: 'Please select address type',
-                  }));
-                }
-              }}
-            >
-              <Text style={styles.addressTypeConfirmText}>Confirm</Text>
-            </TouchableOpacity>
-          </View>
+              <View style={styles.addressTypeList}>
+                {ADDRESS_TYPES.map(type => (
+                  <TouchableOpacity
+                    key={type.value}
+                    style={[
+                      styles.addressTypeButton,
+                      localValues.addressType === type.value &&
+                        styles.addressTypeButtonSelected,
+                    ]}
+                    onPress={() =>
+                      handleAddressTypeSelect(
+                        type.value as LocalPickupData['addressType'],
+                      )
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.addressTypeText,
+                        localValues.addressType === type.value &&
+                          styles.addressTypeTextSelected,
+                      ]}
+                    >
+                      {type.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Button
+                mode="contained"
+                style={styles.addressTypeConfirmButton}
+                onPress={handleAddressTypeModalClose}
+              >
+                {isConfirmStep ? 'Cancel' : 'Close'}
+              </Button>
+            </Card.Content>
+          </Card>
         </View>
       </Modal>
     ),
     [
       showAddressTypeModal,
       localValues.addressType,
-      fieldErrors.addressType,
+      isConfirmStep,
       handleAddressTypeSelect,
+      handleAddressTypeModalClose,
     ],
   );
 
@@ -554,17 +652,19 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         }}
       >
         <View style={styles.mapContainer}>
-          <View style={styles.mapHeader}>
-            <Text style={styles.mapTitle}>Select Location on Map</Text>
-            <TouchableOpacity
-              onPress={() => setShowMapModal(false)}
-              style={styles.mapCloseButton}
-              accessibilityLabel="Close map modal"
-              accessibilityHint="Closes the map selection modal"
-            >
-              <Icon name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+          <Card style={styles.mapHeader}>
+            <Card.Content style={styles.mapHeaderContent}>
+              <Text style={styles.mapTitle}>Select Location on Map</Text>
+              <TouchableOpacity
+                onPress={() => setShowMapModal(false)}
+                style={styles.mapCloseButton}
+                accessibilityLabel="Close map modal"
+                accessibilityHint="Closes the map selection modal"
+              >
+                <Icon name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </Card.Content>
+          </Card>
 
           <PickupModaldebug
             onLocationSelected={handleLocationSelected}
@@ -588,271 +688,118 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         disableSwipe
       >
         <ScrollView style={styles.container}>
-          <View style={styles.header}>
-            <View style={styles.headerContent}>
-              <Text style={styles.title}>Pickup Location</Text>
-            </View>
-            <TouchableOpacity
-              onPress={handleModalClose}
-              style={styles.closeButton}
-              accessibilityLabel="Close pickup modal"
-              accessibilityHint="Closes the pickup location selection modal"
-            >
-              <Icon name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.sectionContainer}>
-            <View style={tw`flex-row items-center flex-wrap`}>
-              {/* Registered Option */}
-              <View style={tw`flex-row items-center mr-4`}>
-                <RadioButton
-                  value="Registered"
-                  status={
-                    localValues.pickupType == 'Registered'
-                      ? 'checked'
-                      : 'unchecked'
-                  }
-                  onPress={() => {
-                    setLocalValues(prev => ({
-                      ...prev,
-                      pickupType: 'Registered',
-                    }));
-                  }}
-                  color={tw.color('blue-500')}
-                />
-                <Text style={styles.radioLabel}>Registered</Text>
-              </View>
-
-              {/* Current Option */}
-              <View style={tw`flex-row items-center mr-4`}>
-                <RadioButton
-                  value="self"
-                  status={
-                    localValues.pickupType === 'self' ? 'checked' : 'unchecked'
-                  }
-                  onPress={() => {
-                    setLocalValues(prev => ({ ...prev, pickupType: 'self' }));
-                  }}
-                  color={tw.color('blue-500')}
-                />
-                <Text style={styles.radioLabel}>Current</Text>
-              </View>
-
-              {/* Other Option + History */}
-              <View style={tw`flex-row items-center`}>
-                <RadioButton
-                  value="other"
-                  status={
-                    localValues.pickupType == 'other' ? 'checked' : 'unchecked'
-                  }
-                  onPress={() => {
-                    setLocalValues(prev => ({ ...prev, pickupType: 'other' }));
-                  }}
-                  color={tw.color('blue-500')}
-                />
-                <Text style={styles.radioLabel}>Other</Text>
-
-                {localValues.pickupType == 'other' && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setActiveOriginButton('history');
-                      setShowHistoryModal(true);
-                    }}
-                    style={tw`ml-3 flex-row items-center bg-gray-100 px-3 py-1 rounded-full border border-gray-300`}
-                  >
-                    <FontAwesome
-                      name="history"
-                      size={16}
-                      color={tw.color('gray-700')}
-                    />
-                    <Text style={tw`ml-1 text-gray-700 text-sm font-medium`}>
-                      History
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.sectionContainer}>
-            {isRegisteredPickupType && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Contact Name *</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    fieldErrors.contactName && {
-                      borderColor: 'red',
-                      borderWidth: 1,
-                    },
-                  ]}
-                  placeholder="Enter contact person name"
-                  value={localValues.contactName}
-                  textTransform="capitalize"
-                  onChangeText={text => {
-                    setLocalValues(prev => ({ ...prev, contactName: text }));
-                    if (fieldErrors.contactName) {
-                      setFieldErrors(prev => ({
-                        ...prev,
-                        contactName: '',
-                      }));
-                    }
-                  }}
-                />
-                {fieldErrors.contactName && (
-                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                    {fieldErrors.contactName}
-                  </Text>
-                )}
-                <Text style={styles.label}>Contact Number *</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    fieldErrors.contactNumber && {
-                      borderColor: 'red',
-                      borderWidth: 1,
-                    },
-                  ]}
-                  placeholder="Enter contact number"
-                  value={localValues.contactNumber}
-                  maxLength={10}
-                  onChangeText={text => {
-                    setLocalValues(prev => ({ ...prev, contactNumber: text }));
-                    if (fieldErrors.contactNumber) {
-                      setFieldErrors(prev => ({
-                        ...prev,
-                        contactNumber: '',
-                      }));
-                    }
-                  }}
-                  keyboardType="phone-pad"
-                />
-                {fieldErrors.contactNumber && (
-                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                    {fieldErrors.contactNumber}
-                  </Text>
-                )}
-                <Text style={styles.label}>Registered Pickup Address *</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    fieldErrors.origin && {
-                      borderColor: 'red',
-                      borderWidth: 1,
-                    },
-                  ]}
-                  placeholder="Enter registered pickup address"
-                  value={localValues?.origin?.address || ''}
-                  textTransform="capitalize"
-                  onChangeText={text => {
-                    setLocalValues(prev => ({
-                      ...prev,
-                      origin: {
-                        ...prev.origin,
-                        address: text,
-                      },
-                    }));
-
-                    if (fieldErrors.origin) {
-                      setFieldErrors(prev => ({ ...prev, origin: '' }));
-                    }
-                  }}
-                />
-
-                {fieldErrors.origin && (
-                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                    {fieldErrors.origin}
-                  </Text>
-                )}
-              </View>
-            )}
-
-            {isOtherPickupType && (
-              <View style={styles.sectionContainer}>
-                {/* Show selected address type */}
-                {localValues.addressType && (
-                  <View style={styles.addressTypeBadge}>
-                    <Text style={styles.addressTypeBadgeText}>
-                      {localValues.addressType}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => setShowAddressTypeModal(true)}
-                      style={styles.addressTypeEditButton}
+          <Card style={styles.header}>
+            <Card.Content style={styles.headerContent}>
+              <View style={tw`flex-row justify-between items-center`}>
+                <Text style={styles.title}>Pickup Location</Text>
+                <View style={tw`flex-row items-center`}>
+                  {localValues.pickupType === 'other' && (
+                    <Button
+                      mode="outlined"
+                      icon="history"
+                      onPress={() => {
+                        setActiveOriginButton('history');
+                        setShowHistoryModal(true);
+                      }}
+                      style={tw`mr-2`}
+                      labelStyle={tw`text-gray-700`}
                     >
-                      <Icon name="edit" size={16} color="#3B82F6" />
-                    </TouchableOpacity>
-                  </View>
-                )}
+                      History
+                    </Button>
+                  )}
+                  <TouchableOpacity
+                    onPress={handleModalClose}
+                    style={styles.closeButton}
+                    accessibilityLabel="Close pickup modal"
+                    accessibilityHint="Closes the pickup location selection modal"
+                  >
+                    <Icon name="close" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Contact Name *</Text>
+          <Card style={styles.sectionContainer}>
+            <Card.Content>
+              {/* <Text style={styles.sectionLabel}>Pickup Type</Text> */}
+              <View style={tw`flex-row items-center flex-wrap mt-2`}>
+                {/* Registered Option */}
+                <View style={tw`flex-row items-center mr-4`}>
+                  <RadioButton
+                    value="Registered"
+                    status={
+                      localValues.pickupType === 'Registered'
+                        ? 'checked'
+                        : 'unchecked'
+                    }
+                    onPress={() => handlePickupTypeChange('Registered')}
+                    color={tw.color('blue-500')}
+                  />
+                  <Text style={styles.radioLabel}>Registered</Text>
+                </View>
+
+                {/* Current Option */}
+                <View style={tw`flex-row items-center mr-4`}>
+                  <RadioButton
+                    value="self"
+                    status={
+                      localValues.pickupType === 'self'
+                        ? 'checked'
+                        : 'unchecked'
+                    }
+                    onPress={() => handlePickupTypeChange('self')}
+                    color={tw.color('blue-500')}
+                  />
+                  <Text style={styles.radioLabel}>Current</Text>
+                </View>
+
+                {/* Other Option */}
+                <View style={tw`flex-row items-center`}>
+                  <RadioButton
+                    value="other"
+                    status={
+                      localValues.pickupType === 'other'
+                        ? 'checked'
+                        : 'unchecked'
+                    }
+                    onPress={() => handlePickupTypeChange('other')}
+                    color={tw.color('blue-500')}
+                  />
+                  <Text style={styles.radioLabel}>Other</Text>
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.sectionContainer}>
+            <Card.Content>
+              {isRegisteredPickupType && (
+                <>
                   <TextInput
-                    style={[
-                      styles.input,
-                      fieldErrors.contactName && {
-                        borderColor: 'red',
-                        borderWidth: 1,
-                      },
-                    ]}
+                    mode="outlined"
+                    label="Contact Name *"
+                    style={styles.input}
                     placeholder="Enter contact person name"
                     value={localValues.contactName}
-                    textTransform="capitalize"
                     onChangeText={text => {
                       setLocalValues(prev => ({ ...prev, contactName: text }));
                       if (fieldErrors.contactName) {
-                        setFieldErrors(prev => ({
-                          ...prev,
-                          contactName: '',
-                        }));
+                        setFieldErrors(prev => ({ ...prev, contactName: '' }));
                       }
                     }}
+                    error={!!fieldErrors.contactName}
                   />
                   {fieldErrors.contactName && (
-                    <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                    <HelperText type="error" visible={true}>
                       {fieldErrors.contactName}
-                    </Text>
+                    </HelperText>
                   )}
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Company / Warehouse Name *</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      fieldErrors.companyName && {
-                        borderColor: 'red',
-                        borderWidth: 1,
-                      },
-                    ]}
-                    placeholder="Enter Company / Warehouse Name"
-                    value={localValues.companyName}
-                    onChangeText={text => {
-                      setLocalValues(prev => ({ ...prev, companyName: text }));
-                      if (fieldErrors.companyName) {
-                        setFieldErrors(prev => ({
-                          ...prev,
-                          companyName: '',
-                        }));
-                      }
-                    }}
-                  />
-                  {fieldErrors.companyName && (
-                    <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                      {fieldErrors.companyName}
-                    </Text>
-                  )}
-                </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Contact Number *</Text>
                   <TextInput
-                    style={[
-                      styles.input,
-                      fieldErrors.contactNumber && {
-                        borderColor: 'red',
-                        borderWidth: 1,
-                      },
-                    ]}
+                    mode="outlined"
+                    label="Contact Number *"
+                    style={styles.input}
                     placeholder="Enter contact number"
                     value={localValues.contactNumber}
                     maxLength={10}
@@ -869,161 +816,197 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                       }
                     }}
                     keyboardType="phone-pad"
+                    error={!!fieldErrors.contactNumber}
                   />
                   {fieldErrors.contactNumber && (
-                    <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                    <HelperText type="error" visible={true}>
                       {fieldErrors.contactNumber}
-                    </Text>
+                    </HelperText>
                   )}
-                </View>
-              </View>
-            )}
 
-            {isselfPickupType && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Current Location (fetched)</Text>
-                <TextInput
-                  style={[styles.input]}
-                  placeholder="Current location"
-                  value={localValues?.origin?.address || ''}
-                  editable={false}
-                />
-                <Text style={styles.label}>Contact Name *</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    fieldErrors.contactName && {
-                      borderColor: 'red',
-                      borderWidth: 1,
-                    },
-                  ]}
-                  placeholder="Enter contact person name"
-                  value={localValues.contactName}
-                  textTransform="capitalize"
-                  onChangeText={text => {
-                    setLocalValues(prev => ({ ...prev, contactName: text }));
-                    if (fieldErrors.contactName) {
-                      setFieldErrors(prev => ({
-                        ...prev,
-                        contactName: '',
-                      }));
-                    }
-                  }}
-                />
-                {fieldErrors.contactName && (
-                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                    {fieldErrors.contactName}
-                  </Text>
-                )}
-                <Text style={styles.label}>Contact Number *</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    fieldErrors.contactNumber && {
-                      borderColor: 'red',
-                      borderWidth: 1,
-                    },
-                  ]}
-                  placeholder="Enter contact number"
-                  value={localValues.contactNumber}
-                  maxLength={10}
-                  onChangeText={text => {
-                    setLocalValues(prev => ({ ...prev, contactNumber: text }));
-                    if (fieldErrors.contactNumber) {
-                      setFieldErrors(prev => ({
-                        ...prev,
-                        contactNumber: '',
-                      }));
-                    }
-                  }}
-                  keyboardType="phone-pad"
-                />
-                {fieldErrors.contactNumber && (
-                  <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
-                    {fieldErrors.contactNumber}
-                  </Text>
-                )}
-                <Text style={[styles.label, { marginTop: 10 }]}>
-                  Plot / Unit / Building *
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    fieldErrors.plotOrBuilding && {
-                      borderColor: 'red',
-                      borderWidth: 1,
-                    },
-                  ]}
-                  placeholder="Enter plot/unit number"
-                  value={localValues.plotOrBuilding}
-                  onChangeText={text =>
-                    setLocalValues(prev => ({ ...prev, plotOrBuilding: text }))
-                  }
-                />
-
-                <Text style={styles.label}>
-                  Street / Area /Sector / Village *
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    fieldErrors.streetArea && {
-                      borderColor: 'red',
-                      borderWidth: 1,
-                    },
-                  ]}
-                  placeholder="Enter area details"
-                  value={localValues.streetArea}
-                  onChangeText={text =>
-                    setLocalValues(prev => ({ ...prev, streetArea: text }))
-                  }
-                />
-              </View>
-            )}
-
-            {isOtherPickupType && (
-              <>
-                <View style={styles.sectionContainer}>
-                  <Text style={styles.label}>Plot / Unit / Building *</Text>
                   <TextInput
-                    style={[
-                      styles.input,
-                      fieldErrors.plotOrBuilding && {
-                        borderColor: 'red',
-                        borderWidth: 1,
-                      },
-                    ]}
+                    mode="outlined"
+                    label="Company Name *"
+                    style={styles.input}
+                    value={localValues.companyName}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, companyName: text }));
+                    }}
+                  />
+                  {/* <TextInput
+                    mode="outlined"
+                    label="Alternate Name *"
+                    style={styles.input}
+                    placeholder="Enter contact person name"
+                    value={localValues?.contactName}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, contactName: text }));
+                      if (fieldErrors.contactName) {
+                        setFieldErrors(prev => ({ ...prev, contactName: '' }));
+                      }
+                    }}
+                    error={!!fieldErrors.contactName}
+                  /> */}
+                  <TextInput
+                    mode="outlined"
+                    label="Alternate No *"
+                    style={styles.input}
+                    placeholder="Enter contact person name"
+                    value={localValues?.contactName}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, contactName: text }));
+                      if (fieldErrors.contactName) {
+                        setFieldErrors(prev => ({ ...prev, contactName: '' }));
+                      }
+                    }}
+                    error={!!fieldErrors.contactName}
+                  />
+
+                  <TextInput
+                    mode="outlined"
+                    label="Registered Pickup Address *"
+                    style={styles.input}
+                    placeholder="Enter registered pickup address"
+                    value={localValues?.origin?.address || ''}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({
+                        ...prev,
+                        origin: {
+                          ...prev.origin,
+                          address: text,
+                        },
+                      }));
+                      if (fieldErrors.origin) {
+                        setFieldErrors(prev => ({ ...prev, origin: '' }));
+                      }
+                    }}
+                    error={!!fieldErrors.origin}
+                  />
+                  {fieldErrors.origin && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.origin}
+                    </HelperText>
+                  )}
+                </>
+              )}
+
+              {isOtherPickupType && (
+                <>
+                  <TextInput
+                    mode="outlined"
+                    label="Contact Name *"
+                    style={styles.input}
+                    placeholder="Enter contact person name"
+                    value={localValues.contactName}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, contactName: text }));
+                      if (fieldErrors.contactName) {
+                        setFieldErrors(prev => ({ ...prev, contactName: '' }));
+                      }
+                    }}
+                    error={!!fieldErrors.contactName}
+                  />
+                  {fieldErrors.contactName && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.contactName}
+                    </HelperText>
+                  )}
+                  <TextInput
+                    mode="outlined"
+                    label="Contact Number *"
+                    style={styles.input}
+                    placeholder="Enter contact number"
+                    value={localValues.contactNumber}
+                    maxLength={10}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({
+                        ...prev,
+                        contactNumber: text,
+                      }));
+                      if (fieldErrors.contactNumber) {
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          contactNumber: '',
+                        }));
+                      }
+                    }}
+                    keyboardType="phone-pad"
+                    error={!!fieldErrors.contactNumber}
+                  />
+                  {fieldErrors.contactNumber && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.contactNumber}
+                    </HelperText>
+                  )}
+                  <TextInput
+                    mode="outlined"
+                    label="Company / Warehouse Name *"
+                    style={styles.input}
+                    placeholder="Enter Company / Warehouse Name"
+                    value={localValues.companyName}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, companyName: text }));
+                      if (fieldErrors.companyName) {
+                        setFieldErrors(prev => ({ ...prev, companyName: '' }));
+                      }
+                    }}
+                    error={!!fieldErrors.companyName}
+                  />
+                  {fieldErrors.companyName && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.companyName}
+                    </HelperText>
+                  )}
+                  {/* <Divider style={tw`my-4`} /> */}
+                  <TextInput
+                    mode="outlined"
+                    label="Plot / Unit / Building *"
+                    style={styles.input}
                     placeholder="Enter plot/unit number"
                     value={localValues.plotOrBuilding}
-                    onChangeText={text =>
+                    onChangeText={text => {
                       setLocalValues(prev => ({
                         ...prev,
                         plotOrBuilding: text,
-                      }))
-                    }
+                      }));
+                      if (fieldErrors.plotOrBuilding) {
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          plotOrBuilding: '',
+                        }));
+                      }
+                    }}
+                    error={!!fieldErrors.plotOrBuilding}
                   />
-
-                  <Text style={styles.label}>
-                    Street / Area /Sector /Village *
-                  </Text>
+                  {fieldErrors.plotOrBuilding && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.plotOrBuilding}
+                    </HelperText>
+                  )}
                   <TextInput
-                    style={[
-                      styles.input,
-                      fieldErrors.streetArea && {
-                        borderColor: 'red',
-                        borderWidth: 1,
-                      },
-                    ]}
+                    mode="outlined"
+                    label="Street / Area / Sector / Village *"
+                    style={styles.input}
                     placeholder="Enter area details"
                     value={localValues.streetArea}
-                    onChangeText={text =>
-                      setLocalValues(prev => ({ ...prev, streetArea: text }))
-                    }
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, streetArea: text }));
+                      if (fieldErrors.streetArea) {
+                        setFieldErrors(prev => ({ ...prev, streetArea: '' }));
+                      }
+                    }}
+                    error={!!fieldErrors.streetArea}
                   />
+                  {fieldErrors.streetArea && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.streetArea}
+                    </HelperText>
+                  )}
                   <View style={tw`flex-row gap-3 mb-4`}>
                     <View style={tw`flex-1`}>
-                      <Text style={styles.label}>Pincode *</Text>
                       <TextInput
+                        mode="outlined"
+                        label="Pincode *"
                         style={styles.input}
                         placeholder="Enter Pincode"
                         value={localValues.pincode}
@@ -1038,14 +1021,14 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                         error={!!fieldErrors.pincode}
                       />
                       {fieldErrors.pincode && (
-                        <Text style={{ color: 'red', fontSize: 12 }}>
+                        <HelperText type="error" visible={true}>
                           {fieldErrors.pincode}
-                        </Text>
+                        </HelperText>
                       )}
                     </View>
 
                     <View style={tw`flex-1`}>
-                      <Text style={styles.label}>State *</Text>
+                      <Text style={tw`text-gray-700 mb-1`}>State *</Text>
                       <SelectList
                         data={stateData?.data || []}
                         displayKey="state"
@@ -1070,16 +1053,17 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                         }
                       />
                       {fieldErrors.state && (
-                        <Text style={{ color: 'red', fontSize: 12 }}>
+                        <HelperText type="error" visible={true}>
                           {fieldErrors.state}
-                        </Text>
+                        </HelperText>
                       )}
                     </View>
                   </View>
-
                   <View style={tw`flex-row gap-3 mb-4`}>
                     <View style={tw`flex-1`}>
-                      <Text style={styles.label}>District / City *</Text>
+                      <Text style={tw`text-gray-700 mb-1`}>
+                        District / City *
+                      </Text>
                       <SelectList
                         data={availableDistricts}
                         displayKey="region"
@@ -1098,27 +1082,28 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                     </View>
 
                     <View style={tw`flex-1`}>
-                      <Text style={styles.label}>Taluka / Town</Text>
                       <TextInput
+                        mode="outlined"
+                        label="Taluka / Town"
                         style={styles.input}
                         placeholder="Enter Taluka"
                         value={localValues.taluka}
-                        error={!!fieldErrors.taluka}
                         onChangeText={text => {
                           setLocalValues(prev => ({ ...prev, taluka: text }));
                           if (fieldErrors.taluka) {
                             setFieldErrors(prev => ({ ...prev, taluka: '' }));
                           }
                         }}
+                        error={!!fieldErrors.taluka}
                       />
                       {fieldErrors.taluka && (
-                        <Text style={{ color: 'red', fontSize: 12 }}>
+                        <HelperText type="error" visible={true}>
                           {fieldErrors.taluka}
-                        </Text>
+                        </HelperText>
                       )}
                     </View>
                   </View>
-
+                  <Text style={tw`text-gray-700 mb-2`}>Pickup Location</Text>
                   <SelectList
                     data={originPlaces?.suggestions}
                     displayKey="value"
@@ -1156,33 +1141,149 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                       />
                     ))}
                   </View>
-                </View>
-              </>
-            )}
-          </View>
+                </>
+              )}
 
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.cancelButton, tw`border border-gray-300`]}
-              onPress={handleModalClose}
-              accessibilityLabel="Cancel pickup selection"
-              accessibilityHint="Closes the modal without saving changes"
-            >
-              <Text style={[styles.cancelButtonText, tw`text-gray-700`]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.confirmButton, tw`bg-blue-600`]}
-              onPress={handleConfirm}
-              accessibilityLabel="Confirm pickup location"
-              accessibilityHint="Saves the selected pickup location and closes the modal"
-            >
-              <Text style={[styles.confirmButtonText, tw`text-white`]}>
-                Confirm Pickup
-              </Text>
-            </TouchableOpacity>
-          </View>
+              {isselfPickupType && (
+                <>
+                  <TextInput
+                    mode="outlined"
+                    label="Contact Name *"
+                    style={styles.input}
+                    placeholder="Enter contact person name"
+                    value={localValues.contactName}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, contactName: text }));
+                      if (fieldErrors.contactName) {
+                        setFieldErrors(prev => ({ ...prev, contactName: '' }));
+                      }
+                    }}
+                    error={!!fieldErrors.contactName}
+                  />
+                  {fieldErrors.contactName && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.contactName}
+                    </HelperText>
+                  )}
+
+                  <TextInput
+                    mode="outlined"
+                    label="Contact Number *"
+                    style={styles.input}
+                    placeholder="Enter contact number"
+                    value={localValues.contactNumber}
+                    maxLength={10}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({
+                        ...prev,
+                        contactNumber: text,
+                      }));
+                      if (fieldErrors.contactNumber) {
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          contactNumber: '',
+                        }));
+                      }
+                    }}
+                    keyboardType="phone-pad"
+                    error={!!fieldErrors.contactNumber}
+                  />
+                  {fieldErrors.contactNumber && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.contactNumber}
+                    </HelperText>
+                  )}
+
+                  <TextInput
+                    mode="outlined"
+                    label="Company Name *"
+                    style={styles.input}
+                    placeholder="Company Name"
+                    value={localValues.companyName}
+                    onChangeText={text =>
+                      setLocalValues(prev => ({ ...prev, companyName: text }))
+                    }
+                  />
+
+                  <TextInput
+                    mode="outlined"
+                    label="Current Location (fetched)"
+                    style={styles.input}
+                    placeholder="Current location"
+                    value={localValues?.origin?.address || ''}
+                    editable={false}
+                  />
+
+                  <TextInput
+                    mode="outlined"
+                    label="Plot / Unit / Building *"
+                    style={styles.input}
+                    placeholder="Enter plot/unit number"
+                    value={localValues.plotOrBuilding}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({
+                        ...prev,
+                        plotOrBuilding: text,
+                      }));
+                      if (fieldErrors.plotOrBuilding) {
+                        setFieldErrors(prev => ({
+                          ...prev,
+                          plotOrBuilding: '',
+                        }));
+                      }
+                    }}
+                    error={!!fieldErrors.plotOrBuilding}
+                  />
+                  {fieldErrors.plotOrBuilding && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.plotOrBuilding}
+                    </HelperText>
+                  )}
+
+                  <TextInput
+                    mode="outlined"
+                    label="Street / Area / Sector / Village *"
+                    style={styles.input}
+                    placeholder="Enter area details"
+                    value={localValues.streetArea}
+                    onChangeText={text => {
+                      setLocalValues(prev => ({ ...prev, streetArea: text }));
+                      if (fieldErrors.streetArea) {
+                        setFieldErrors(prev => ({ ...prev, streetArea: '' }));
+                      }
+                    }}
+                    error={!!fieldErrors.streetArea}
+                  />
+                  {fieldErrors.streetArea && (
+                    <HelperText type="error" visible={true}>
+                      {fieldErrors.streetArea}
+                    </HelperText>
+                  )}
+                </>
+              )}
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.modalFooter}>
+            <Card.Content style={styles.footerContent}>
+              <View style={tw`flex-row justify-between w-full`}>
+                <Button
+                  mode="outlined"
+                  style={[styles.cancelButton, tw`flex-1 mr-2`]}
+                  onPress={handleModalClose}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  mode="contained"
+                  style={[styles.confirmButton, tw`flex-1 ml-2`]}
+                  onPress={handleConfirm}
+                >
+                  Confirm Pickup
+                </Button>
+              </View>
+            </Card.Content>
+          </Card>
         </ScrollView>
 
         <LocationHistoryModal
@@ -1214,110 +1315,71 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
     backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   headerContent: {
-    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-    textAlign: 'center',
   },
   closeButton: {
     padding: 4,
-    marginLeft: 16,
   },
   modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: '#FFF',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  footerContent: {
     padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  cancelButton: {
-    flex: 1,
-    padding: 12,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    marginRight: 8,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#4b5563',
-    fontWeight: '600',
-  },
-  confirmButton: {
-    flex: 1,
-    padding: 12,
-    backgroundColor: '#3B82F6',
-    borderRadius: 8,
-    marginLeft: 8,
-    alignItems: 'center',
-  },
-  confirmButtonText: {
-    color: 'white',
-    fontWeight: '600',
   },
   sectionContainer: {
-    marginTop: 5,
-    marginBottom: 0,
-    backgroundColor: 'white',
-    padding: 10,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
+    marginVertical: 8,
+    marginHorizontal: 16,
+  },
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
   },
   radioLabel: {
     marginLeft: 8,
     color: '#374151',
+    fontSize: 14,
   },
   actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    margin: 5,
+    marginVertical: 12,
     gap: 12,
   },
   actionButton: {
     flex: 1,
   },
-  inputGroup: {
-    marginBottom: 5,
-  },
-  label: {
-    marginBottom: 0,
-    fontWeight: '500',
-    color: '#374151',
-    fontSize: 14,
-  },
   input: {
-    height: 45,
-    color: 'black',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    fontSize: 16,
     backgroundColor: 'white',
+    marginBottom: 8,
   },
   mapContainer: {
     flex: 1,
     backgroundColor: 'white',
   },
   mapHeader: {
+    backgroundColor: '#FFF',
+    elevation: 2,
+  },
+  mapHeaderContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    backgroundColor: '#FFF',
+    paddingVertical: 8,
   },
   mapTitle: {
     fontSize: 18,
@@ -1327,7 +1389,6 @@ const styles = StyleSheet.create({
   mapCloseButton: {
     padding: 4,
   },
-  // Address Type Modal Styles
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1336,9 +1397,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   addressTypeModal: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
     width: '90%',
     maxWidth: 400,
   },
@@ -1386,41 +1444,18 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   addressTypeConfirmButton: {
-    backgroundColor: '#3B82F6',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
+    marginTop: 8,
   },
-  addressTypeConfirmText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  errorText: {
-    color: 'red',
-    fontSize: 12,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  // Address Type Badge
   addressTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginBottom: 15,
+    marginBottom: 16,
   },
-  addressTypeBadgeText: {
-    color: '#1E40AF',
-    fontWeight: '600',
-    fontSize: 14,
-    marginRight: 8,
+  cancelButton: {
+    minWidth: 100,
   },
-  addressTypeEditButton: {
-    padding: 2,
+  confirmButton: {
+    minWidth: 100,
   },
 });
 
