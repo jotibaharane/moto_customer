@@ -70,25 +70,32 @@ interface FormValues {
   driverName?: string;
 }
 
-// Document Type Radio Options (Removed airwaybill)
+// Document Type Radio Options
 const DOCUMENT_TYPES = [
   {
     id: 'invoice',
-    label: 'Invoice',
+    label: 'Invoice Details',
     value: 'invoice',
     icon: 'file-document-outline',
-  },
-  {
-    id: 'challan',
-    label: 'Challan',
-    value: 'challan',
-    icon: 'truck-outline',
+    color: '#10B981',
+    bgColor: '#F0FDF4',
   },
   {
     id: 'bill-of-entry',
-    label: 'Bill of Entry',
+    label: 'Bill of Entry Details',
     value: 'bill-of-entry',
     icon: 'ship-wheel',
+    color: '#F59E0B',
+    bgColor: '#FEF3C7',
+  },
+
+  {
+    id: 'challan',
+    label: 'Challan Details',
+    value: 'challan',
+    icon: 'truck-outline',
+    color: '#3B82F6',
+    bgColor: '#EFF6FF',
   },
 ];
 
@@ -140,8 +147,18 @@ const formatQuantityDisplay = (group: any): string => {
   return `${group.totalQuantity} QTY`;
 };
 
+// Format currency display
+const formatCurrencyDisplay = (group: any, type: DocumentType): string => {
+  if (type === 'bill-of-entry') {
+    return `${
+      group.items[0]?.currency || 'INR'
+    } ${group.totalValue.toLocaleString()}`;
+  }
+  return `₹${group.totalValue.toLocaleString()}`;
+};
+
 // ---------------------------------------------
-// MAIN COMPONENT
+// MAIN COMPONENT - FIXED VERSION
 // ---------------------------------------------
 export default function Step2_InvoiceDetails() {
   const [showDocumentModal, setShowDocumentModal] = useState<boolean>(false);
@@ -151,6 +168,8 @@ export default function Step2_InvoiceDetails() {
   const [editingGroupIndex, setEditingGroupIndex] = useState<number | null>(
     null,
   );
+  const [editingDocumentType, setEditingDocumentType] =
+    useState<DocumentType | null>(null);
   const [tempItems, setTempItems] = useState<DocumentItem[]>([]);
 
   const packageTypeModalRef = useRef<BottomModalRef>(null);
@@ -167,27 +186,29 @@ export default function Step2_InvoiceDetails() {
     setSelectedDocumentType(type);
     setTempItems([]);
     setEditingGroupIndex(null);
+    setEditingDocumentType(null);
     setShowDocumentModal(true);
   };
 
   // Open document modal for editing existing group
   const openEditDocumentModal = (type: DocumentType, index: number) => {
     setSelectedDocumentType(type);
+    setEditingDocumentType(type);
 
     switch (type) {
       case 'invoice':
         if (values.invoices?.[index]) {
-          setTempItems(values.invoices[index].items);
+          setTempItems([...values.invoices[index].items]);
         }
         break;
       case 'challan':
         if (values.challans?.[index]) {
-          setTempItems(values.challans[index].items);
+          setTempItems([...values.challans[index].items]);
         }
         break;
       case 'bill-of-entry':
         if (values.billOfEntries?.[index]) {
-          setTempItems(values.billOfEntries[index].items);
+          setTempItems([...values.billOfEntries[index].items]);
         }
         break;
     }
@@ -196,16 +217,16 @@ export default function Step2_InvoiceDetails() {
     setShowDocumentModal(true);
   };
 
-  // Submit document group
+  // Submit document group - FIXED: Now preserves all document types
   const handleSubmitDocument = () => {
     if (tempItems.length === 0) {
-      if (editingGroupIndex === null) {
-        Alert.alert('Error', 'Please add at least one item!');
+      if (editingGroupIndex !== null && editingDocumentType) {
+        // If editing and no items, delete the group
+        deleteDocumentGroup(editingDocumentType, editingGroupIndex);
+        setShowDocumentModal(false);
         return;
       }
-      // If editing and no items, delete the group
-      deleteDocumentGroup(selectedDocumentType, editingGroupIndex);
-      setShowDocumentModal(false);
+      Alert.alert('Error', 'Please add at least one item!');
       return;
     }
 
@@ -217,16 +238,19 @@ export default function Step2_InvoiceDetails() {
 
     const baseGroup = {
       id:
-        editingGroupIndex !== null
-          ? getGroupId(selectedDocumentType, editingGroupIndex)
+        editingGroupIndex !== null && editingDocumentType
+          ? getGroupId(editingDocumentType, editingGroupIndex)
           : `${selectedDocumentType}-group-${Date.now()}-${Math.random()}`,
-      items: tempItems,
+      items: [...tempItems],
       totalValue: totalValue,
       totalQuantity: quantityData.total,
       ...(quantityData.unitType && { unitType: quantityData.unitType }),
     };
 
-    switch (selectedDocumentType) {
+    // Use editingDocumentType if editing, otherwise use selectedDocumentType
+    const targetType = editingDocumentType || selectedDocumentType;
+
+    switch (targetType) {
       case 'invoice':
         const updatedInvoices = [...(values.invoices || [])];
         if (editingGroupIndex !== null) {
@@ -261,6 +285,7 @@ export default function Step2_InvoiceDetails() {
     setShowDocumentModal(false);
     setTempItems([]);
     setEditingGroupIndex(null);
+    setEditingDocumentType(null);
   };
 
   // Delete document group
@@ -304,11 +329,11 @@ export default function Step2_InvoiceDetails() {
   const getGroupId = (type: DocumentType, index: number): string => {
     switch (type) {
       case 'invoice':
-        return values.invoices[index].id;
+        return values.invoices?.[index]?.id || '';
       case 'challan':
-        return values.challans[index].id;
+        return values.challans?.[index]?.id || '';
       case 'bill-of-entry':
-        return values.billOfEntries[index].id;
+        return values.billOfEntries?.[index]?.id || '';
     }
   };
 
@@ -324,19 +349,7 @@ export default function Step2_InvoiceDetails() {
     }
   };
 
-  // Get group icon and color
-  const getGroupIcon = (type: DocumentType) => {
-    switch (type) {
-      case 'invoice':
-        return { icon: 'file-document-outline', color: '#10B981' };
-      case 'challan':
-        return { icon: 'truck-outline', color: '#10B981' };
-      case 'bill-of-entry':
-        return { icon: 'ship-wheel', color: '#F59E0B' };
-    }
-  };
-
-  // Calculate totals
+  // Calculate totals for summary
   const calculateTotals = () => {
     let totalInvoiceValue = 0;
     let totalChallanValue = 0;
@@ -368,6 +381,15 @@ export default function Step2_InvoiceDetails() {
     grandTotalValue,
   } = calculateTotals();
 
+  // Check if any document exists
+  const hasAnyDocument = () => {
+    return (
+      (values.invoices?.length || 0) > 0 ||
+      (values.challans?.length || 0) > 0 ||
+      (values.billOfEntries?.length || 0) > 0
+    );
+  };
+
   return (
     <>
       <ScrollView
@@ -375,88 +397,260 @@ export default function Step2_InvoiceDetails() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Document Type Selection - Professional 2-column layout */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Add Documents</Text>
+        {/* Header Section */}
+        {/* <View style={styles.headerSection}>
+          <Text style={styles.headerTitle}>Document Management</Text>
+          <Text style={styles.headerSubtitle}>
+            Add and manage invoices, challans, and bill of entries
+          </Text>
+        </View> */}
 
-          <View style={[styles.documentTypeGrid, { flexDirection: 'column' }]}>
-            <View style={{ gap: 12 }}>
-              {DOCUMENT_TYPES.map(docType => (
-                <CustomRadioButton
-                  key={docType.id}
-                  options={[docType]}
-                  selectedOption={selectedDocumentType}
-                  onSelect={(value: DocumentType) => {
-                    setSelectedDocumentType(value);
-                    openAddDocumentModal(value);
-                  }}
-                />
-              ))}
-            </View>
+        {/* Add Documents Section - Professional Cards Layout */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            {/* <Text style={styles.sectionTitle}>Add New Document</Text> */}
+            {/* <Text style={styles.sectionDescription}>
+              Select document type to add
+            </Text> */}
+          </View>
+
+          <View style={styles.documentTypeGrid}>
+            {DOCUMENT_TYPES.map(docType => (
+              <TouchableOpacity
+                key={docType.id}
+                style={[
+                  styles.documentTypeCard,
+                  { backgroundColor: docType.bgColor },
+                ]}
+                onPress={() =>
+                  openAddDocumentModal(docType.value as DocumentType)
+                }
+              >
+                <View style={styles.documentTypeIconContainer}>
+                  <Icon name={docType.icon} size={24} color={docType.color} />
+                </View>
+                <Text style={styles.documentTypeLabel}>{docType.label}</Text>
+                <View style={styles.documentCountBadge}>
+                  <Text style={styles.documentCountText}>
+                    {getGroupsByType(docType.value as DocumentType).length}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Documents List */}
-        {DOCUMENT_TYPES.filter(
-          docType => docType.value === selectedDocumentType,
-        ).map(docType => {
-          const groups = getGroupsByType(docType.value as DocumentType);
-          if (groups.length === 0) return null;
+        {/* Document Summary Section */}
+        {/* {hasAnyDocument() && (
+          <View style={styles.summarySection}>
+            <Text style={styles.sectionTitle}>Document Summary</Text>
+            <View style={styles.summaryCards}>
+              {totalInvoiceValue > 0 && (
+                <View
+                  style={[styles.summaryCard, { backgroundColor: '#F0FDF4' }]}
+                >
+                  <View style={styles.summaryCardHeader}>
+                    <Icon
+                      name="file-document-outline"
+                      size={16}
+                      color="#10B981"
+                    />
+                    <Text
+                      style={[styles.summaryCardTitle, { color: '#10B981' }]}
+                    >
+                      Invoices
+                    </Text>
+                  </View>
+                  <Text style={styles.summaryCardValue}>
+                    ₹{totalInvoiceValue.toLocaleString()}
+                  </Text>
+                  <Text style={styles.summaryCardCount}>
+                    {values.invoices?.length || 0} groups
+                  </Text>
+                </View>
+              )}
 
-          return (
-            <View key={docType.id} style={styles.section}>
-              <Text style={styles.sectionTitle}>{docType.label}s</Text>
-              <View style={styles.buttonsGrid}>
-                {groups.map((group, index) => {
-                  const iconInfo = getGroupIcon(docType.value as DocumentType);
-                  return (
+              {totalChallanValue > 0 && (
+                <View
+                  style={[styles.summaryCard, { backgroundColor: '#EFF6FF' }]}
+                >
+                  <View style={styles.summaryCardHeader}>
+                    <Icon name="truck-outline" size={16} color="#3B82F6" />
+                    <Text
+                      style={[styles.summaryCardTitle, { color: '#3B82F6' }]}
+                    >
+                      Challans
+                    </Text>
+                  </View>
+                  <Text style={styles.summaryCardValue}>
+                    ₹{totalChallanValue.toLocaleString()}
+                  </Text>
+                  <Text style={styles.summaryCardCount}>
+                    {values.challans?.length || 0} groups
+                  </Text>
+                </View>
+              )}
+
+              {totalBillOfEntryValue > 0 && (
+                <View
+                  style={[styles.summaryCard, { backgroundColor: '#FEF3C7' }]}
+                >
+                  <View style={styles.summaryCardHeader}>
+                    <Icon name="ship-wheel" size={16} color="#F59E0B" />
+                    <Text
+                      style={[styles.summaryCardTitle, { color: '#F59E0B' }]}
+                    >
+                      Bill of Entries
+                    </Text>
+                  </View>
+                  <Text style={styles.summaryCardValue}>
+                    ${totalBillOfEntryValue.toLocaleString()}
+                  </Text>
+                  <Text style={styles.summaryCardCount}>
+                    {values.billOfEntries?.length || 0} groups
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.grandTotalCard}>
+              <Text style={styles.grandTotalLabel}>Grand Total</Text>
+              <Text style={styles.grandTotalValue}>
+                ₹{grandTotalValue.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+        )} */}
+
+        {/* Documents List - Show ALL document groups */}
+        {hasAnyDocument() && (
+          <View style={styles.section}>
+            {/* <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>All Documents</Text>
+              <Text style={styles.sectionDescription}>
+                Tap to edit, long press to delete
+              </Text>
+            </View> */}
+
+            {/* Show ALL document groups from ALL types */}
+            {DOCUMENT_TYPES.map(docType => {
+              const groups = getGroupsByType(docType.value as DocumentType);
+              if (groups.length === 0) return null;
+
+              return (
+                <View key={docType.id} style={styles.documentTypeSection}>
+                  <View style={styles.documentTypeHeader}>
+                    <View style={styles.documentTypeTitleRow}>
+                      <Icon
+                        name={docType.icon}
+                        size={18}
+                        color={docType.color}
+                      />
+                      <Text style={styles.documentTypeSectionTitle}>
+                        {docType.label}s ({groups.length})
+                      </Text>
+                    </View>
                     <TouchableOpacity
-                      key={group.id}
-                      style={[styles.documentButton, styles.buttonCompleted]}
+                      style={styles.addMoreButton}
                       onPress={() =>
-                        openEditDocumentModal(
-                          docType.value as DocumentType,
-                          index,
-                        )
-                      }
-                      onLongPress={() =>
-                        deleteDocumentGroup(
-                          docType.value as DocumentType,
-                          index,
-                        )
+                        openAddDocumentModal(docType.value as DocumentType)
                       }
                     >
-                      <View style={styles.buttonContent}>
-                        <View style={styles.completedButtonContent}>
-                          <Icon
-                            name={iconInfo.icon}
-                            size={20}
-                            color={iconInfo.color}
-                          />
-                          <View style={styles.buttonTextContainer}>
-                            <Text style={styles.buttonText}>
+                      <Icon name="plus" size={16} color={docType.color} />
+                      <Text
+                        style={[styles.addMoreText, { color: docType.color }]}
+                      >
+                        Add More
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.documentGroupsList}>
+                    {groups.map((group, index) => (
+                      <TouchableOpacity
+                        key={group.id}
+                        style={[
+                          styles.documentGroupCard,
+                          { borderLeftColor: docType.color },
+                        ]}
+                        onPress={() =>
+                          openEditDocumentModal(
+                            docType.value as DocumentType,
+                            index,
+                          )
+                        }
+                        onLongPress={() =>
+                          deleteDocumentGroup(
+                            docType.value as DocumentType,
+                            index,
+                          )
+                        }
+                      >
+                        <View style={styles.documentGroupHeader}>
+                          {/* <View style={styles.documentGroupTitle}>
+                            <Icon
+                              name={docType.icon}
+                              size={16}
+                              color={docType.color}
+                            />
+                            <Text style={styles.documentGroupName}>
                               {docType.label} {index + 1}
                             </Text>
-                            <Text style={styles.buttonSubText}>
-                              {docType.value === 'bill-of-entry'
-                                ? `${
-                                    group.items[0]?.currency || ''
-                                  } ${group.totalValue.toLocaleString()}`
-                                : `₹${group.totalValue.toLocaleString()}`}
+                          </View> */}
+                          {/* <Icon
+                              name="chevron-right"
+                              size={18}
+                              color="#9CA3AF"
+                            /> */}
+                        </View>
+
+                        <View style={styles.documentGroupDetails}>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Value:</Text>
+                            <Text style={styles.detailValue}>
+                              {formatCurrencyDisplay(
+                                group,
+                                docType.value as DocumentType,
+                              )}
                             </Text>
-                            <Text style={styles.buttonQuantityText}>
+                          </View>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Quantity:</Text>
+                            <Text style={styles.detailValue}>
                               {formatQuantityDisplay(group)}
                             </Text>
                           </View>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Items:</Text>
+                            <Text style={styles.detailValue}>
+                              {group.items.length} item
+                              {group.items.length !== 1 ? 's' : ''}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          );
-        })}
+
+                        <View style={styles.documentGroupFooter}>
+                          <View style={styles.statusBadge}>
+                            <View
+                              style={[
+                                styles.statusDot,
+                                { backgroundColor: docType.color },
+                              ]}
+                            />
+                            <Text style={styles.statusText}>Active</Text>
+                          </View>
+                          <Text style={styles.editHint}>
+                            Tap to edit • Long press to delete
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
 
       {/* Reusable Document Modal */}
@@ -466,16 +660,17 @@ export default function Step2_InvoiceDetails() {
           setShowDocumentModal(false);
           setTempItems([]);
           setEditingGroupIndex(null);
+          setEditingDocumentType(null);
         }}
-        documentType={selectedDocumentType}
+        documentType={editingDocumentType || selectedDocumentType}
         editingIndex={editingGroupIndex}
         tempItems={tempItems}
         setTempItems={setTempItems}
         onSubmit={handleSubmitDocument}
         onDeleteGroup={() => {
           // Delete the group when all items are removed
-          if (editingGroupIndex !== null) {
-            deleteDocumentGroup(selectedDocumentType, editingGroupIndex);
+          if (editingGroupIndex !== null && editingDocumentType) {
+            deleteDocumentGroup(editingDocumentType, editingGroupIndex);
           }
         }}
         loadpostid={values.loadpostid || 'LP12345'}
@@ -487,7 +682,7 @@ export default function Step2_InvoiceDetails() {
 }
 
 // ---------------------------------------------
-// STYLES
+// PROFESSIONAL STYLES
 // ---------------------------------------------
 const styles = StyleSheet.create({
   container: {
@@ -496,60 +691,266 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 32,
   },
+  // Header Section
+  headerSection: {
+    marginBottom: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  // Section Styles
   section: {
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 12,
+    marginBottom: 4,
   },
+  sectionDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  // Document Type Cards
   documentTypeGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 12,
   },
-  buttonsGrid: {
-    gap: 8,
+  documentTypeCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    minHeight: 100,
   },
-  documentButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
+  documentTypeIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  documentTypeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+    marginLeft: 4,
+  },
+  documentCountBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  documentCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  // Summary Section
+  summarySection: {
+    marginBottom: 24,
+  },
+  summaryCards: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 12,
+  },
+  summaryCard: {
+    flex: 1,
+    minWidth: '48%',
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  buttonCompleted: {
-    borderColor: '#D1FAE5',
-    backgroundColor: '#F0FDF4',
-  },
-  buttonContent: {
-    width: '100%',
-  },
-  completedButtonContent: {
-    width: '100%',
+  summaryCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
   },
-  buttonTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  buttonSubText: {
+  summaryCardTitle: {
     fontSize: 13,
-    fontWeight: '500',
-    color: '#059669',
-    marginBottom: 2,
+    fontWeight: '600',
   },
-  buttonQuantityText: {
+  summaryCardValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  summaryCardCount: {
     fontSize: 12,
     color: '#6B7280',
-    marginTop: 2,
+  },
+  grandTotalCard: {
+    backgroundColor: '#111827',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  grandTotalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#D1D5DB',
+  },
+  grandTotalValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  // Document Groups List
+  documentTypeSection: {
+    marginBottom: 20,
+  },
+  documentTypeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  documentTypeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  documentTypeSectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  addMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 4,
+  },
+  addMoreText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  documentGroupsList: {
+    gap: 12,
+  },
+  documentGroupCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderLeftWidth: 4,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  documentGroupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  documentGroupTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  documentGroupName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  documentGroupDetails: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  documentGroupFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  editHint: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
   },
 });

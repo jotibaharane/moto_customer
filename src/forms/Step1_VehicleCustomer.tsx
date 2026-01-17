@@ -61,6 +61,7 @@ const LocationCard: React.FC<{
           <Text variant="labelSmall" style={styles.fieldLabel}>
             NAME
           </Text>
+
           <Text variant="bodyMedium" style={styles.fieldValue}>
             {values[`${prefix}Name`] || '—'}
           </Text>
@@ -114,7 +115,7 @@ const LocationCard: React.FC<{
             <Text variant="labelSmall" style={styles.fieldLabel}>
               GOOGLE
             </Text>
-            <Text variant="bodySmall" style={styles.googleValue}>
+            <Text variant="bodySmall" style={styles.fieldValue}>
               {values[`${prefix}Google`]}
             </Text>
           </View>
@@ -478,12 +479,12 @@ const styles = StyleSheet.create({
   fieldRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
   fieldLabel: {
-    color: '#64748b', // Light gray for labels
-    fontWeight: '500',
+    color: '#000000', // Light gray for labels
+    fontWeight: '600',
     fontSize: 12,
     letterSpacing: 0.5,
     flex: 1,
@@ -493,7 +494,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     flex: 2,
-    textAlign: 'right',
+    marginLeft: 8,
+    textAlign: 'left',
   },
   googleValue: {
     color: '#475569', // Slightly lighter for google address

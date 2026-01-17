@@ -491,6 +491,7 @@ export interface ShipmentData {
   CurrentTime?: string;
   NextDate?: string;
   NextTime?: string;
+  isVoluminous?: boolean;
 }
 
 // body type
@@ -600,4 +601,104 @@ export interface DriverData {
 export interface NearestDriversRequest {
   LoadPostID: string;
   CustomerID: string;
+}
+
+export interface GetLoadPostRequest {
+  CustomerID: string;
+  LoadPostID: string;
+}
+export interface GetLoadPostReached {
+  CustomerID: string;
+  LoadPostID: string;
+}
+export interface GetLoadPostLoaded {
+  CustomerID: string;
+  LoadPostID: string;
+}
+export interface LoadPostApiLoadedResponse {
+  status: number;
+  message: string;
+  count: number;
+  data: LoadPostData[];
+}
+export interface LoadPostApiReachedResponse {
+  status: number;
+  message: string;
+  count: number;
+  data: LoadPostData[];
+}
+export interface LoadPostApiResponse {
+  status: number;
+  message: string;
+  count: number;
+  data: LoadPostData[];
+}
+export interface LoadPostData {
+  LoadPostID: string;
+  CustomerID: string;
+
+  PickupContactPerson: string;
+  PickupCompanyName: string;
+  PickupContactNumber: string;
+  PickupPlotBuilding: string;
+  PickupStreetArea: string;
+  PickupAddress: string;
+
+  DeliveryContactPerson: string;
+  DeliveryCompanyName: string;
+  DeliveryContactNumber: string;
+  DeliveryPlotBuilding: string;
+  DeliveryStreetArea: string;
+  DeliveryAddress: string;
+
+  VehicleType: string;
+  Weight: string;
+  Approximate_weight: number;
+  cargo_type: string;
+  BodyType: string;
+  CargoContent: string;
+  CargoPackageType: string;
+
+  ExpectedAvailableTime: string;
+  ScheduleDate: string | null;
+  ScheduleTime: string | null;
+
+  isVolumetric: boolean;
+  DhalaLength: number | null;
+  cost: number;
+
+  master_status: string;
+  verification_code: string;
+  verify_flag: string;
+
+  LoadPost_InsertDate: string;
+  LoadPost_UpdateDate: string;
+
+  PickupCity: string;
+  PickupDistrict: string;
+  PickupTaluka: string;
+  PickupState: string;
+  PickupPincode: string;
+  PickupLat: number;
+  PickupLng: number;
+
+  DeliveryCity: string;
+  DeliveryDistrict: string;
+  DeliveryTaluka: string;
+  DeliveryState: string;
+  DeliveryPincode: string;
+  DeliveryLat: number;
+  DeliveryLng: number;
+
+  Address_InsertDate: string;
+  Address_UpdateDate: string;
+
+  CustomerPostID: string;
+  VendorID: string | null;
+  DriverID: string;
+
+  CustomerStatus: string;
+  VendorStatus: string | null;
+  DriverStatus: string;
+  LP_Status: string;
 }

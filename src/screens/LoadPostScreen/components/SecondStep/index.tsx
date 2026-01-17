@@ -18,15 +18,15 @@ import {
   Modal,
   FlatList,
   Platform,
-  Alert,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Cargotypeoptions, DhalaLengthOptions } from '../../constant';
 import SelectionModal, { SelectionModalRef } from '../SelectionModal';
-import TimePicker from '../TimePicker24Hr';
 import { useSelector } from 'react-redux';
 import { RootState } from '@store/index';
-import { RadioButton } from 'react-native-paper';
+import { RadioButton, Checkbox } from 'react-native-paper';
 import CurrentDatePicker from '../CurrentDatePicker';
 import NextDatePicker from '../NextDatePicker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -230,6 +230,318 @@ const HistoryModal: React.FC<HistoryModalProps> = ({
   );
 };
 
+// Add Cargo Content Modal Component
+interface CargoContentModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (data: {
+    cargoType: string;
+    packageType: string;
+    weight: string;
+    isFlammable?: boolean;
+  }) => void;
+  isLiquid?: boolean;
+  initialData?: {
+    cargoType: string;
+    packageType: string;
+    weight: string;
+    isFlammable?: boolean;
+  };
+}
+
+const CargoContentModal: React.FC<CargoContentModalProps> = ({
+  visible,
+  onClose,
+  onSubmit,
+  isLiquid = false,
+  initialData,
+}) => {
+  const [selectedCargoType, setSelectedCargoType] = useState<string>(
+    initialData?.cargoType || '',
+  );
+  const [selectedPackageType, setSelectedPackageType] = useState<string>(
+    initialData?.packageType || '',
+  );
+  const [weight, setWeight] = useState<string>(initialData?.weight || '');
+  const [isFlammable, setIsFlammable] = useState<boolean>(
+    initialData?.isFlammable || false,
+  );
+
+  const { data: cargoContentData } = useGetCargoContentQuery();
+  const { data: packageTypeData } = useGetPackageTypeQuery(
+    { cargotype: selectedCargoType },
+    { skip: !selectedCargoType },
+  );
+
+  const cargoContentOptions =
+    cargoContentData?.data?.map(item => ({
+      id: item?.cargo_type,
+      label: item?.cargo_type,
+      image: { uri: item?.img },
+    })) || [];
+
+  const packageTypeOptions =
+    packageTypeData?.data?.map(item => ({
+      id: item?.packaging_type,
+      label: item?.packaging_type,
+      image: { uri: item?.img },
+    })) || [];
+
+  const handleSubmit = () => {
+    onSubmit({
+      cargoType: selectedCargoType,
+      packageType: selectedPackageType,
+      weight,
+      isFlammable: isLiquid ? isFlammable : undefined,
+    });
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={onClose}
+    >
+      <View style={tw`flex-1 justify-center items-center bg-black/50`}>
+        <View style={tw`bg-white w-11/12 max-w-md rounded-xl`}>
+          {/* Header */}
+          <View style={tw`p-4 border-b border-gray-200`}>
+            <View style={tw`flex-row items-center justify-between`}>
+              <Text style={tw`text-lg font-bold text-gray-900`}>
+                {isLiquid ? 'Liquid Cargo Details' : 'Cargo Content Details'}
+              </Text>
+              <TouchableOpacity
+                onPress={onClose}
+                style={tw`w-8 h-8 items-center justify-center rounded-full bg-gray-100`}
+              >
+                <Icon name="close" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <Text style={tw`text-sm text-gray-600 mt-1`}>
+              {isLiquid
+                ? 'Fill in your liquid cargo information'
+                : 'Fill in your cargo information'}
+            </Text>
+          </View>
+
+          {/* Content */}
+          <ScrollView style={tw`max-h-96 p-4`}>
+            {/* Cargo Type Selection */}
+            <View style={tw`mb-4`}>
+              <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>
+                Select Cargo Type *
+              </Text>
+              <SelectionButton
+                value={selectedCargoType}
+                placeholder="Choose Cargo Type"
+                iconName="inventory"
+                onPress={() => {}}
+                renderSelected={() => (
+                  <View style={tw`flex-row items-center gap-3`}>
+                    <Image
+                      source={{
+                        uri:
+                          cargoContentData?.data?.find(
+                            c => c.cargo_type === selectedCargoType,
+                          )?.img || '',
+                      }}
+                      style={tw`w-10 h-10`}
+                      resizeMode="contain"
+                    />
+                    <View style={tw`flex-1`}>
+                      <Text style={tw`text-sm font-bold text-gray-800`}>
+                        {selectedCargoType}
+                      </Text>
+                      <Text style={tw`text-xs text-gray-600 mt-1`}>
+                        Selected cargo type
+                      </Text>
+                    </View>
+                    <Icon
+                      name="keyboard-arrow-down"
+                      size={20}
+                      color={tw.color('gray-500')}
+                    />
+                  </View>
+                )}
+              />
+              {cargoContentOptions.length > 0 && (
+                <View style={tw`mt-2 border border-gray-200 rounded-lg p-2`}>
+                  <FlatList
+                    data={cargoContentOptions}
+                    keyExtractor={item => item.id}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={tw`flex-row items-center p-3 border-b border-gray-100`}
+                        onPress={() => setSelectedCargoType(item.id)}
+                      >
+                        <View
+                          style={tw`w-6 h-6 rounded-full border-2 ${
+                            selectedCargoType === item.id
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-300'
+                          } items-center justify-center`}
+                        >
+                          {selectedCargoType === item.id && (
+                            <View
+                              style={tw`w-3 h-3 rounded-full bg-blue-500`}
+                            />
+                          )}
+                        </View>
+                        {item.image?.uri && (
+                          <Image
+                            source={{ uri: item.image.uri }}
+                            style={tw`w-8 h-8 ml-3`}
+                            resizeMode="contain"
+                          />
+                        )}
+                        <Text style={tw`ml-3 text-gray-700`}>{item.label}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Package Type Selection */}
+            <View style={tw`mb-4`}>
+              <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>
+                Select Package Type *
+              </Text>
+              <SelectionButton
+                value={selectedPackageType}
+                placeholder="Choose Package Type"
+                iconName="storefront"
+                onPress={() => {}}
+                renderSelected={() => (
+                  <View style={tw`flex-row items-center gap-3`}>
+                    <Image
+                      source={{
+                        uri:
+                          packageTypeData?.data?.find(
+                            p => p.packaging_type === selectedPackageType,
+                          )?.img || '',
+                      }}
+                      style={tw`w-10 h-10`}
+                      resizeMode="contain"
+                    />
+                    <View style={tw`flex-1`}>
+                      <Text style={tw`text-sm font-bold text-gray-800`}>
+                        {selectedPackageType}
+                      </Text>
+                      <Text style={tw`text-xs text-gray-600 mt-1`}>
+                        Selected package type
+                      </Text>
+                    </View>
+                    <Icon
+                      name="keyboard-arrow-down"
+                      size={20}
+                      color={tw.color('gray-500')}
+                    />
+                  </View>
+                )}
+              />
+              {packageTypeOptions.length > 0 && (
+                <View style={tw`mt-2 border border-gray-200 rounded-lg p-2`}>
+                  <FlatList
+                    data={packageTypeOptions}
+                    keyExtractor={item => item.id}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={tw`flex-row items-center p-3 border-b border-gray-100`}
+                        onPress={() => setSelectedPackageType(item.id)}
+                      >
+                        <View
+                          style={tw`w-6 h-6 rounded-full border-2 ${
+                            selectedPackageType === item.id
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-300'
+                          } items-center justify-center`}
+                        >
+                          {selectedPackageType === item.id && (
+                            <View
+                              style={tw`w-3 h-3 rounded-full bg-blue-500`}
+                            />
+                          )}
+                        </View>
+                        {item.image?.uri && (
+                          <Image
+                            source={{ uri: item.image.uri }}
+                            style={tw`w-8 h-8 ml-3`}
+                            resizeMode="contain"
+                          />
+                        )}
+                        <Text style={tw`ml-3 text-gray-700`}>{item.label}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Weight Input */}
+            <View style={tw`mb-4`}>
+              <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>
+                Approximate Weight per kg *
+              </Text>
+              <View style={tw`border border-gray-300 rounded-lg bg-gray-50`}>
+                <TextInput
+                  value={weight}
+                  onChangeText={setWeight}
+                  placeholder="Enter weight in kg"
+                  keyboardType="numeric"
+                  style={tw`p-3 text-gray-800`}
+                />
+              </View>
+            </View>
+
+            {/* Flammable Checkbox (only for liquid) */}
+            {isLiquid && (
+              <View style={tw`mb-4`}>
+                <TouchableOpacity
+                  style={tw`flex-row items-center`}
+                  onPress={() => setIsFlammable(!isFlammable)}
+                >
+                  <View
+                    style={tw`w-6 h-6 rounded border-2 ${
+                      isFlammable
+                        ? 'border-blue-500 bg-blue-500'
+                        : 'border-gray-400'
+                    } items-center justify-center`}
+                  >
+                    {isFlammable && (
+                      <Icon name="check" size={16} color="white" />
+                    )}
+                  </View>
+                  <Text style={tw`ml-3 text-gray-700 font-medium`}>
+                    Is flammable
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={tw`p-4 border-t border-gray-200`}>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              // disabled={!selectedCargoType || !selectedPackageType || !weight}
+              style={tw`bg-blue-500 rounded-lg p-3 items-center ${
+                !selectedCargoType || !selectedPackageType || !weight
+                  ? 'opacity-50'
+                  : ''
+              }`}
+            >
+              <Text style={tw`text-white font-semibold`}>Save Details</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 const SecondStep: React.FC = () => {
   const { values, errors, touched, setFieldValue } =
     useFormikContext<ShipmentData>();
@@ -237,9 +549,14 @@ const SecondStep: React.FC = () => {
     (state: RootState) => state.auth.customerDetails,
   ) || { CustomerID: '' };
 
-  const [cargoContentHistoryVisible, setCargoContentHistoryVisible] =
-    useState(false);
   const [bodyTypeHistoryVisible, setBodyTypeHistoryVisible] = useState(false);
+  const [cargoContentModalVisible, setCargoContentModalVisible] =
+    useState(false);
+  const [liquidCargoModalVisible, setLiquidCargoModalVisible] = useState(false);
+  const [selectedCargoOption, setSelectedCargoOption] = useState<
+    'cargoContent' | 'liquid' | ''
+  >('');
+  const [expectedDay, setExpectedDay] = useState('current');
 
   const { data: BodyTypeData } = useGetBodyTypeQuery(
     {
@@ -248,26 +565,9 @@ const SecondStep: React.FC = () => {
     },
     { skip: !values.vehicle.vehicleType || !values.vehicle.weightRange },
   );
-  const [expectedDay, setExpectedDay] = useState('current');
-  console.log('BodyTypeData', BodyTypeData);
-  const {
-    data: cargoTypeBodyTypeHistoryData,
-    error,
-    isLoading,
-    isSuccess,
-    isError,
-  } = useCargoType_BodyType_HistoryQuery({ CustomerID: CustomerID });
 
-  const { data: packageTypeData } = useGetPackageTypeQuery(
-    { cargotype: values.load.cargoContent },
-    { skip: !values.load.cargoContent },
-  );
-
-  const { data: cargoContentData } = useGetCargoContentQuery();
-
-  const bodyTypeRef = useRef<SelectionModalRef>(null);
-  const cargoContentRef = useRef<SelectionModalRef>(null);
-  const packageTypeRef = useRef<SelectionModalRef>(null);
+  const { data: cargoTypeBodyTypeHistoryData } =
+    useCargoType_BodyType_HistoryQuery({ CustomerID: CustomerID });
 
   const historyList = cargoTypeBodyTypeHistoryData?.data ?? [];
 
@@ -280,17 +580,7 @@ const SecondStep: React.FC = () => {
     count: historyList.filter(x => x.BodyType === item.BodyType).length,
   }));
 
-  const cargoContentHistoryData = Array.from(
-    new Map(historyList.map(item => [item.CargoContent, item])).values(),
-  ).map((item, index) => ({
-    id: String(index + 1),
-    label: item.CargoContent,
-    image:
-      'https://via.placeholder.com/100x100.png?text=' +
-      encodeURIComponent(item.CargoContent),
-    timestamp: new Date(item.LastUsedDate).toLocaleString(),
-    count: historyList.filter(x => x.CargoContent === item.CargoContent).length,
-  }));
+  const bodyTypeRef = useRef<SelectionModalRef>(null);
 
   const updateSchedule = (dayType: string, date: string, time: string) => {
     if (!date || !time) return;
@@ -310,8 +600,7 @@ const SecondStep: React.FC = () => {
 
     return minutes >= 15 * 60; // enabled only after 3:00 PM
   };
-  console.log({ BodyTypeData });
-  // Format options for modals
+
   const bodyTypeOptions =
     BodyTypeData?.data?.map(item => ({
       id: item?.BodyType,
@@ -325,48 +614,44 @@ const SecondStep: React.FC = () => {
     [BodyTypeData, values.load.bodyType],
   );
 
-  const cargoContentOptions =
-    cargoContentData?.data?.map(item => ({
-      id: item?.cargo_type,
-      label: item?.cargo_type,
-      image: { uri: item?.img },
-    })) || [];
+  const handleHistorySelect = (item: HistoryItem) => {
+    setFieldValue('load.bodyType', item.label);
+    setBodyTypeHistoryVisible(false);
+  };
 
-  const selectedCargoContentType = useMemo(
-    () =>
-      cargoContentData?.data.find(
-        content => content.cargo_type === values.load.cargoContent,
-      ),
-    [cargoContentData, values.load.cargoContent],
-  );
-
-  const packageTypeOptions =
-    packageTypeData?.data?.map(item => ({
-      id: item?.packaging_type,
-      label: item?.packaging_type,
-      image: { uri: item?.img },
-    })) || [];
-
-  const selectedPackageType = useMemo(
-    () =>
-      packageTypeData?.data.find(
-        pkg => pkg.packaging_type === values.load.packageType,
-      ),
-    [packageTypeData, values.load.packageType],
-  );
-
-  const handleHistorySelect = (
-    item: HistoryItem,
-    type: 'bodyType' | 'cargoContent',
-  ) => {
-    if (type === 'cargoContent') {
-      setFieldValue('load.cargoContent', item.label);
-      setCargoContentHistoryVisible(false);
-      setFieldValue('load.packageType', '');
-    } else if (type === 'bodyType') {
-      setFieldValue('load.bodyType', item.label);
-      setBodyTypeHistoryVisible(false);
+  const handleCargoContentSubmit = (data: {
+    cargoType: string;
+    packageType: string;
+    weight: string;
+    isFlammable?: boolean;
+  }) => {
+    setFieldValue('load.cargoType', data.cargoType);
+    setFieldValue('load.packageType', data.packageType);
+    setFieldValue('load.weight', data.weight);
+    setFieldValue('load.isLiquid', selectedCargoOption === 'liquid');
+    if (selectedCargoOption === 'liquid') {
+      setFieldValue('load.isFlammable', data.isFlammable || false);
     }
+  };
+
+  const handleCargoOptionSelect = (option: 'cargoContent' | 'liquid') => {
+    setSelectedCargoOption(option);
+    if (option === 'cargoContent') {
+      setCargoContentModalVisible(true);
+    } else {
+      setLiquidCargoModalVisible(true);
+    }
+  };
+
+  const getSelectedCargoDisplay = () => {
+    if (!values.load.cargoType) return null;
+
+    const isLiquid = values.load.isLiquid;
+    return `${isLiquid ? 'Liquid Cargo' : 'Cargo Content'}: ${
+      values.load.cargoType
+    }${values.load.packageType ? `, ${values.load.packageType}` : ''}${
+      values.load.weight ? `, ${values.load.weight}kg` : ''
+    }${isLiquid && values.load.isFlammable ? ', Flammable' : ''}`;
   };
 
   return (
@@ -380,31 +665,6 @@ const SecondStep: React.FC = () => {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.compactContainer} testID="address-info-step">
-        {/* Cargo Type Selection with History */}
-        <View>
-          <SelectionCard
-            title="Select Cargo Type"
-            color="#F59E0B"
-            error={errors.load?.dhalaLength as string}
-            touched={touched.load?.dhalaLength as boolean}
-            testID="dhala-length-card"
-          >
-            <View
-              style={tw`border-2 border-gray-300 bg-gray-50 p-2 rounded-lg`}
-            >
-              <CustomRadioButton
-                options={Cargotypeoptions}
-                selectedOption={values.load.cargoType}
-                onSelect={(value: string) => {
-                  setFieldValue('load.cargoType', value);
-                }}
-                selectedColor="#3B82F6"
-                containerStyle={tw`p-2`}
-              />
-            </View>
-          </SelectionCard>
-        </View>
-
         {/* Dhala Length Selection */}
         <SelectionCard
           title="Select Dhala Length"
@@ -490,132 +750,75 @@ const SecondStep: React.FC = () => {
           />
         </SelectionCard>
 
-        {/* Cargo Content Selection with History */}
-        <View>
-          <SelectionCard
-            title="Cargo Content | Material"
-            color="#10B981"
-            error={errors.load?.cargoContent as string}
-            touched={touched.load?.cargoContent as boolean}
-            testID="cargo-content-card"
-          >
-            <View style={tw`flex-row items-center gap-2`}>
-              <View style={tw`flex-1`}>
-                <SelectionButton
-                  value={values.load.cargoContent}
-                  placeholder="Choose Cargo Content"
-                  iconName="inventory"
-                  onPress={() => cargoContentRef.current?.open()}
-                  hasError={
-                    !!errors.load?.cargoContent && !!touched.load?.cargoContent
-                  }
-                  testID="cargo-content-button"
-                  renderSelected={() => (
-                    <View style={tw`flex-row items-center gap-3`}>
-                      <Image
-                        source={
-                          selectedCargoContentType?.img
-                            ? { uri: selectedCargoContentType?.img }
-                            : undefined
-                        }
-                        style={tw`w-10 h-10`}
-                        resizeMode="contain"
-                      />
-                      <View style={tw`flex-1`}>
-                        <Text style={tw`text-sm font-bold text-gray-800`}>
-                          {selectedCargoContentType?.cargo_type}
-                        </Text>
-                        <Text style={tw`text-xs text-gray-600 mt-1`}>
-                          Selected cargo type
-                        </Text>
-                      </View>
-                      <Icon
-                        name="keyboard-arrow-down"
-                        size={20}
-                        color={tw.color('gray-500')}
-                      />
-                    </View>
-                  )}
-                />
-              </View>
+        {/* Cargo Content Radio Buttons */}
+        <SelectionCard
+          title="Cargo Information"
+          color="#10B981"
+          error={errors.load?.cargoType as string}
+          touched={touched.load?.cargoType as boolean}
+          testID="cargo-info-card"
+        >
+          {/* Display selected cargo if exists */}
+          {getSelectedCargoDisplay() && (
+            <View
+              style={tw`mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg`}
+            >
+              <Text style={tw`text-sm font-semibold text-blue-800`}>
+                Selected:
+              </Text>
+              <Text style={tw`text-sm text-blue-700 mt-1`}>
+                {getSelectedCargoDisplay()}
+              </Text>
               <TouchableOpacity
-                onPress={() => setCargoContentHistoryVisible(true)}
-                style={tw`h-12 w-12 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 shadow-xs`}
+                onPress={() => {
+                  if (values.load.isLiquid) {
+                    setSelectedCargoOption('liquid');
+                    setLiquidCargoModalVisible(true);
+                  } else {
+                    setSelectedCargoOption('cargoContent');
+                    setCargoContentModalVisible(true);
+                  }
+                }}
+                style={tw`mt-2`}
               >
-                <Icon name="history" size={20} color="#6B7280" />
+                <Text style={tw`text-xs text-blue-500 underline`}>
+                  Edit selection
+                </Text>
               </TouchableOpacity>
             </View>
-            <SelectionModal
-              ref={cargoContentRef}
-              title="Select Cargo Content"
-              options={cargoContentOptions}
-              selectedValue={values.load.cargoContent}
-              onSelect={(cargoContent: any) => {
-                setFieldValue('load.cargoContent', cargoContent);
-                setFieldValue('load.packageType', '');
-              }}
-              numColumns={2}
-            />
-          </SelectionCard>
-        </View>
+          )}
 
-        {/* Package Type Selection */}
-        <SelectionCard
-          title="Package Type"
-          color="#8B5CF6"
-          error={errors.load?.packageType as string}
-          touched={touched.load?.packageType as boolean}
-          testID="package-type-card"
-        >
-          <SelectionButton
-            value={values.load.packageType}
-            placeholder="Choose Package Type"
-            iconName="storefront"
-            onPress={() => packageTypeRef.current?.open()}
-            hasError={!!errors.load?.packageType && !!touched.load?.packageType}
-            testID="package-type-button"
-            renderSelected={() => (
-              <View style={tw`flex-row items-center gap-3`}>
-                <Image
-                  source={
-                    selectedPackageType?.img
-                      ? { uri: selectedPackageType?.img }
-                      : undefined
-                  }
-                  style={tw`w-10 h-10`}
-                  resizeMode="contain"
-                />
-                <View style={tw`flex-1`}>
-                  <Text style={tw`text-sm font-bold text-gray-800`}>
-                    {selectedPackageType?.packaging_type}
-                  </Text>
-                  <Text style={tw`text-xs text-gray-600 mt-1`}>
-                    Selected package type
-                  </Text>
-                </View>
-                <Icon
-                  name="keyboard-arrow-down"
-                  size={20}
-                  color={tw.color('gray-500')}
-                />
-              </View>
-            )}
-          />
-          <SelectionModal
-            ref={packageTypeRef}
-            title="Select Package Type"
-            options={packageTypeOptions}
-            selectedValue={values.load.packageType}
-            onSelect={(packageType: any) => {
-              setFieldValue('load.packageType', packageType);
-            }}
-            numColumns={2}
-          />
+          {/* Radio Buttons */}
+          <View style={tw`border-2 border-gray-300 bg-gray-50 p-3 rounded-lg`}>
+            <CustomRadioButton
+              options={[
+                { label: 'Select Cargo Content', value: 'cargoContent' },
+              ]}
+              selectedOption={selectedCargoOption}
+              onSelect={(value: string) => {
+                handleCargoOptionSelect(value as 'cargoContent' | 'liquid');
+              }}
+              selectedColor="#10B981"
+              containerStyle={tw`p-2`}
+            />
+            <CustomRadioButton
+              options={[
+                {
+                  label: 'Select if your cargo is in liquid form',
+                  value: 'liquid',
+                },
+              ]}
+              selectedOption={selectedCargoOption}
+              onSelect={(value: string) => {
+                handleCargoOptionSelect(value as 'cargoContent' | 'liquid');
+              }}
+              selectedColor="#10B981"
+              containerStyle={tw`p-2`}
+            />
+          </View>
         </SelectionCard>
 
         {/* Time Picker */}
-        {/* Expected Availability Section */}
-
         <View
           style={tw`bg-white p-4 rounded-xl border border-gray-100 shadow-xs`}
         >
@@ -708,20 +911,40 @@ const SecondStep: React.FC = () => {
           </RadioButton.Group>
         </View>
 
-        {/* History Modals */}
+        {/* History Modal */}
         <HistoryModal
           visible={bodyTypeHistoryVisible}
           onClose={() => setBodyTypeHistoryVisible(false)}
           title="Body Type History"
           historyData={bodyTypeHistoryData}
-          onSelect={item => handleHistorySelect(item, 'bodyType')}
+          onSelect={handleHistorySelect}
         />
-        <HistoryModal
-          visible={cargoContentHistoryVisible}
-          onClose={() => setCargoContentHistoryVisible(false)}
-          title="Cargo Content History"
-          historyData={cargoContentHistoryData}
-          onSelect={item => handleHistorySelect(item, 'cargoContent')}
+
+        {/* Cargo Content Modal */}
+        <CargoContentModal
+          visible={cargoContentModalVisible}
+          onClose={() => setCargoContentModalVisible(false)}
+          onSubmit={handleCargoContentSubmit}
+          isLiquid={false}
+          initialData={{
+            cargoType: values.load.cargoType,
+            packageType: values.load.packageType,
+            weight: values.load.weight,
+          }}
+        />
+
+        {/* Liquid Cargo Modal */}
+        <CargoContentModal
+          visible={liquidCargoModalVisible}
+          onClose={() => setLiquidCargoModalVisible(false)}
+          onSubmit={handleCargoContentSubmit}
+          isLiquid={true}
+          initialData={{
+            cargoType: values.load.cargoType,
+            packageType: values.load.packageType,
+            weight: values.load.weight,
+            isFlammable: values.load.isFlammable,
+          }}
         />
       </View>
     </KeyboardAwareScrollView>

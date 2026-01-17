@@ -1,5 +1,4 @@
-// DocumentItemModal.tsx (Updated)
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -46,6 +45,7 @@ export interface ChallanItem {
   image: string | null;
   materialType: string;
   packageType: string;
+  documentno: string;
 }
 
 export interface BillOfEntryItem {
@@ -59,6 +59,8 @@ export interface BillOfEntryItem {
   image: string | null;
   materialType: string;
   packageType: string;
+  buyerName: string;
+  destination: string;
 }
 
 export type DocumentItem = InvoiceItem | ChallanItem | BillOfEntryItem;
@@ -79,9 +81,12 @@ interface DocumentItemModalProps {
 }
 
 const UNIT_OPTIONS = [
-  { id: 'pcs', label: 'PCS', value: 'pcs' },
   { id: 'kg', label: 'KG', value: 'kg' },
+  { id: 'Qtl', label: 'Qtl', value: 'Qtl' },
+  { id: 'Ton', label: 'Ton', value: 'Ton' },
+  { id: 'pcs', label: 'PCS', value: 'pcs' },
   { id: 'litre', label: 'LITRE', value: 'litre' },
+  { id: 'Meter', label: 'Meter', value: 'Meter' },
 ];
 
 const PACKAGE_TYPE_OPTIONS = [
@@ -107,6 +112,17 @@ const COUNTRY_OPTIONS = [
   { id: 'china', label: 'China', value: 'China' },
 ];
 
+const DESTINATION_OPTIONS = [
+  { id: 'india', label: 'India', value: 'India' },
+  { id: 'usa', label: 'USA', value: 'USA' },
+  { id: 'uk', label: 'UK', value: 'UK' },
+  { id: 'germany', label: 'Germany', value: 'Germany' },
+  { id: 'china', label: 'China', value: 'China' },
+  { id: 'uae', label: 'UAE', value: 'UAE' },
+  { id: 'singapore', label: 'Singapore', value: 'Singapore' },
+  { id: 'japan', label: 'Japan', value: 'Japan' },
+];
+
 // ---------------------------------------------
 // MAIN COMPONENT
 // ---------------------------------------------
@@ -127,11 +143,113 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
   const [currentTempItem, setCurrentTempItem] = useState<DocumentItem | null>(
     null,
   );
-
+  const [isFormDirty, setIsFormDirty] = useState<boolean>(false);
+  const [hasAddedItem, setHasAddedItem] = useState<boolean>(false);
   const unitModalRef = useRef<BottomModalRef>(null);
   const packageModalRef = useRef<BottomModalRef>(null);
   const currencyModalRef = useRef<BottomModalRef>(null);
   const countryModalRef = useRef<BottomModalRef>(null);
+  const destinationModalRef = useRef<BottomModalRef>(null);
+
+  useEffect(() => {
+    if (visible) {
+      resetFormState();
+      if (!currentTempItem) {
+        setCurrentTempItem(getEmptyItem());
+      }
+    }
+  }, [visible, documentType]);
+
+  const resetFormState = () => {
+    setIsFormDirty(false);
+    setHasAddedItem(false);
+  };
+
+  const hasFormData = useCallback(() => {
+    if (!currentTempItem) return false;
+
+    switch (documentType) {
+      case 'invoice':
+        const invoiceItem = currentTempItem as InvoiceItem;
+        return !!(
+          invoiceItem.invoiceNo ||
+          invoiceItem.invoiceDate ||
+          invoiceItem.quantity ||
+          invoiceItem.netWeight ||
+          invoiceItem.grossWeight ||
+          invoiceItem.value ||
+          invoiceItem.materialType ||
+          invoiceItem.packageType ||
+          invoiceItem.poNo ||
+          invoiceItem.poDate ||
+          invoiceItem.image
+        );
+
+      case 'challan':
+        const challanItem = currentTempItem as ChallanItem;
+        return !!(
+          challanItem.challanNo ||
+          challanItem.challanDate ||
+          challanItem.quantity ||
+          challanItem.netWeight ||
+          challanItem.value ||
+          challanItem.materialType ||
+          challanItem.packageType ||
+          challanItem.documentno ||
+          challanItem.image
+        );
+
+      case 'bill-of-entry':
+        const boeItem = currentTempItem as BillOfEntryItem;
+        return !!(
+          boeItem.billOfEntryNo ||
+          boeItem.billOfEntryDate ||
+          boeItem.shipperName ||
+          boeItem.country ||
+          boeItem.currency ||
+          boeItem.value ||
+          boeItem.materialType ||
+          boeItem.packageType ||
+          boeItem.buyerName ||
+          boeItem.destination ||
+          boeItem.image
+        );
+    }
+  }, [currentTempItem, documentType]);
+
+  // Helper function to format bill of entry number
+  const formatBillOfEntryNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    const limitedDigits = digits.slice(0, 16);
+    const groups = [];
+    for (let i = 0; i < limitedDigits.length; i += 4) {
+      groups.push(limitedDigits.slice(i, i + 4));
+    }
+    return groups.join('-');
+  };
+
+  // Handle bill of entry number change
+  const handleBillOfEntryChange = (text: string) => {
+    if (!currentTempItem) return;
+
+    const digits = text.replace(/\D/g, '');
+    if (digits.length <= 16) {
+      const updated = { ...currentTempItem, billOfEntryNo: digits };
+      setCurrentTempItem(updated);
+    }
+  };
+
+  // Get display value for bill of entry number
+  const getDisplayValue = () => {
+    const digits = (currentTempItem as BillOfEntryItem)?.billOfEntryNo || '';
+    if (digits.length === 0) return '';
+
+    const groups = [];
+    for (let i = 0; i < digits.length; i += 4) {
+      groups.push(digits.slice(i, i + 4));
+    }
+    return groups.join('-');
+  };
 
   // Initialize currentTempItem when modal opens
   useEffect(() => {
@@ -150,7 +268,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           id: baseId,
           invoiceNo: '',
           invoiceDate: '',
-          unit: 'pcs',
+          unit: 'kg',
           quantity: '',
           netWeight: '',
           grossWeight: '',
@@ -166,13 +284,14 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           id: baseId,
           challanNo: '',
           challanDate: '',
-          unit: 'pcs',
+          unit: 'kg',
           quantity: '',
           netWeight: '',
           value: '',
           image: null,
           materialType: '',
           packageType: '',
+          documentno: '',
         };
       case 'bill-of-entry':
         return {
@@ -186,6 +305,8 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           image: null,
           materialType: '',
           packageType: '',
+          buyerName: '',
+          destination: 'India',
         };
     }
   };
@@ -196,7 +317,9 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
     value: DocumentItem[K],
   ) => {
     if (!currentTempItem) {
-      setCurrentTempItem(getEmptyItem());
+      const newItem = getEmptyItem();
+      setCurrentTempItem({ ...newItem, [key]: value });
+      setIsFormDirty(true);
       return;
     }
 
@@ -218,8 +341,11 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
     }
 
     setCurrentTempItem(updated);
+    setIsFormDirty(true);
   };
-
+  const handleInputFocus = () => {
+    setIsFormDirty(true);
+  };
   // Add new item to temp list
   const addItem = () => {
     if (!currentTempItem) return;
@@ -263,7 +389,16 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
         break;
       case 'bill-of-entry':
         const boeItem = currentTempItem as BillOfEntryItem;
-        if (!boeItem.billOfEntryNo || !boeItem.value || !boeItem.shipperName) {
+        const cleanedBillNo = boeItem.billOfEntryNo.replace(/\D/g, '');
+
+        if (cleanedBillNo.length !== 16) {
+          isValid = false;
+          errorMessage = 'Bill of Entry Number must be 16 digits!';
+        } else if (
+          !boeItem.value ||
+          !boeItem.shipperName ||
+          !boeItem.buyerName
+        ) {
           isValid = false;
           errorMessage = 'Please fill all required fields!';
         }
@@ -276,7 +411,10 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
     }
 
     setTempItems([...tempItems, currentTempItem]);
-    setCurrentTempItem(getEmptyItem());
+    // Reset form for next item
+    // setCurrentTempItem(getEmptyItem());
+    setIsFormDirty(false);
+    setHasAddedItem(true);
   };
 
   // Remove item from temp list
@@ -323,16 +461,26 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
       handleItemChange('image', uri);
     }
   };
-
+  const isAddButtonDisabled = () => {
+    // If user has added an item and form is not dirty, disable button
+    if (hasAddedItem && !isFormDirty) {
+      return true;
+    }
+    // If form has no data at all, disable button
+    if (!hasFormData()) {
+      return true;
+    }
+    return false;
+  };
   // Get modal title
   const getModalTitle = () => {
     switch (documentType) {
       case 'invoice':
-        return 'Invoice';
+        return 'Invoice Details';
       case 'challan':
-        return 'Challan';
+        return 'Challan Details';
       case 'bill-of-entry':
-        return 'Bill of Entry';
+        return 'Bill of Entry Details';
     }
   };
 
@@ -360,9 +508,30 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           'Action',
         ];
       case 'bill-of-entry':
-        return ['BOE No', 'Value', 'Currency', 'Action'];
+        return ['BOE No', 'Currency', 'Value', 'Action'];
     }
   };
+  const getAddButtonText = () => {
+    switch (documentType) {
+      case 'invoice':
+        return 'Add Invoice';
+      case 'challan':
+        return 'Add Challan';
+      case 'bill-of-entry':
+        return 'Add Bill of Entry';
+    }
+  };
+  // const getTablebtton = () => {
+  //   switch (documentType) {
+  //     case 'invoice':
+  //       return ['Invoice No'];
+  //     case 'challan':
+  //       return ['Challan No'];
+
+  //     case 'bill-of-entry':
+  //       return ['BOE No'];
+  //   }
+  // };
 
   // Format table cell data
   const formatTableCell = (item: DocumentItem, cellIndex: number): string => {
@@ -392,11 +561,11 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
       case 'bill-of-entry':
         const boeItem = item as BillOfEntryItem;
         if (cellIndex === 0) return boeItem.billOfEntryNo;
-        if (cellIndex === 1)
+        if (cellIndex === 1) return boeItem.currency;
+        if (cellIndex === 2)
           return `${boeItem.currency} ${Number(
             boeItem.value || 0,
           ).toLocaleString()}`;
-        if (cellIndex === 2) return boeItem.currency;
         return '';
     }
   };
@@ -440,10 +609,12 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
   // Render form fields based on document type
   const renderFormFields = () => {
     switch (documentType) {
-      case 'invoice':
+      case 'invoice': {
         const invoiceItem = currentTempItem as InvoiceItem;
+
         return (
           <>
+            {/* Invoice No + Invoice Date */}
             <View style={styles.formRow}>
               <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
@@ -451,6 +622,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   value={invoiceItem?.invoiceNo || ''}
                   onChangeText={t => handleItemChange('invoiceNo', t)}
                   mode="outlined"
+                  onFocus={handleInputFocus}
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
                 />
@@ -459,11 +631,16 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                 <DateInput
                   label="Invoice Date"
                   value={invoiceItem?.invoiceDate || ''}
-                  onChange={date => handleItemChange('invoiceDate', date)}
+                  onChange={date => {
+                    handleItemChange('invoiceDate', date);
+                    setIsFormDirty(true);
+                  }}
+                  onFocus={handleInputFocus}
                 />
               </View>
             </View>
 
+            {/* Unit + Net Weight / Qty + Gross Weight (same row) */}
             <View style={styles.formRow}>
               <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
@@ -472,6 +649,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
                   editable={false}
                   pointerEvents="none"
                   right={
@@ -482,15 +660,17 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   }
                 />
               </View>
-              <View style={styles.formColumn}>
+
+              <View style={[styles.formColumn, styles.formColumnGap]}>
                 {invoiceItem?.unit === 'pcs' ? (
                   <TextInput
-                    label="Unit Quantity"
+                    label="Quantity"
                     value={invoiceItem?.quantity || ''}
                     onChangeText={t => handleItemChange('quantity', t)}
                     mode="outlined"
                     style={styles.compactInput}
                     outlineStyle={styles.inputOutline}
+                    onFocus={handleInputFocus}
                     keyboardType="numeric"
                   />
                 ) : (
@@ -501,6 +681,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                     mode="outlined"
                     style={styles.compactInput}
                     outlineStyle={styles.inputOutline}
+                    onFocus={handleInputFocus}
                     keyboardType="numeric"
                     right={
                       <TextInput.Affix
@@ -510,19 +691,40 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   />
                 )}
               </View>
+
+              {invoiceItem?.unit !== 'pcs' && (
+                <View style={styles.formColumn}>
+                  <TextInput
+                    label="Gross Weight"
+                    value={invoiceItem?.grossWeight || ''}
+                    onChangeText={t => handleItemChange('grossWeight', t)}
+                    mode="outlined"
+                    style={styles.compactInput}
+                    outlineStyle={styles.inputOutline}
+                    onFocus={handleInputFocus}
+                    keyboardType="numeric"
+                    right={<TextInput.Affix text="kg" />}
+                  />
+                </View>
+              )}
             </View>
 
+            {/* Invoice Value + Package Type */}
             <View style={styles.formRow}>
               <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
-                  label="Material Type"
-                  value={invoiceItem?.materialType || ''}
-                  onChangeText={t => handleItemChange('materialType', t)}
+                  label="Invoice Value"
+                  value={invoiceItem?.value || ''}
+                  onChangeText={t => handleItemChange('value', t)}
                   mode="outlined"
                   style={styles.compactInput}
+                  onFocus={handleInputFocus}
                   outlineStyle={styles.inputOutline}
+                  keyboardType="numeric"
+                  left={<TextInput.Affix text="₹" />}
                 />
               </View>
+
               <View style={styles.formColumn}>
                 <TextInput
                   label="Package Type"
@@ -530,6 +732,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
                   editable={false}
                   pointerEvents="none"
                   right={
@@ -541,53 +744,20 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                 />
               </View>
             </View>
-
-            {invoiceItem?.unit !== 'pcs' && (
-              <View style={styles.formRow}>
-                <View style={[styles.formColumn, styles.formColumnGap]}>
-                  <TextInput
-                    label="Gross Weight"
-                    value={invoiceItem?.grossWeight || ''}
-                    onChangeText={t => handleItemChange('grossWeight', t)}
-                    mode="outlined"
-                    style={styles.compactInput}
-                    outlineStyle={styles.inputOutline}
-                    keyboardType="numeric"
-                    right={<TextInput.Affix text="kg" />}
-                  />
-                </View>
-                <View style={styles.formColumn}>
-                  <TextInput
-                    label="Invoice Value"
-                    value={invoiceItem?.value || ''}
-                    onChangeText={t => handleItemChange('value', t)}
-                    mode="outlined"
-                    style={styles.compactInput}
-                    outlineStyle={styles.inputOutline}
-                    keyboardType="numeric"
-                    left={<TextInput.Affix text="₹" />}
-                  />
-                </View>
+            <View style={styles.formRow}>
+              <View style={styles.fullWidthColumn}>
+                <TextInput
+                  label="Material Type"
+                  value={invoiceItem?.materialType || ''}
+                  onChangeText={t => handleItemChange('materialType', t)}
+                  mode="outlined"
+                  onFocus={handleInputFocus}
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
               </View>
-            )}
-            {invoiceItem?.unit === 'pcs' && (
-              <View style={styles.formRow}>
-                <View style={[styles.formColumn, styles.formColumnGap]}>
-                  <TextInput
-                    label="Invoice Value"
-                    value={invoiceItem?.value || ''}
-                    onChangeText={t => handleItemChange('value', t)}
-                    mode="outlined"
-                    style={styles.compactInput}
-                    outlineStyle={styles.inputOutline}
-                    keyboardType="numeric"
-                    left={<TextInput.Affix text="₹" />}
-                  />
-                </View>
-                <View style={styles.formColumn}></View>
-              </View>
-            )}
-
+            </View>
+            {/* PO No + PO Date */}
             <View style={styles.formRow}>
               <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
@@ -595,6 +765,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   value={invoiceItem?.poNo || ''}
                   onChangeText={t => handleItemChange('poNo', t)}
                   mode="outlined"
+                  onFocus={handleInputFocus}
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
                 />
@@ -603,13 +774,18 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                 <DateInput
                   label="PO Date"
                   value={invoiceItem?.poDate || ''}
-                  onChange={date => handleItemChange('poDate', date)}
+                  onChange={date => {
+                    handleItemChange('poDate', date);
+                    setIsFormDirty(true);
+                  }}
                 />
               </View>
             </View>
+
+            {/* Material Type */}
           </>
         );
-
+      }
       case 'challan':
         const challanItem = currentTempItem as ChallanItem;
         return (
@@ -621,6 +797,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   value={challanItem?.challanNo || ''}
                   onChangeText={t => handleItemChange('challanNo', t)}
                   mode="outlined"
+                  onFocus={handleInputFocus}
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
                 />
@@ -629,7 +806,11 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                 <DateInput
                   label="Challan Date"
                   value={challanItem?.challanDate || ''}
-                  onChange={date => handleItemChange('challanDate', date)}
+                  onFocus={handleInputFocus}
+                  onChange={date => {
+                    handleItemChange('challanDate', date);
+                    setIsFormDirty(true);
+                  }}
                 />
               </View>
             </View>
@@ -643,6 +824,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
                   editable={false}
+                  onFocus={handleInputFocus}
                   pointerEvents="none"
                   right={
                     <TextInput.Icon
@@ -660,6 +842,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                     onChangeText={t => handleItemChange('quantity', t)}
                     mode="outlined"
                     style={styles.compactInput}
+                    onFocus={handleInputFocus}
                     outlineStyle={styles.inputOutline}
                     keyboardType="numeric"
                   />
@@ -671,6 +854,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                     mode="outlined"
                     style={styles.compactInput}
                     outlineStyle={styles.inputOutline}
+                    onFocus={handleInputFocus}
                     keyboardType="numeric"
                     right={
                       <TextInput.Affix
@@ -685,12 +869,15 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             <View style={styles.formRow}>
               <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
-                  label="Material Type"
-                  value={challanItem?.materialType || ''}
-                  onChangeText={t => handleItemChange('materialType', t)}
+                  label="Value"
+                  value={challanItem?.value || ''}
+                  onChangeText={t => handleItemChange('value', t)}
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
+                  keyboardType="numeric"
+                  left={<TextInput.Affix text="₹" />}
                 />
               </View>
               <View style={styles.formColumn}>
@@ -700,6 +887,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
                   editable={false}
                   pointerEvents="none"
                   right={
@@ -713,16 +901,54 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             </View>
 
             <View style={styles.formRow}>
-              <View style={styles.fullWidthColumn}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
-                  label="Value"
+                  label="Material Type"
+                  value={challanItem?.materialType || ''}
+                  onChangeText={t => handleItemChange('materialType', t)}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
+                />
+              </View>
+            </View>
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="Document No"
+                  value={challanItem?.documentno || ''}
+                  onChangeText={t => handleItemChange('documentno', t)}
+                  mode="outlined"
+                  onFocus={handleInputFocus}
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="Po No"
                   value={challanItem?.value || ''}
                   onChangeText={t => handleItemChange('value', t)}
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
                   keyboardType="numeric"
                   left={<TextInput.Affix text="₹" />}
+                />
+              </View>
+              <View style={styles.formColumn}>
+                <DateInput
+                  label="PO Date"
+                  // value={invoiceItem?.poDate || ''}
+                  onChange={date => {
+                    handleItemChange('poDate', date);
+                    setIsFormDirty(true);
+                  }}
                 />
               </View>
             </View>
@@ -731,46 +957,121 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
 
       case 'bill-of-entry':
         const boeItem = currentTempItem as BillOfEntryItem;
+        const billOfEntryDigits = boeItem?.billOfEntryNo || '';
+
         return (
           <>
             <View style={styles.formRow}>
-              <View style={[styles.formColumn, styles.formColumnGap]}>
-                <TextInput
-                  label="Bill of Entry No"
-                  value={boeItem?.billOfEntryNo || ''}
-                  onChangeText={t => handleItemChange('billOfEntryNo', t)}
-                  mode="outlined"
-                  style={styles.compactInput}
-                  outlineStyle={styles.inputOutline}
-                />
+              <View style={[styles.formColumn70, styles.formColumnGap]}>
+                <View style={styles.billEntryContainer}>
+                  {/* <Text style={styles.inputLabel}>Bill of Entry Number</Text> */}
+                  <TextInput
+                    label="Bill-Of-Entry-No"
+                    value={getDisplayValue()}
+                    onChangeText={handleBillOfEntryChange}
+                    mode="outlined"
+                    style={[styles.compactInput, styles.billEntryInput]}
+                    outlineStyle={styles.inputOutline}
+                    keyboardType="numeric"
+                    onFocus={handleInputFocus}
+                    maxLength={19} // 16 digits + 3 hyphens
+                    placeholder="0000-0000-0000-0000"
+                    // left={<TextInput.Affix text="BOE" />}
+                  />
+
+                  {/* Segmented visual indicator */}
+                  {/* <View style={styles.segmentsContainer}>
+                    {[0, 1, 2, 3].map(segmentIndex => {
+                      const segmentStart = segmentIndex * 4;
+                      const segmentEnd = segmentStart + 4;
+                      const segmentDigits = billOfEntryDigits.slice(
+                        segmentStart,
+                        segmentEnd,
+                      );
+                      const isComplete = segmentDigits.length === 4;
+
+                      return (
+                        <View key={segmentIndex} style={styles.segmentWrapper}>
+                          <View
+                            style={[
+                              styles.segmentBox,
+                              isComplete && styles.segmentBoxFilled,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.segmentText,
+                                isComplete && styles.segmentTextFilled,
+                              ]}
+                            >
+                              {segmentDigits ||
+                                (segmentIndex === 0 ? 'XXXX' : '')}
+                            </Text>
+                          </View>
+                          {segmentIndex < 3 && (
+                            <Text style={styles.separator}>-</Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View> */}
+
+                  {/* Character count */}
+                  <View style={styles.charCountContainer}>
+                    <Text
+                      style={[
+                        styles.charCountText,
+                        billOfEntryDigits.length === 16 &&
+                          styles.charCountComplete,
+                      ]}
+                    >
+                      {billOfEntryDigits.length}/16 digits
+                    </Text>
+                    {billOfEntryDigits.length === 16 && (
+                      <Icon
+                        name="check-circle"
+                        size={16}
+                        color="#10B981"
+                        style={styles.checkIcon}
+                      />
+                    )}
+                  </View>
+                </View>
               </View>
-              <View style={styles.formColumn}>
+
+              <View style={styles.formColumn30}>
                 <DateInput
-                  label="Bill of Entry Date"
+                  label="Date"
                   value={boeItem?.billOfEntryDate || ''}
-                  onChange={date => handleItemChange('billOfEntryDate', date)}
+                  onChange={date => {
+                    handleItemChange('billOfEntryDate', date);
+                    setIsFormDirty(true);
+                  }}
                 />
               </View>
             </View>
 
+            {/* Shipper Name | Country - 70/30 */}
             <View style={styles.formRow}>
-              <View style={[styles.formColumn, styles.formColumnGap]}>
+              <View style={[styles.formColumn70, styles.formColumnGap]}>
                 <TextInput
                   label="Shipper Name"
                   value={boeItem?.shipperName || ''}
                   onChangeText={t => handleItemChange('shipperName', t)}
                   mode="outlined"
+                  onFocus={handleInputFocus}
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
                 />
               </View>
-              <View style={styles.formColumn}>
+              <View style={styles.formColumn30}>
                 <TextInput
                   label="Country"
                   value={boeItem?.country || 'India'}
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
                   editable={false}
                   pointerEvents="none"
                   right={
@@ -783,8 +1084,42 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
               </View>
             </View>
 
+            {/* Buyer Name | Destination - 70/30 */}
             <View style={styles.formRow}>
-              <View style={[styles.formColumn, styles.formColumnGap]}>
+              <View style={[styles.formColumn70, styles.formColumnGap]}>
+                <TextInput
+                  label="Buyer Name"
+                  value={boeItem?.buyerName || ''}
+                  onChangeText={t => handleItemChange('buyerName', t)}
+                  mode="outlined"
+                  onFocus={handleInputFocus}
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+              <View style={styles.formColumn30}>
+                <TextInput
+                  label="Destination"
+                  value={boeItem?.destination || 'India'}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
+                  editable={false}
+                  pointerEvents="none"
+                  right={
+                    <TextInput.Icon
+                      icon="menu-down"
+                      onPress={() => destinationModalRef.current?.open()}
+                    />
+                  }
+                />
+              </View>
+            </View>
+
+            {/* Currency | Value - 70/30 */}
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn70, styles.formColumnGap]}>
                 <TextInput
                   label="Currency"
                   value={boeItem?.currency || 'INR'}
@@ -792,6 +1127,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
                   editable={false}
+                  onFocus={handleInputFocus}
                   pointerEvents="none"
                   right={
                     <TextInput.Icon
@@ -801,7 +1137,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   }
                 />
               </View>
-              <View style={styles.formColumn}>
+              <View style={styles.formColumn30}>
                 <TextInput
                   label="Value"
                   value={boeItem?.value || ''}
@@ -809,24 +1145,16 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   mode="outlined"
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
                   keyboardType="numeric"
                   left={<TextInput.Affix text={boeItem?.currency || '$'} />}
                 />
               </View>
             </View>
 
+            {/* Package Type (Full Width) */}
             <View style={styles.formRow}>
-              <View style={[styles.formColumn, styles.formColumnGap]}>
-                <TextInput
-                  label="Material Type"
-                  value={boeItem?.materialType || ''}
-                  onChangeText={t => handleItemChange('materialType', t)}
-                  mode="outlined"
-                  style={styles.compactInput}
-                  outlineStyle={styles.inputOutline}
-                />
-              </View>
-              <View style={styles.formColumn}>
+              <View style={styles.fullWidthColumn}>
                 <TextInput
                   label="Package Type"
                   value={boeItem?.packageType || ''}
@@ -834,6 +1162,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                   style={styles.compactInput}
                   outlineStyle={styles.inputOutline}
                   editable={false}
+                  onFocus={handleInputFocus}
                   pointerEvents="none"
                   right={
                     <TextInput.Icon
@@ -841,6 +1170,23 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                       onPress={() => packageModalRef.current?.open()}
                     />
                   }
+                />
+              </View>
+            </View>
+
+            {/* Material Details (Full Width) */}
+            <View style={styles.formRow}>
+              <View style={styles.fullWidthColumn}>
+                <TextInput
+                  label="Material Details"
+                  value={boeItem?.materialType || ''}
+                  onChangeText={t => handleItemChange('materialType', t)}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
+                  multiline={true}
+                  numberOfLines={3}
                 />
               </View>
             </View>
@@ -894,7 +1240,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             </TouchableOpacity>
 
             <Text style={styles.modalTitle}>
-              {editingIndex !== null ? 'Edit' : 'Add'} {getModalTitle()}
+              {editingIndex !== null ? 'Edit' : ''} {getModalTitle()}
             </Text>
 
             <View style={styles.modalHeaderPlaceholder} />
@@ -908,7 +1254,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             <View style={styles.invoiceForm}>
               {/* Add New Item Form */}
               <View style={styles.addItemForm}>
-                <Text style={styles.addItemTitle}>Add New Item</Text>
+                {/* <Text style={styles.addItemTitle}>Add New Item</Text> */}
 
                 <View style={styles.formGrid}>
                   {renderFormFields()}
@@ -965,11 +1311,27 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
 
                   {/* Add Item Button */}
                   <TouchableOpacity
-                    style={styles.addItemButton}
+                    style={[
+                      styles.addItemButton,
+                      isAddButtonDisabled() && styles.addItemButtonDisabled,
+                    ]}
                     onPress={addItem}
+                    disabled={isAddButtonDisabled()}
                   >
-                    <Icon name="plus" size={18} color="#FFFFFF" />
-                    <Text style={styles.addItemButtonText}>Add Item</Text>
+                    <Icon
+                      name="plus"
+                      size={18}
+                      color={isAddButtonDisabled() ? '#9CA3AF' : '#FFFFFF'}
+                    />
+                    <Text
+                      style={[
+                        styles.addItemButtonText,
+                        isAddButtonDisabled() &&
+                          styles.addItemButtonTextDisabled,
+                      ]}
+                    >
+                      {getAddButtonText()} {/* Changed from "Add Items" */}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1282,6 +1644,50 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
                     {item.label}
                   </Text>
                   {(currentTempItem as BillOfEntryItem)?.country ===
+                    item.value && (
+                    <Icon name="check" size={18} color="#3B82F6" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </BottomModal>
+      )}
+
+      {/* Bottom Modal for Destination Selection (Bill of Entry) */}
+      {documentType === 'bill-of-entry' && (
+        <BottomModal
+          ref={destinationModalRef}
+          customHeight={350}
+          backdropOpacity={0.6}
+          preventSwipeClose={true}
+        >
+          <View style={styles.modalContentWrapper}>
+            <Text style={styles.bottomModalTitle}>Select Destination</Text>
+            <View style={styles.bottomModalOptionsContainer}>
+              {DESTINATION_OPTIONS.map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.bottomModalOption,
+                    (currentTempItem as BillOfEntryItem)?.destination ===
+                      item.value && styles.bottomModalOptionSelected,
+                  ]}
+                  onPress={() => {
+                    handleItemChange('destination', item.value);
+                    destinationModalRef.current?.close();
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.bottomModalOptionText,
+                      (currentTempItem as BillOfEntryItem)?.destination ===
+                        item.value && styles.bottomModalOptionTextSelected,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  {(currentTempItem as BillOfEntryItem)?.destination ===
                     item.value && (
                     <Icon name="check" size={18} color="#3B82F6" />
                   )}
@@ -1638,6 +2044,89 @@ const styles = StyleSheet.create({
   bottomModalOptionTextSelected: {
     color: '#3B82F6',
     fontWeight: '600',
+  },
+  // Bill of Entry specific styles
+  billEntryContainer: {
+    marginBottom: 4,
+  },
+  billEntryInput: {
+    marginBottom: 8,
+  },
+  segmentsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    marginBottom: 8,
+  },
+  segmentWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  segmentBox: {
+    width: 60,
+    height: 32,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  segmentBoxFilled: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#3B82F6',
+  },
+  segmentText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    letterSpacing: 1,
+  },
+  segmentTextFilled: {
+    color: '#1E40AF',
+  },
+  separator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    marginHorizontal: 4,
+  },
+  charCountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
+  charCountText: {
+    fontSize: 11,
+    color: '#6B7280',
+  },
+  charCountComplete: {
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  checkIcon: {
+    marginLeft: 4,
+  },
+  formColumn70: {
+    flex: 7, // Takes 70% of the row
+  },
+  formColumn30: {
+    flex: 3, // Takes 30% of the row
+  },
+  addItemButtonDisabled: {
+    backgroundColor: '#E5E7EB',
+  },
+  addItemButtonTextDisabled: {
+    color: '#9CA3AF',
+  },
+  helperText: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });
 

@@ -187,6 +187,7 @@ const RegistrationScreen: React.FC = () => {
       });
     }
   }, [formData.CompanyType]);
+
   useEffect(() => {
     if (mobilenumber) {
       setFormData(prev => ({

@@ -45,6 +45,7 @@ export const emptyShipmentData: ShipmentData = {
     vehicleType: '',
     weightRange: '',
     approximateWeightKg: '',
+    isVoluminous: '',
   },
   load: {
     cargoType: 'Normal',

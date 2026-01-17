@@ -19,6 +19,8 @@ export const wp = (percentage: number) =>
 export type FloatingButtonTab =
   | 'load-posts'
   | 'process-trips'
+  | 'Reached-trips'
+  | 'Loading-trips'
   | 'active-trips'
   | 'completed-trips';
 
