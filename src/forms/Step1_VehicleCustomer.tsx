@@ -78,14 +78,14 @@ const LocationCard: React.FC<{
         </View>
 
         {/* GST - label and value in same row */}
-        <View style={styles.fieldRow}>
+        {/* <View style={styles.fieldRow}>
           <Text variant="labelSmall" style={styles.fieldLabel}>
             GST NO
           </Text>
           <Text variant="bodyMedium" style={styles.fieldValue}>
             {values[`${prefix}Gst`] || 'Not specified'}
           </Text>
-        </View>
+        </View> */}
 
         {/* Address Line 1 - label and value in same row */}
         <View style={styles.fieldRow}>
@@ -110,7 +110,7 @@ const LocationCard: React.FC<{
         )}
 
         {/* Google Address - only show if exists */}
-        {values[`${prefix}Google`] && (
+        {/* {values[`${prefix}Google`] && (
           <View style={styles.fieldRow}>
             <Text variant="labelSmall" style={styles.fieldLabel}>
               GOOGLE
@@ -119,7 +119,7 @@ const LocationCard: React.FC<{
               {values[`${prefix}Google`]}
             </Text>
           </View>
-        )}
+        )} */}
 
         {/* City - label and value in same row */}
         <View style={styles.fieldRow}>

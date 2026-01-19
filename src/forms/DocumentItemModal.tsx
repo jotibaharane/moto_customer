@@ -62,9 +62,34 @@ export interface BillOfEntryItem {
   buyerName: string;
   destination: string;
 }
+export interface StockTransferItem {
+  id: string;
+  StockTransferNo: string;
+  StockTransferDate: string;
+  unit: 'pcs' | 'kg' | 'litre';
+  quantity: string;
+  netWeight: string;
+  grossWeight: string;
+  value: string;
+  image: string | null;
+  materialType: string;
+  packageType: string;
+  poNo: string;
+  poDate: string;
+  fromLocation: string;
+  toLocation: string;
+}
 
-export type DocumentItem = InvoiceItem | ChallanItem | BillOfEntryItem;
-export type DocumentType = 'invoice' | 'challan' | 'bill-of-entry';
+export type DocumentItem =
+  | InvoiceItem
+  | ChallanItem
+  | BillOfEntryItem
+  | StockTransferItem;
+export type DocumentType =
+  | 'invoice'
+  | 'challan'
+  | 'bill-of-entry'
+  | 'Stock-transfer';
 
 interface DocumentItemModalProps {
   visible: boolean;
@@ -214,6 +239,23 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           boeItem.destination ||
           boeItem.image
         );
+      case 'Stock-transfer':
+        const StockItem = currentTempItem as StockTransferItem;
+        return !!(
+          StockItem.StockTransferNo ||
+          StockItem.StockTransferDate ||
+          StockItem.quantity ||
+          StockItem.netWeight ||
+          StockItem.grossWeight ||
+          StockItem.value ||
+          StockItem.materialType ||
+          StockItem.packageType ||
+          StockItem.poNo ||
+          StockItem.poDate ||
+          StockItem.fromLocation ||
+          StockItem.toLocation ||
+          StockItem.image
+        );
     }
   }, [currentTempItem, documentType]);
 
@@ -307,6 +349,24 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           packageType: '',
           buyerName: '',
           destination: 'India',
+        };
+      case 'Stock-transfer':
+        return {
+          id: baseId,
+          StockTransferNo: '',
+          StockTransferDate: '',
+          unit: 'kg',
+          quantity: '',
+          netWeight: '',
+          grossWeight: '',
+          value: '',
+          image: null,
+          materialType: '',
+          packageType: '',
+          poNo: '',
+          poDate: '',
+          fromLocation: '',
+          toLocation: '',
         };
     }
   };
@@ -403,6 +463,25 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           errorMessage = 'Please fill all required fields!';
         }
         break;
+      case 'Stock-transfer':
+        const StockItem = currentTempItem as StockTransferItem;
+        if (!StockItem.StockTransferNo || !StockItem.value) {
+          isValid = false;
+          errorMessage = 'Please fill Stock Transfer No and Value!';
+        } else if (StockItem.unit === 'pcs' && !StockItem.quantity) {
+          isValid = false;
+          errorMessage = 'Please enter quantity!';
+        } else if (
+          (StockItem.unit === 'kg' || StockItem.unit === 'litre') &&
+          !StockItem.netWeight
+        ) {
+          isValid = false;
+          errorMessage = 'Please enter net weight!';
+        } else if (!StockItem.fromLocation || !StockItem.toLocation) {
+          isValid = false;
+          errorMessage = 'Please fill From and To locations!';
+        }
+        break;
     }
 
     if (!isValid) {
@@ -481,6 +560,8 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
         return 'Challan Details';
       case 'bill-of-entry':
         return 'Bill of Entry Details';
+      case 'Stock-transfer':
+        return 'Stock Transfer Details';
     }
   };
 
@@ -509,6 +590,16 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
         ];
       case 'bill-of-entry':
         return ['BOE No', 'Currency', 'Value', 'Action'];
+      case 'Stock-transfer':
+        if (tempItems.length === 0)
+          return ['Transfer No', 'Qty/Weight', 'Value', 'Action'];
+        // const firstItem = tempItems[0] as StockTransferItem;
+        return [
+          'Transfer No',
+          firstItem.unit === 'pcs' ? 'Quantity' : 'Weight',
+          'Value',
+          'Action',
+        ];
     }
   };
   const getAddButtonText = () => {
@@ -519,6 +610,8 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
         return 'Add Challan';
       case 'bill-of-entry':
         return 'Add Bill of Entry';
+      case 'Stock-transfer':
+        return 'Add Stock Transfer';
     }
   };
   // const getTablebtton = () => {
@@ -566,6 +659,17 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
           return `${boeItem.currency} ${Number(
             boeItem.value || 0,
           ).toLocaleString()}`;
+        return '';
+      case 'Stock-transfer':
+        const StockItem = item as StockTransferItem;
+        if (cellIndex === 0) return StockItem.StockTransferNo;
+        if (cellIndex === 1) {
+          return StockItem.unit === 'pcs'
+            ? `${StockItem.quantity} pcs`
+            : `${StockItem.netWeight} ${StockItem.unit}`;
+        }
+        if (cellIndex === 2)
+          return `₹${Number(StockItem.value || 0).toLocaleString()}`;
         return '';
     }
   };
@@ -1192,6 +1296,212 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             </View>
           </>
         );
+
+      case 'Stock-transfer': {
+        const StockItem = currentTempItem as StockTransferItem;
+
+        return (
+          <>
+            {/* Stock Transfer No + Date */}
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="Stock Transfer Number"
+                  value={StockItem?.StockTransferNo || ''}
+                  onChangeText={t => handleItemChange('StockTransferNo', t)}
+                  mode="outlined"
+                  onFocus={handleInputFocus}
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+              <View style={styles.formColumn}>
+                <DateInput
+                  label="Transfer Date"
+                  value={StockItem?.StockTransferDate || ''}
+                  onChange={date => {
+                    handleItemChange('StockTransferDate', date);
+                    setIsFormDirty(true);
+                  }}
+                  onFocus={handleInputFocus}
+                />
+              </View>
+            </View>
+
+            {/* Unit + Net Weight / Qty + Gross Weight */}
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="Unit"
+                  value={StockItem?.unit?.toUpperCase() || 'PCS'}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
+                  editable={false}
+                  pointerEvents="none"
+                  right={
+                    <TextInput.Icon
+                      icon="menu-down"
+                      onPress={() => unitModalRef.current?.open()}
+                    />
+                  }
+                />
+              </View>
+
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                {StockItem?.unit === 'pcs' ? (
+                  <TextInput
+                    label="Quantity"
+                    value={StockItem?.quantity || ''}
+                    onChangeText={t => handleItemChange('quantity', t)}
+                    mode="outlined"
+                    style={styles.compactInput}
+                    outlineStyle={styles.inputOutline}
+                    onFocus={handleInputFocus}
+                    keyboardType="numeric"
+                  />
+                ) : (
+                  <TextInput
+                    label="Net Weight"
+                    value={StockItem?.netWeight || ''}
+                    onChangeText={t => handleItemChange('netWeight', t)}
+                    mode="outlined"
+                    style={styles.compactInput}
+                    outlineStyle={styles.inputOutline}
+                    onFocus={handleInputFocus}
+                    keyboardType="numeric"
+                    right={
+                      <TextInput.Affix
+                        text={StockItem?.unit === 'kg' ? 'kg' : 'L'}
+                      />
+                    }
+                  />
+                )}
+              </View>
+
+              {StockItem?.unit !== 'pcs' && (
+                <View style={styles.formColumn}>
+                  <TextInput
+                    label="Gross Weight"
+                    value={StockItem?.grossWeight || ''}
+                    onChangeText={t => handleItemChange('grossWeight', t)}
+                    mode="outlined"
+                    style={styles.compactInput}
+                    outlineStyle={styles.inputOutline}
+                    onFocus={handleInputFocus}
+                    keyboardType="numeric"
+                    right={<TextInput.Affix text="kg" />}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Value + Package Type */}
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="Transfer Value"
+                  value={StockItem?.value || ''}
+                  onChangeText={t => handleItemChange('value', t)}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  onFocus={handleInputFocus}
+                  outlineStyle={styles.inputOutline}
+                  keyboardType="numeric"
+                  left={<TextInput.Affix text="₹" />}
+                />
+              </View>
+
+              <View style={styles.formColumn}>
+                <TextInput
+                  label="Package Type"
+                  value={StockItem?.packageType || ''}
+                  mode="outlined"
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                  onFocus={handleInputFocus}
+                  editable={false}
+                  pointerEvents="none"
+                  right={
+                    <TextInput.Icon
+                      icon="menu-down"
+                      onPress={() => packageModalRef.current?.open()}
+                    />
+                  }
+                />
+              </View>
+            </View>
+
+            {/* From Location + To Location */}
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="From Location"
+                  value={StockItem?.fromLocation || ''}
+                  onChangeText={t => handleItemChange('fromLocation', t)}
+                  mode="outlined"
+                  onFocus={handleInputFocus}
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+              <View style={styles.formColumn}>
+                <TextInput
+                  label="To Location"
+                  value={StockItem?.toLocation || ''}
+                  onChangeText={t => handleItemChange('toLocation', t)}
+                  mode="outlined"
+                  onFocus={handleInputFocus}
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+            </View>
+
+            {/* Material Type */}
+            <View style={styles.formRow}>
+              <View style={styles.fullWidthColumn}>
+                <TextInput
+                  label="Material Type"
+                  value={StockItem?.materialType || ''}
+                  onChangeText={t => handleItemChange('materialType', t)}
+                  mode="outlined"
+                  onFocus={handleInputFocus}
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+            </View>
+
+            {/* PO No + PO Date */}
+            <View style={styles.formRow}>
+              <View style={[styles.formColumn, styles.formColumnGap]}>
+                <TextInput
+                  label="PO Number"
+                  value={StockItem?.poNo || ''}
+                  onChangeText={t => handleItemChange('poNo', t)}
+                  mode="outlined"
+                  onFocus={handleInputFocus}
+                  style={styles.compactInput}
+                  outlineStyle={styles.inputOutline}
+                />
+              </View>
+              <View style={styles.formColumn}>
+                <DateInput
+                  label="PO Date"
+                  value={StockItem?.poDate || ''}
+                  onChange={date => {
+                    handleItemChange('poDate', date);
+                    setIsFormDirty(true);
+                  }}
+                  onFocus={handleInputFocus}
+                />
+              </View>
+            </View>
+          </>
+        );
+      }
     }
   };
 

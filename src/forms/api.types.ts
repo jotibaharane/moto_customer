@@ -183,19 +183,19 @@ export interface FormikValues {
   grossWeight: string;
 
   // Freight Details
-  freightDetails: {
-    noOfPackages: string;
-    netQuantity: string;
-    grossWeight: string;
-    freightAmount: string;
-    loading: string;
-    unloading: string;
-    lrCharges: string;
-    otherCharges: string;
-    otherChargesLabel: string;
-    advance: string;
-    balance: string;
-  };
+  // freightDetails: {
+  //   noOfPackages: string;
+  //   netQuantity: string;
+  //   grossWeight: string;
+  //   freightAmount: string;
+  //   loading: string;
+  //   unloading: string;
+  //   lrCharges: string;
+  //   otherCharges: string;
+  //   otherChargesLabel: string;
+  //   advance: string;
+  //   balance: string;
+  // };
 
   // Additional Fields
   labReportApplied: boolean;

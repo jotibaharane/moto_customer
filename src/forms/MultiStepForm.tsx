@@ -24,7 +24,7 @@ import { useSelector } from 'react-redux';
 import Step1_VehicleCustomer from './Step1_VehicleCustomer';
 import Step2_CargoInvoice from './Step2_CargoInvoice';
 import Step3_FreightDetails from './Step3_FreightDetails';
-
+// import ChargesFreightInput from './ChargesFreightInput';
 // Import types
 import {
   DropdownItem,
@@ -192,15 +192,15 @@ const transformToApiPayload = (
         values.freightDetails?.grossWeight || values.grossWeight || '0',
     },
 
-    charges: {
-      freightAmount: values.freightDetails?.freightAmount || '0',
-      loadingcharge: values.freightDetails?.loading || '0',
-      unloadingcharge: values.freightDetails?.unloading || '0',
-      LRcharge: values.freightDetails?.lrCharges || '0',
-      othercharge: values.freightDetails?.otherCharges || '0',
-      otherchargelabel: values.freightDetails?.otherChargesLabel || '',
-      Advance: values.freightDetails?.advance || '0',
-    },
+    // charges: {
+    //   freightAmount: values.freightDetails?.freightAmount || '0',
+    //   loadingcharge: values.freightDetails?.loading || '0',
+    //   unloadingcharge: values.freightDetails?.unloading || '0',
+    //   LRcharge: values.freightDetails?.lrCharges || '0',
+    //   othercharge: values.freightDetails?.otherCharges || '0',
+    //   otherchargelabel: values.freightDetails?.otherChargesLabel || '',
+    //   Advance: values.freightDetails?.advance || '0',
+    // },
 
     lr_no: values.lr_no || '',
     lr_date: values.lr_date || '',
@@ -290,19 +290,19 @@ const initialValues: FormikValues = {
   grossWeight: '',
 
   // Freight Details
-  freightDetails: {
-    noOfPackages: '0',
-    netQuantity: '0',
-    grossWeight: '0',
-    freightAmount: '0',
-    loading: '0',
-    unloading: '0',
-    lrCharges: '0',
-    otherCharges: '0',
-    otherChargesLabel: '',
-    advance: '0',
-    balance: '0',
-  },
+  // freightDetails: {
+  //   noOfPackages: '0',
+  //   netQuantity: '0',
+  //   grossWeight: '0',
+  //   freightAmount: '0',
+  //   loading: '0',
+  //   unloading: '0',
+  //   // lrCharges: '0',
+  //   // otherCharges: '0',
+  //   // otherChargesLabel: '',
+  //   // advance: '0',
+  //   // balance: '0',
+  // },
 
   // Additional
   labReportApplied: false,
@@ -583,7 +583,7 @@ export default function MultiStepFormTabs() {
                             },
                           ]}
                         >
-                          Invoice / Documents
+                          Documents
                         </Text>
                         {stepCompletion.step2 && !focused && (
                           <View style={styles.completedIndicator}>
@@ -618,12 +618,13 @@ export default function MultiStepFormTabs() {
                         </Button>
                         <Button
                           mode="contained"
-                          onPress={() => navigation.navigate('Freight Summary')}
-                          style={styles.nextButton}
+                          onPress={() => formik.handleSubmit()}
+                          style={styles.submitButton}
                           labelStyle={styles.buttonLabel}
-                          disabled={!stepCompletion.step2}
+                          loading={isSubmitting}
+                          disabled={isSubmitting || !stepCompletion.step3}
                         >
-                          <Text> Next: Freight Summary</Text>
+                          {isSubmitting ? 'Submitting...' : 'Submit Load'}
                         </Button>
                       </View>
                     </ScrollView>
@@ -631,7 +632,7 @@ export default function MultiStepFormTabs() {
                 </Tab.Screen>
 
                 {/* STEP 3 */}
-                <Tab.Screen
+                {/* <Tab.Screen
                   name="Freight Summary"
                   options={{
                     tabBarLabel: ({ focused, color }) => (
@@ -695,7 +696,7 @@ export default function MultiStepFormTabs() {
                       </View>
                     </ScrollView>
                   )}
-                </Tab.Screen>
+                </Tab.Screen> */}
               </Tab.Navigator>
             </View>
           );
