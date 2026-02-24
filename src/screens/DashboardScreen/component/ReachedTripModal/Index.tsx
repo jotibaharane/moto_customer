@@ -248,12 +248,12 @@ const DUMMY_PROCESS_TRIPS: CustomerProcess[] = [
   },
 ];
 
-interface ProcessTripsModalRef {
+interface ReachedTripModalRef {
   open: () => void;
   close: () => void;
 }
 
-const ReachedTripModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
+const ReachedTripModal = forwardRef<ReachedTripModalRef>((_, ref) => {
   const CustomerID = useSelector(
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );
@@ -484,7 +484,7 @@ const ReachedTripModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
     <View style={processTripStyles.listContainer}>
       <View style={processTripStyles.listHeader}>
         <View style={processTripStyles.titleContainer}>
-          <Text style={processTripStyles.listTitle}>Process Trips</Text>
+          <Text style={processTripStyles.listTitle}>Reached Trips</Text>
           <Text style={processTripStyles.tripCount}>
             {tripsData.length} trip{tripsData.length !== 1 ? 's' : ''}
           </Text>

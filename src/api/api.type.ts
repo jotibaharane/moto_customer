@@ -429,6 +429,7 @@ export interface Location {
 
 // Pickup Interface
 export interface PickupData {
+  alternateNo: any;
   pickupType: 'Registered' | 'self' | 'other';
   contactName: string;
   companyName: string;
@@ -466,18 +467,20 @@ export interface VehicleData {
 
 // Load Interface
 export interface LoadData {
-  cargoType: string;
   bodyType: string;
-  cargoContent: string;
+  cargoType: string;
+  materialName: string;
+  isFlammable: boolean;
+  isHazardous: boolean;
+  hazardousDeclaration: string;
   packageType: string;
+  packageDescription: string;
+  weight: string;
+  packageImage: string;
+  flammableDeclaration: string;
   expectedVehicleAvailability: string;
+  hdescription: string;
   dhalaLength?: string;
-}
-
-// Schedule Interface
-export interface ScheduleData {
-  date: string;
-  time: string;
 }
 
 export interface ShipmentData {
@@ -486,7 +489,6 @@ export interface ShipmentData {
   delivery: DeliveryData;
   vehicle: VehicleData;
   load: LoadData;
-  schedule: ScheduleData;
   CurrentDate?: string;
   CurrentTime?: string;
   NextDate?: string;
@@ -701,4 +703,21 @@ export interface LoadPostData {
   VendorStatus: string | null;
   DriverStatus: string;
   LP_Status: string;
+}
+
+export interface GetvehicleTypesRequest {
+  Weight: string;
+}
+export interface VehicleTye {
+  VehicleName: string;
+  VehicleType: string;
+  BodyType: string;
+  WeightRange: string;
+  img: string;
+}
+export interface GetvehicleTypesResponse {
+  status: string;
+  message: string;
+  count: string;
+  data: VehicleTye[];
 }

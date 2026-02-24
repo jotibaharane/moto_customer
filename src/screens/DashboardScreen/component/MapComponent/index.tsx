@@ -18,6 +18,7 @@ import DropMarker from '../icon/DropMarker';
 import Parcel from '../icon/Parcel';
 import Truck from '../icon/Truck';
 import { MAP_STYLE } from './helper';
+import { setCurrentLocation } from '@store/slices/mapSlice';
 
 interface Coordinate {
   latitude: number;

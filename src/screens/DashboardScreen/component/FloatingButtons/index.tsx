@@ -29,6 +29,8 @@ import ActiveTripsModal from '../ActiveTripsModal';
 import LoadPostModal from '../LoadPostModal';
 import ProcessTripsModal from '../ProcessTripsModal';
 import { ProcessTripsModalRef } from '../ProcessTripsModal/helper';
+import ReachedTripModalRef from '../ReachedTripModal/Index';
+import LoadingTripModalRef from '../LoadingTripModal/Index';
 import {
   colors,
   DASHBOARD_BUTTONS,
@@ -36,6 +38,7 @@ import {
   hp,
   wp,
 } from './helper';
+import ReachedTripModal from '../ReachedTripModal/Index';
 
 // Individual Button Component
 interface DashboardButtonProps {
@@ -182,6 +185,9 @@ export const FloatingActionButton = () => {
 
   const activeTripsModalRef = useRef<ProcessTripsModalRef>(null);
   const processTripsModalRef = useRef<ProcessTripsModalRef>(null);
+  const ReachedTripModalRef = useRef<ReachedTripModalRef>(null);
+  const LoadingTripModalRef = useRef<LoadingTripModalRef>(null);
+  const CompletedTripsModalRef = useRef<ProcessTripsModalRef>(null);
 
   const [isOpen, setIsOpen] = useState(false);
   const animation = React.useRef(new Animated.Value(0)).current;
@@ -376,6 +382,12 @@ export const FloatingActionButton = () => {
       );
 
       processTripsModalRef.current?.open();
+    } else if (button?.id === 'Reached-trips') {
+      ReachedTripModalRef.current?.open();
+    } else if (button?.id === 'Loading-trips') {
+      LoadingTripModalRef.current?.open();
+    } else if (button?.id === 'completed-trips') {
+      CompletedTripsModalRef.current?.open();
     }
   };
 
@@ -446,11 +458,11 @@ export const FloatingActionButton = () => {
       <LoadPostModal ref={modalRef} />
       <ProcessTripsModal ref={processTripsModalRef} />
       <ActiveTripsModal ref={activeTripsModalRef} />
+      <ReachedTripModal ref={ReachedTripModalRef} />
     </>
   );
 };
 
-// Enhanced Styles
 const buttonStyles = StyleSheet.create({
   container: {
     position: 'absolute',

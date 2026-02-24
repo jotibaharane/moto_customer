@@ -12,12 +12,14 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import Profile from '@screens/ProfileScreen/Profile';
 import MultiStepForm from './../../forms/MultiStepForm';
+import Loading from '@screens/LoadPostScreen/Vehicleloading/Loading';
 
 export type TabParamList = {
   [routeName.HOME]: undefined;
   Profile: undefined;
   MyPost: undefined;
   History: undefined;
+  Load: undefined;
 };
 
 // Mock Components for other tabs
@@ -45,6 +47,10 @@ const ICON_MAP = {
   History: {
     focused: 'history',
     default: 'history',
+  },
+  Load: {
+    focused: 'cloud-upload',
+    default: 'cloud-upload-outline',
   },
   Profile: {
     focused: 'account-circle',
@@ -113,6 +119,7 @@ const TabNavigator = () => {
         <Tab.Screen name={routeName.HOME} component={Dashboard} />
         <Tab.Screen name="MyPost" component={LoadPostForm} />
         <Tab.Screen name="History" component={HistoryScreen} />
+        <Tab.Screen name="Load" component={Loading} />
         <Tab.Screen name="Profile" component={Profile} />
       </Tab.Navigator>
     </>

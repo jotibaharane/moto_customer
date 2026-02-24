@@ -1,5 +1,4 @@
-// Step2_CargoInvoice.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,6 +21,10 @@ import DocumentItemModal, {
   InvoiceItem,
 } from './DocumentItemModal';
 import CustomRadioButton from '@components/common/CustomRadioButton';
+import { Checkbox } from 'react-native-paper';
+import { useDispatch } from 'react-redux';
+import { setIsDocumentsAvailable } from '@store/slices/VehicleSheet';
+import DeclarationModal from '@modal/DeclarationModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -69,18 +72,20 @@ interface FormValues {
   shipmentDocumentType?: 'domestic' | 'international' | null;
   domesticDocuments?: string[];
   internationalDocuments?: string[];
+  declarationImages?: [];
 
   // Additional fields for context
   loadpostid?: string;
   vehicleno?: string;
   driverName?: string;
+  isDeclared?: string;
 }
 
 // Document Type Radio Options
 const DOCUMENT_TYPES = [
   {
     id: 'invoice',
-    label: 'Invoice',
+    label: 'Commercial Invoice ',
     value: 'invoice',
     icon: 'file-document-outline',
     color: '#10B981',
@@ -88,7 +93,7 @@ const DOCUMENT_TYPES = [
   },
   {
     id: 'bill-of-entry',
-    label: 'Bill of Entry',
+    label: 'Bill of Entry / AirwayBill',
     value: 'bill-of-entry',
     icon: 'ship-wheel',
     color: '#F59E0B',
@@ -110,30 +115,6 @@ const DOCUMENT_TYPES = [
     color: '#8B5CF6',
     bgColor: '#F5F3FF',
   },
-];
-
-// Domestic Document Options
-const DOMESTIC_DOCUMENTS = [
-  { id: 'invoice_copy', label: 'Invoice Copy', value: 'invoice_copy' },
-  { id: 'challan_copy', label: 'Challan Copy', value: 'challan_copy' },
-  { id: 'eway_bill', label: 'E-Way Bill', value: 'eway_bill' },
-  { id: 'gst_document', label: 'GST Document', value: 'gst_document' },
-];
-
-// International Document Options
-const INTERNATIONAL_DOCUMENTS = [
-  {
-    id: 'commercial_invoice',
-    label: 'Commercial Invoice',
-    value: 'commercial_invoice',
-  },
-  { id: 'packing_list', label: 'Packing List', value: 'packing_list' },
-  {
-    id: 'certificate_of_origin',
-    label: 'Certificate of Origin',
-    value: 'certificate_of_origin',
-  },
-  { id: 'bill_of_lading', label: 'Bill of Lading', value: 'bill_of_lading' },
 ];
 
 // Helper function to calculate total quantity
@@ -195,116 +176,71 @@ const formatCurrencyDisplay = (group: any, type: DocumentType): string => {
 };
 
 // ---------------------------------------------
-// SHIPMENT DOCUMENTS COMPONENTS
+// SHIPMENT TYPE SELECTION COMPONENT
 // ---------------------------------------------
-
-interface DocumentCheckboxProps {
-  label: string;
-  checked: boolean;
-  onToggle: () => void;
-  iconName?: string;
-  iconColor?: string;
+interface ShipmentTypeSelectorProps {
+  selectedType: 'domestic' | 'international' | null;
+  onSelectType: (type: 'domestic' | 'international' | null) => void;
 }
 
-const DocumentCheckbox: React.FC<DocumentCheckboxProps> = ({
-  label,
-  checked,
-  onToggle,
-  iconName = 'file-document-outline',
-  iconColor = '#3B82F6',
+const ShipmentTypeSelector: React.FC<ShipmentTypeSelectorProps> = ({
+  selectedType,
+  onSelectType,
 }) => {
   return (
-    <TouchableOpacity
-      style={[
-        styles.checkboxContainer,
-        checked && styles.checkboxContainerChecked,
-      ]}
-      onPress={onToggle}
-      activeOpacity={0.7}
-    >
-      <View style={styles.checkboxContent}>
-        {/* <View
+    <View style={styles.shipmentTypeContainer}>
+      {/* <Text style={styles.shipmentTypeTitle}>Select Shipment Type</Text> */}
+
+      <View style={styles.shipmentTypeButtons}>
+        <TouchableOpacity
           style={[
-            styles.checkboxIconContainer,
-            { backgroundColor: checked ? iconColor + '20' : '#F3F4F6' },
+            styles.shipmentTypeButton,
+            selectedType === 'domestic' && styles.shipmentTypeButtonActive,
           ]}
+          onPress={() => onSelectType('domestic')}
         >
-          <Icon
-            name={iconName}
-            size={18}
-            color={checked ? iconColor : '#9CA3AF'}
-          />
-        </View> */}
-        <Text
-          style={[styles.checkboxLabel, checked && styles.checkboxLabelChecked]}
+          <View style={styles.shipmentTypeButtonContent}>
+            <Icon
+              name="truck-fast-outline"
+              size={20}
+              color={selectedType === 'domestic' ? '#FFFFFF' : '#6B7280'}
+            />
+            <Text
+              style={[
+                styles.shipmentTypeButtonText,
+                selectedType === 'domestic' &&
+                  styles.shipmentTypeButtonTextActive,
+              ]}
+            >
+              Domestic
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.shipmentTypeButton,
+            selectedType === 'international' && styles.shipmentTypeButtonActive,
+          ]}
+          onPress={() => onSelectType('international')}
         >
-          {label}
-        </Text>
-      </View>
-      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-        {checked && <Icon name="check" size={16} color="#FFFFFF" />}
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-interface DomesticDocumentsProps {
-  selectedDocuments: string[];
-  onDocumentToggle: (documentId: string) => void;
-}
-
-const DomesticDocuments: React.FC<DomesticDocumentsProps> = ({
-  selectedDocuments,
-  onDocumentToggle,
-}) => {
-  return (
-    <View style={styles.documentsContainer}>
-      {/* <Text style={styles.documentsTitle}>Select Domestic Documents</Text>
-      <Text style={styles.documentsDescription}>
-        Check the documents that are provided with this shipment
-      </Text> */}
-      <View style={styles.checkboxList}>
-        {DOMESTIC_DOCUMENTS.map(doc => (
-          <DocumentCheckbox
-            key={doc.id}
-            label={doc.label}
-            checked={selectedDocuments.includes(doc.value)}
-            onToggle={() => onDocumentToggle(doc.value)}
-            iconName="file-document-outline"
-            iconColor="#10B981"
-          />
-        ))}
-      </View>
-    </View>
-  );
-};
-
-interface InternationalDocumentsProps {
-  selectedDocuments: string[];
-  onDocumentToggle: (documentId: string) => void;
-}
-
-const InternationalDocuments: React.FC<InternationalDocumentsProps> = ({
-  selectedDocuments,
-  onDocumentToggle,
-}) => {
-  return (
-    <View style={styles.documentsContainer}>
-      {/* <Text style={styles.documentsTitle}>Select International Documents</Text>
-      <Text style={styles.documentsDescription}>
-        Check the documents required for international shipments
-      </Text> */}
-      <View style={styles.checkboxList}>
-        {INTERNATIONAL_DOCUMENTS.map(doc => (
-          <DocumentCheckbox
-            key={doc.id}
-            label={doc.label}
-            checked={selectedDocuments.includes(doc.value)}
-            onToggle={() => onDocumentToggle(doc.value)}
-            iconName="earth"
-            iconColor="#3B82F6"
-          />
-        ))}
+          <View style={styles.shipmentTypeButtonContent}>
+            <Icon
+              name="earth"
+              size={20}
+              color={selectedType === 'international' ? '#FFFFFF' : '#6B7280'}
+            />
+            <Text
+              style={[
+                styles.shipmentTypeButtonText,
+                selectedType === 'international' &&
+                  styles.shipmentTypeButtonTextActive,
+              ]}
+            >
+              International
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -314,6 +250,7 @@ const InternationalDocuments: React.FC<InternationalDocumentsProps> = ({
 // MAIN COMPONENT
 // ---------------------------------------------
 export default function Step2_InvoiceDetails() {
+  const dispatch = useDispatch();
   const [showDocumentModal, setShowDocumentModal] = useState<boolean>(false);
   const [selectedDocumentType, setSelectedDocumentType] =
     useState<DocumentType>('invoice');
@@ -326,43 +263,40 @@ export default function Step2_InvoiceDetails() {
 
   const packageTypeModalRef = useRef<BottomModalRef>(null);
   const { values, setFieldValue } = useFormikContext<FormValues>();
+  const [modalVisible, setModalVisible] = useState(false);
 
   // Handle shipment document type selection
-  const handleShipmentTypeSelect = (
-    type: 'domestic' | 'international' | null,
-  ) => {
+  const handleShipmentTypeSelect = (type: 'domestic' | 'international') => {
     const newType = values.shipmentDocumentType === type ? null : type;
+
     setFieldValue('shipmentDocumentType', newType);
-
-    // Clear other type's selections when switching
-    if (type === 'domestic') {
-      setFieldValue('internationalDocuments', []);
-    } else if (type === 'international') {
-      setFieldValue('domesticDocuments', []);
-    }
   };
+  // const [checked, setChecked] = useState(false);
 
-  // Handle document checkbox toggle
-  const handleDocumentToggle = (
-    documentId: string,
-    documentType: 'domestic' | 'international',
-  ) => {
-    const field =
-      documentType === 'domestic'
-        ? 'domesticDocuments'
-        : 'internationalDocuments';
-    const currentSelection = values[field] || [];
+  const checked = values?.isDeclared;
 
-    if (currentSelection.includes(documentId)) {
-      setFieldValue(
-        field,
-        currentSelection.filter(id => id !== documentId),
+  // Filter document types based on shipment type
+  const getFilteredDocumentTypes = () => {
+    if (values.shipmentDocumentType === 'domestic') {
+      return DOCUMENT_TYPES.filter(
+        doc =>
+          doc.value === 'invoice' ||
+          doc.value === 'Stock-transfer' ||
+          doc.value === 'challan',
       );
-    } else {
-      setFieldValue(field, [...currentSelection, documentId]);
+    } else if (values.shipmentDocumentType === 'international') {
+      return DOCUMENT_TYPES.filter(
+        doc => doc.value === 'challan' || doc.value === 'bill-of-entry',
+      );
     }
+    return DOCUMENT_TYPES; // Show all when no type selected
   };
-
+  useEffect(() => {
+    // Set default shipment type to 'domestic' if not already set
+    if (!values.shipmentDocumentType) {
+      setFieldValue('shipmentDocumentType', 'domestic');
+    }
+  }, []);
   // Handle package type selection
   const handleSelectPackageType = (type: string) => {
     setFieldValue('packageType', type);
@@ -377,6 +311,13 @@ export default function Step2_InvoiceDetails() {
     setEditingDocumentType(null);
     setShowDocumentModal(true);
   };
+
+  // const hasAnyDocument = () => {
+  //   return (values.invoices?.length || 0) > 0 ||
+  //     (values.challans?.length || 0) > 0 ||
+  //     (values.billOfEntries?.length || 0) > 0 ||
+  //     (values.StockTransfers?.length || 0) > 0;
+  // };
 
   // Open document modal for editing existing group
   const openEditDocumentModal = (type: DocumentType, index: number) => {
@@ -435,6 +376,7 @@ export default function Step2_InvoiceDetails() {
     };
 
     // Use editingDocumentType if editing, otherwise use selectedDocumentType
+
     const targetType = editingDocumentType || selectedDocumentType;
 
     switch (targetType) {
@@ -605,6 +547,36 @@ export default function Step2_InvoiceDetails() {
       (values.StockTransfers?.length || 0) > 0
     );
   };
+  const isDisabled = hasAnyDocument();
+
+  useEffect(() => {
+    dispatch(setIsDocumentsAvailable(hasAnyDocument()));
+  }, [
+    values.invoices,
+    values.challans,
+    values.billOfEntries,
+    values.StockTransfers,
+  ]);
+  const handleSaveDeclaration = (data: any) => {
+    setFieldValue('isDeclared', true); // ✅ single source of truth
+  };
+  useEffect(() => {
+    const hasDeclarationText =
+      Array.isArray(values?.declarationTextList) &&
+      values?.declarationTextList.some(text => text?.trim().length > 0);
+
+    const hasImages =
+      Array.isArray(values.declarationImages) &&
+      values.declarationImages.length > 0;
+
+    const shouldBeDeclared = hasDeclarationText && hasImages;
+
+    if (values.isDeclared !== shouldBeDeclared) {
+      setFieldValue('isDeclared', shouldBeDeclared);
+    }
+  }, [values?.declarationTextList, values.declarationImages]);
+
+  const filteredDocumentTypes = getFilteredDocumentTypes();
 
   return (
     <>
@@ -613,10 +585,39 @@ export default function Step2_InvoiceDetails() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
+        {/* Shipment Type Selector */}
+        <View style={styles.section}>
+          <ShipmentTypeSelector
+            selectedType={values.shipmentDocumentType || null}
+            onSelectType={handleShipmentTypeSelect}
+          />
+        </View>
+
         {/* Add Documents Section - Professional Cards Layout */}
         <View style={styles.section}>
+          {/* <Text style={styles.sectionTitle}>Add Documents</Text> */}
+
+          {!values.shipmentDocumentType && (
+            <Text style={styles.sectionDescription}>
+              Please select a shipment type above to see available document
+              options
+            </Text>
+          )}
+
+          {/* {values.shipmentDocumentType === 'domestic' && (
+            <Text style={styles.sectionDescription}>
+              Available for Domestic Shipments
+            </Text>
+          )} */}
+
+          {/* {values.shipmentDocumentType === 'international' && (
+            <Text style={styles.sectionDescription}>
+              Available for International Shipments
+            </Text>
+          )} */}
+
           <View style={styles.documentTypeGrid}>
-            {DOCUMENT_TYPES.map(docType => (
+            {filteredDocumentTypes.map(docType => (
               <TouchableOpacity
                 key={docType.id}
                 style={[
@@ -639,155 +640,6 @@ export default function Step2_InvoiceDetails() {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
-
-        {/* Shipment Document Type Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Shipment Documents</Text>
-          {/* <Text style={styles.sectionDescription}>
-            Select the type of shipment and check provided documents
-          </Text> */}
-
-          {/* Document Provided with Shipment Radio Button */}
-          <TouchableOpacity
-            style={[
-              styles.radioButtonContainer,
-              values.shipmentDocumentType === 'domestic' &&
-                styles.radioButtonContainerSelected,
-            ]}
-            onPress={() => handleShipmentTypeSelect('domestic')}
-          >
-            <View style={styles.radioButtonContent}>
-              <View style={styles.radioButtonLeft}>
-                <View
-                  style={[
-                    styles.radioButtonCircle,
-                    values.shipmentDocumentType === 'domestic' &&
-                      styles.radioButtonCircleSelected,
-                  ]}
-                >
-                  {values.shipmentDocumentType === 'domestic' && (
-                    <View style={styles.radioButtonInnerCircle} />
-                  )}
-                </View>
-                <View style={styles.radioButtonTextContainer}>
-                  <Text style={styles.radioButtonLabel}>
-                    Domestic Shipments
-                  </Text>
-                  {/* <Text style={styles.radioButtonDescription}>
-                    For domestic shipments within the country
-                  </Text> */}
-                </View>
-              </View>
-              <Icon
-                name="truck-fast-outline"
-                size={24}
-                color={
-                  values.shipmentDocumentType === 'domestic'
-                    ? '#10B981'
-                    : '#9CA3AF'
-                }
-              />
-            </View>
-          </TouchableOpacity>
-
-          {/* Domestic Documents Checkboxes */}
-          {values.shipmentDocumentType === 'domestic' && (
-            <DomesticDocuments
-              selectedDocuments={values.domesticDocuments || []}
-              onDocumentToggle={docId =>
-                handleDocumentToggle(docId, 'domestic')
-              }
-            />
-          )}
-
-          {/* International Shipments Documents Radio Button */}
-          <TouchableOpacity
-            style={[
-              styles.radioButtonContainer,
-              values.shipmentDocumentType === 'international' &&
-                styles.radioButtonContainerSelected,
-              { marginTop: 12 },
-            ]}
-            onPress={() => handleShipmentTypeSelect('international')}
-          >
-            <View style={styles.radioButtonContent}>
-              <View style={styles.radioButtonLeft}>
-                <View
-                  style={[
-                    styles.radioButtonCircle,
-                    values.shipmentDocumentType === 'international' &&
-                      styles.radioButtonCircleSelected,
-                  ]}
-                >
-                  {values.shipmentDocumentType === 'international' && (
-                    <View style={styles.radioButtonInnerCircle} />
-                  )}
-                </View>
-                <View style={styles.radioButtonTextContainer}>
-                  <Text style={styles.radioButtonLabel}>
-                    International Shipments
-                  </Text>
-                  {/* <Text style={styles.radioButtonDescription}>
-                    For shipments crossing international borders
-                  </Text> */}
-                </View>
-              </View>
-              <Icon
-                name="earth"
-                size={24}
-                color={
-                  values.shipmentDocumentType === 'international'
-                    ? '#3B82F6'
-                    : '#9CA3AF'
-                }
-              />
-            </View>
-          </TouchableOpacity>
-
-          {/* International Documents Checkboxes */}
-          {values.shipmentDocumentType === 'international' && (
-            <InternationalDocuments
-              selectedDocuments={values.internationalDocuments || []}
-              onDocumentToggle={docId =>
-                handleDocumentToggle(docId, 'international')
-              }
-            />
-          )}
-
-          {/* Selected Documents Summary */}
-          {/* {(values.domesticDocuments?.length > 0 ||
-            values.internationalDocuments?.length > 0) && (
-            <View style={styles.selectedDocumentsSummary}>
-              <Text style={styles.selectedDocumentsTitle}>
-                Selected Documents:
-              </Text>
-              <View style={styles.selectedDocumentsTags}>
-                {values.shipmentDocumentType === 'domestic' &&
-                  values.domesticDocuments?.map(docId => {
-                    const doc = DOMESTIC_DOCUMENTS.find(d => d.value === docId);
-                    return doc ? (
-                      <View key={docId} style={styles.documentTag}>
-                        <Icon name="check-circle" size={14} color="#10B981" />
-                        <Text style={styles.documentTagText}>{doc.label}</Text>
-                      </View>
-                    ) : null;
-                  })}
-                {values.shipmentDocumentType === 'international' &&
-                  values.internationalDocuments?.map(docId => {
-                    const doc = INTERNATIONAL_DOCUMENTS.find(
-                      d => d.value === docId,
-                    );
-                    return doc ? (
-                      <View key={docId} style={styles.documentTag}>
-                        <Icon name="check-circle" size={14} color="#3B82F6" />
-                        <Text style={styles.documentTagText}>{doc.label}</Text>
-                      </View>
-                    ) : null;
-                  })}
-              </View>
-            </View>
-          )} */}
         </View>
 
         {/* Documents List - Show ALL document groups */}
@@ -893,6 +745,46 @@ export default function Step2_InvoiceDetails() {
             })}
           </View>
         )}
+        <View style={[styles.Document, isDisabled && { opacity: 0.5 }]}>
+          <TouchableOpacity
+            onPress={() => {
+              if (values.isDeclared) {
+                Alert.alert(
+                  'Reset Declaration',
+                  'This will clear all declaration checkboxes and images. Continue?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Reset',
+                      style: 'destructive',
+                      onPress: () => {
+                        setFieldValue('isDeclared', false);
+                        setFieldValue('declaration', {
+                          checkbox1: false,
+                          checkbox2: false,
+                          checkbox3: false,
+                          checkbox4: false,
+                          checkbox5: false,
+                        });
+                        setFieldValue('declarationImages', []);
+                      },
+                    },
+                  ],
+                );
+              } else {
+                setModalVisible(true);
+              }
+            }}
+          >
+            <Checkbox status={values.isDeclared ? 'checked' : 'unchecked'} />
+            <Text>Documents are not available for the goods</Text>
+          </TouchableOpacity>
+        </View>
+        <DeclarationModal
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          onSave={handleSaveDeclaration}
+        />
       </ScrollView>
 
       {/* Reusable Document Modal */}
@@ -931,7 +823,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   contentContainer: {
-    padding: 16,
+    // padding: 16,
     paddingBottom: 32,
   },
   // Header Section
@@ -970,6 +862,51 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 16,
   },
+  // Shipment Type Selector
+  shipmentTypeContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  shipmentTypeTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  shipmentTypeButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  shipmentTypeButton: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  shipmentTypeButtonActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  shipmentTypeButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  shipmentTypeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  shipmentTypeButtonTextActive: {
+    color: '#FFFFFF',
+  },
   // Document Type Cards
   documentTypeGrid: {
     flexDirection: 'row',
@@ -984,7 +921,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    minHeight: 80,
+    minHeight: 60,
     backgroundColor: 'white',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -993,8 +930,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   documentTypeIconContainer: {
-    width: 36,
-    height: 36,
+    width: 20,
+    height: 20,
     borderRadius: 18,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
@@ -1022,169 +959,6 @@ const styles = StyleSheet.create({
   documentCountText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#374151',
-  },
-  // Radio Button Styles
-  radioButtonContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-  },
-  radioButtonContainerSelected: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#F0F9FF',
-  },
-  radioButtonContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  radioButtonLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  radioButtonCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  radioButtonCircleSelected: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#3B82F6',
-  },
-  radioButtonInnerCircle: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'white',
-  },
-  radioButtonTextContainer: {
-    flex: 1,
-  },
-  radioButtonLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  // Documents Container
-  documentsContainer: {
-    marginTop: 8,
-    marginStart: 22,
-    backgroundColor: 'white',
-    marginLeft: 5,
-    borderRadius: 12,
-    padding: 6,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  documentsTitle: {
-    fontSize: 8,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  documentsDescription: {
-    fontSize: 8,
-    color: '#6B7280',
-    marginBottom: 16,
-  },
-  // Checkbox Styles
-  checkboxList: {
-    gap: 4,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    padding: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  checkboxContainerChecked: {
-    backgroundColor: '#F0F9FF',
-    borderColor: '#09090920',
-  },
-  checkboxContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  checkboxIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    flex: 1,
-  },
-  checkboxLabelChecked: {
-    color: '#111827',
-    fontWeight: '600',
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
-  },
-  // Selected Documents Summary
-  selectedDocumentsSummary: {
-    marginTop: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  selectedDocumentsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  selectedDocumentsTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  documentTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    gap: 6,
-  },
-  documentTagText: {
-    fontSize: 12,
-    fontWeight: '500',
     color: '#374151',
   },
   // Document Groups List
@@ -1238,22 +1012,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
   },
-  documentGroupHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  documentGroupTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  documentGroupName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-  },
   documentGroupDetails: {
     gap: 8,
     marginBottom: 12,
@@ -1303,5 +1061,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#9CA3AF',
     fontStyle: 'italic',
+  },
+  Document: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
 });

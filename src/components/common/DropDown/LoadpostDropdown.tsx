@@ -17,7 +17,7 @@ type LoadPostItem = {
   pickupCity?: string;
   dropCity?: string;
   pickupName?: string;
-  vehicleNo?: string;
+  Vehicleno?: string;
 };
 
 type Props = {
@@ -48,13 +48,13 @@ export default function LoadpostDropdown({
   const [search, setSearch] = useState('');
 
   const filtered = allData.filter(item =>
-    `${item.loadPostId} ${item.vehicleNo ?? ''} ${item.pickupName ?? ''}`
+    `${item.loadPostId} ${item.Vehicleno ?? ''} ${item.pickupName ?? ''}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
 
   const selectedItem = allData.find(item => item.loadPostId === selected);
-
+  console.log({ selectedItem });
   return (
     <>
       {/* ---------------- SELECTOR ---------------- */}
@@ -64,45 +64,31 @@ export default function LoadpostDropdown({
       >
         <Text style={styles.selectorText} numberOfLines={1}>
           {selectedItem
-            ? `🏷️ ${selectedItem.loadPostId} | 🚚 ${selectedItem.vehicleNo} | 👤 ${selectedItem.pickupName}`
+            ? `🏷️ ${selectedItem.loadPostId} | 🚚 ${selectedItem.Vehicleno} | 👤 ${selectedItem.pickupName}`
             : 'Select Driver Details'}
         </Text>
         <Icon name="chevron-down" size={22} color="#444" />
       </TouchableOpacity>
 
       {/* ---------------- FREIGHT INPUTS ---------------- */}
+      {/* ---------------- FREIGHT DISPLAY ---------------- */}
       <View style={styles.freightRow}>
         {/* Freight Amount */}
         <View style={styles.freightColumn}>
-          <PaperTextInput
-            mode="outlined"
-            label="Freight Amount Excluding GST"
-            value={freightAmount}
-            onChangeText={onFreightChange}
-            disabled={true}
-            keyboardType="numeric"
-            style={styles.paperInput}
-            outlineStyle={styles.inputOutline}
-            activeOutlineColor="#3b82f6"
-            left={<PaperTextInput.Icon icon="currency-inr" size={20} />}
-          />
+          <View style={styles.amountRow}>
+            <Text style={styles.amountLabel}>Freight Amount:</Text>
+            <Text style={styles.amountValue}>₹ {freightAmount || '500'}</Text>
+          </View>
+          <Text style={styles.excludesGstText}>Excluding GST</Text>
         </View>
 
-        {/* Excluding GST */}
+        {/* Optional Excluding GST */}
         {exclGstAmount !== undefined && (
           <View style={styles.freightColumn}>
-            <PaperTextInput
-              mode="outlined"
-              label="Excluding GST"
-              value={exclGstAmount}
-              editable={false}
-              keyboardType="numeric"
-              style={styles.paperInput}
-              outlineStyle={[styles.inputOutline, styles.disabledOutline]}
-              theme={{ colors: { background: '#f9fafb' } }}
-              left={<PaperTextInput.Icon icon="calculator" size={20} />}
-            />
-            {/* Text showing "Excludes GST" */}
+            <View style={styles.amountRow}>
+              <Text style={styles.amountLabel}>Amount (Excl. GST):</Text>
+              <Text style={styles.amountValue}>₹ {exclGstAmount || '500'}</Text>
+            </View>
             <Text style={styles.excludesGstText}>Excludes GST</Text>
           </View>
         )}
@@ -138,7 +124,7 @@ export default function LoadpostDropdown({
                 }}
               >
                 <Text style={styles.itemLabel}>
-                  🏷️ {item.loadPostId} | 🚚 {item.vehicleNo} | 👤{' '}
+                  🏷️ {item.loadPostId} | 🚚 {item.Vehicleno} | 👤{' '}
                   {item.pickupName}
                 </Text>
               </TouchableOpacity>
@@ -209,13 +195,6 @@ const styles = StyleSheet.create({
   disabledOutline: {
     borderColor: '#d1d5db',
   },
-  excludesGstText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4,
-    marginLeft: 4,
-    fontStyle: 'italic',
-  },
   bottomSheetContent: {
     paddingHorizontal: 4,
   },
@@ -229,5 +208,29 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     maxHeight: 350,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  amountLabel: {
+    marginRight: 15,
+    fontSize: 14,
+    color: '#374151',
+  },
+
+  amountValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+
+  excludesGstText: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginTop: 2,
+    fontStyle: 'italic',
   },
 });

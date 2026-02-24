@@ -13,7 +13,7 @@ import { Icon } from 'react-native-paper';
 export interface Option {
   id: string;
   label: string;
-  image: any;
+  image?: any;
   description?: string;
   hasTextInput?: boolean;
 }
@@ -34,7 +34,6 @@ interface SelectionModalProps {
 const SelectionModal = forwardRef<SelectionModalRef, SelectionModalProps>(
   ({ title, options, selectedValue, onSelect, numColumns = 2 }, ref) => {
     const bottomModalRef = useRef<BottomModalRef>(null);
-    console.log({ cargoOption: options });
     // Expose methods via ref
     useImperativeHandle(ref, () => ({
       open: () => {
@@ -55,27 +54,23 @@ const SelectionModal = forwardRef<SelectionModalRef, SelectionModalProps>(
     const renderOptionItem = ({ item }: { item: Option }) => (
       <TouchableOpacity
         style={[
-          styles.optionItem,
-          selectedValue === item.label && styles.selectedOptionItem,
+          styles.optionRow,
+          selectedValue === item.label && styles.selectedOptionRow,
         ]}
         onPress={() => handleSelect(item)}
       >
-        <Image
-          source={item.image}
-          style={styles.optionImage}
-          resizeMode="contain"
-        />
-
-        <Text style={styles.optionLabel}>{item.label}</Text>
-
-        {item?.description && (
-          <Text style={styles.optionDescription}>{item.description}</Text>
+        {item.image && (
+          <Image
+            source={{ uri: item.image }}
+            style={styles.optionRowImage}
+            resizeMode="contain"
+          />
         )}
 
-        {selectedValue === item.id && (
-          <View style={styles.selectedBadge}>
-            <Icon source="check" size={16} color="#FFFFFF" />
-          </View>
+        <Text style={styles.optionRowLabel}>{item.label}</Text>
+
+        {selectedValue === item.label && (
+          <Icon source="check" size={18} color="#4CAF50" />
         )}
       </TouchableOpacity>
     );
@@ -109,18 +104,8 @@ const SelectionModal = forwardRef<SelectionModalRef, SelectionModalProps>(
             data={options}
             renderItem={renderOptionItem}
             keyExtractor={item => item.id}
-            numColumns={numColumns}
             contentContainerStyle={styles.listContent}
-            columnWrapperStyle={
-              numColumns > 1 ? styles.columnWrapper : undefined
-            }
-            showsVerticalScrollIndicator={true}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Icon source="image-off" size={48} color="#E0E0E0" />
-                <Text style={styles.emptyText}>No options available</Text>
-              </View>
-            }
+            showsVerticalScrollIndicator
           />
         </View>
       </BottomModal>
@@ -228,6 +213,34 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 16,
     textAlign: 'center',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    marginBottom: 12,
+  },
+
+  selectedOptionRow: {
+    borderColor: '#FF9800',
+    backgroundColor: '#FFF3E0',
+  },
+
+  optionRowImage: {
+    width: 32,
+    height: 32,
+    marginRight: 12,
+  },
+
+  optionRowLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
   },
 });
 

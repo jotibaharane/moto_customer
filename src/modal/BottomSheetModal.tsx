@@ -11,7 +11,7 @@ const BottomSheetModal = ({
   visible,
   onClose,
   children,
-  width = '85%',
+  width = '100%',
 }: any) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.8)).current;

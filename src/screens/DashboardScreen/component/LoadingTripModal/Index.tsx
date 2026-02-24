@@ -248,12 +248,12 @@ const DUMMY_PROCESS_TRIPS: CustomerProcess[] = [
   },
 ];
 
-interface ProcessTripsModalRef {
+interface LoadingTripModalRef {
   open: () => void;
   close: () => void;
 }
 
-const LoadingTripModal = forwardRef<ProcessTripsModalRef>((_, ref) => {
+const LoadingTripModal = forwardRef<LoadingTripModalRef>((_, ref) => {
   const CustomerID = useSelector(
     (state: RootState) => state?.auth?.customerDetails?.CustomerID || '',
   );

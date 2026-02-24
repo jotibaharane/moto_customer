@@ -66,6 +66,7 @@ const mapSlice = createSlice({
       action: PayloadAction<{
         latitude: number;
         longitude: number;
+        address?: string;
       }>,
     ) => {
       state.currentlocation = action.payload;

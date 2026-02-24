@@ -2,12 +2,17 @@ import { ShipmentData } from '@api/api.type';
 import {
   useGetAproximateWeightQuery,
   useGetTruckTypemutationMutation,
+  useGetVehicleTypesQuery,
+  // useGetBodyTypeQuery,
+  useGetBodytypesQuery,
+  useGetdhalalengthQuery,
 } from '@api/hooks_api';
 import { useNavigation } from '@react-navigation/native';
 import tw from '@utils/tw';
 import { useFormikContext } from 'formik';
 import React, {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -28,88 +33,254 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import DropModal, { DropModalRef } from '../DropModal';
 import PickupModal, { PickupModalRef } from '../PickupModal';
 import SelectionModal, { SelectionModalRef } from '../SelectionModal';
-import { Checkbox } from 'react-native-paper';
+import { useDebounce } from '@utils/debounce';
+import { useSnackbar } from '../../../../errorhandler/snackbar/SnackbarProvider';
+// Dhala Length options
+const DHALA_LENGTHS = [
+  { label: '18 ft', value: '18' },
+  { label: '20 ft', value: '20' },
+  { label: '22 ft', value: '22' },
+  { label: '24 ft', value: '24' },
+  { label: '28 ft', value: '28' },
+  { label: '32 ft', value: '32' },
+];
+
+const DHALA_LENGTH_OPTIONS = DHALA_LENGTHS.map(item => ({
+  id: item.value,
+  label: item.label,
+}));
+// Body Type options with images
+const BODY_TYPES = [
+  {
+    label: 'Close with Tarpaulin',
+    value: 'close_tarpaulin',
+    // image: require('@assets/images/close_tarpaulin.png'), // Add your image paths
+    description: 'Closed body with tarpaulin cover',
+  },
+  {
+    label: 'Close Body Container',
+    value: 'close_body_container',
+    // image: require('@assets/images/close_body_container.png'),
+    description: 'Fully enclosed container',
+  },
+  {
+    label: 'Open Body',
+    value: 'open_body',
+    // image: require('@assets/images/open_body.png'),
+    description: 'Open body truck',
+  },
+  {
+    label: 'Open Platform',
+    value: 'open_platform',
+    // image: require('@assets/images/open_platform.png'),
+    description: 'Flat platform without sides',
+  },
+];
 
 const FirstStep: React.FC = () => {
+  const { showSnackbar } = useSnackbar();
   const navigation = useNavigation();
   const pickupModalRef = useRef<PickupModalRef>(null);
   const dropModalRef = useRef<DropModalRef>(null);
   const vehicleModalRef = useRef<SelectionModalRef>(null);
-  const weightModalRef = useRef<SelectionModalRef>(null);
+  const dhalaLengthModalRef = useRef<SelectionModalRef>(null);
+  const bodyTypeModalRef = useRef<SelectionModalRef>(null);
 
   const { values, errors, setFieldValue, touched } =
     useFormikContext<ShipmentData>();
 
   console.log(values, errors, touched);
 
-  const [getTruck, { data: truckTypesData }] =
-    useGetTruckTypemutationMutation();
-  const { data: ApproximateWeight } = useGetAproximateWeightQuery(
-    { vehicleType: values?.vehicle?.vehicleType },
-    { skip: !values?.vehicle?.vehicleType },
-  );
-  console.log({ ApproximateWeight });
+  // const [getTruck, { data: truckTypesData }] =
+  //   useGetTruckTypemutationMutation();
+
   useLayoutEffect(() => {
-    getTruck();
+    // getTruck();
   }, [navigation]);
 
-  // Truck type
-  const truckTypes =
-    truckTypesData?.data?.map((truck: any) => ({
-      id: truck?.VehicleType?.toLowerCase()?.replace(' ', '-'),
-      label: truck.VehicleType,
-      image: { uri: truck?.img },
-      description: truck.WeightRange,
-      color: '#EF476F',
-    })) || [];
-  console.log(truckTypes, 'trucktype in first');
-  const showVoluminousCheckbox = useMemo(() => {
-    const type = values.vehicle.vehicleType?.toLowerCase();
-    return type === 'medium' || type === 'multiaxle' || type === 'multi axle';
-  }, [values.vehicle.vehicleType]);
-  const selectedTruckType = useMemo(
-    () =>
-      truckTypesData?.data.find(
-        truck => truck.VehicleType === values.vehicle.vehicleType,
-      ),
-    [truckTypesData, values.vehicle.vehicleType],
-  );
+  const BODY_TYPE_OPTIONS = BODY_TYPES.map(type => ({
+    id: type.value, // "open_body"
+    label: type.label, // "Open Body"
+    image: type.image,
+    description: type.description,
+  }));
 
-  // Weight type
-  const weightTypes =
-    ApproximateWeight?.data?.map((weight: any) => ({
-      id: weight?.WeightRange?.toLowerCase()?.replace(' ', '-'),
-      label: weight?.WeightRange,
-      image: { uri: weight?.img },
-      color: '#3B82F6',
-    })) || [];
+  const rawWeightRange = values.vehicle.approximateWeightKg;
+  const debouncedWeightRange = useDebounce(rawWeightRange, 600);
+  const vehicleType = values.vehicle.vehicleType;
+  const BodyType = values.load?.bodyType;
 
-  const selectedWeightType: any = useMemo(
-    () =>
-      ApproximateWeight?.data.find(
-        weight => weight.WeightRange === values.vehicle.weightRange,
-      ),
-    [ApproximateWeight, values.vehicle.weightRange],
-  );
-  const weightLimits = useMemo(() => {
-    if (!values.vehicle.weightRange) return null;
-
-    const match = values.vehicle.weightRange.match(/(\d+)\s*-\s*(\d+)/);
-    if (!match) return null;
+  const vehicleQueryParams = useMemo(() => {
+    if (!debouncedWeightRange) return null;
 
     return {
-      min: Number(match[1]),
-      max: Number(match[2]),
+      weightRange: debouncedWeightRange,
+      // ...(values.vehicle.vehicleType && {
+      //   vehicleType: values.vehicle.vehicleType,
+      // }),
+      // ...(values.load?.bodyType && {
+      //   bodyType: values.load.bodyType,
+      // }),
     };
-  }, [values.vehicle.weightRange]);
+  }, [debouncedWeightRange]);
+
+  const { data, currentData, isError } = useGetVehicleTypesQuery(
+    vehicleQueryParams,
+    {
+      skip: !vehicleQueryParams,
+    },
+  );
+  const vehicleTypesData = currentData ?? data;
+
+  const { data: bodytypedata } = useGetBodytypesQuery({
+    weightRange: rawWeightRange,
+    vehicleType,
+  });
+
+  const { data: dhalalength, originalArgs } = useGetdhalalengthQuery({
+    weightRange: rawWeightRange,
+    vehicleType,
+    BodyType,
+  });
+  console.log(
+    '____',
+    // bodytypedata,
+    // vehicleTypesData,
+    // originalArgs,
+    dhalalength,
+    originalArgs,
+  );
+  useEffect(() => {
+    if (isError) {
+      showSnackbar(
+        `Something went wrong (${error?.originalStatus ?? 'Unknown'})`,
+        { variant: 'error' },
+      );
+    }
+  }, [isError]);
+
+  // if (error)
+  //   return (
+  //     <>s
+  //       {' '}
+  //       <Snackbar
+  //         visible={visible}
+  //         onDismiss={onDismissSnackBar}
+  //         action={{
+  //           label: 'Undo',
+  //           onPress: () => {
+  //             onToggleSnackBar();
+  //             // Do something
+  //           },
+  //         }}
+  //       >
+  //         {error?.originalStatus}
+  //       </Snackbar>
+  //     </>
+  //   );
+
+  const vehicleOptions = useMemo(() => {
+    const options =
+      vehicleTypesData?.data
+        ?.filter(item => item.VehicleType)
+        .map(item => ({
+          id: item.VehicleType,
+          label: item.VehicleType,
+          image: item.img,
+        })) ?? [];
+
+    // 🔐 keep selected vehicle
+    if (
+      values.vehicle.vehicleType &&
+      !options.some(o => o.id === values.vehicle.vehicleType)
+    ) {
+      options.unshift({
+        id: values.vehicle.vehicleType,
+        label: values.vehicle.vehicleType,
+      });
+    }
+
+    return options;
+  }, [vehicleTypesData, values.vehicle.vehicleType]);
+
+  console.log({ vehicleOptions });
+  // const bodyTypeOptions = useMemo(() => {
+  //   if (!vehicleTypesData?.data || !values.vehicle.vehicleType) return [];
+
+  //   return vehicleTypesData.data
+  //     .filter(v => v.VehicleType === values.vehicle.vehicleType)
+  //     .map(v => ({
+  //       id: v.BodyType,
+  //       label: v.BodyType,
+  //       image: v.img,
+  //     }));
+  // }, [vehicleTypesData, values.vehicle.vehicleType]);
+
+  // Truck type - filtered by approximate weight
+  // const truckTypes = useMemo(() => {
+  //   const weight = parseInt(values.vehicle.approximateWeightKg) || 0;
+
+  //   if (!truckTypesData?.data) return [];
+
+  //   // Filter truck types based on weight capacity
+  //   return truckTypesData.data
+  //     .filter((truck: any) => {
+  //       // Parse weight range from truck.WeightRange (e.g., "1-5 tons" or "1000-5000 kg")
+  //       const weightRange = truck.WeightRange?.toLowerCase();
+  //       if (!weightRange) return true;
+
+  //       // Extract min and max weight
+  //       const match = weightRange.match(/(\d+)\s*[-–]\s*(\d+)/);
+  //       if (!match) return true;
+
+  //       const minWeight = parseInt(match[1]);
+  //       const maxWeight = parseInt(match[2]);
+
+  //       // Check if weight is in range (convert tons to kg if needed)
+  //       const isTons = weightRange.includes('ton');
+  //       if (isTons) {
+  //         const weightInTons = weight / 1000;
+  //         return weightInTons >= minWeight && weightInTons <= maxWeight;
+  //       }
+
+  //       return weight >= minWeight && weight <= maxWeight;
+  //     })
+  //     .map((truck: any) => ({
+  //       id: truck?.VehicleType?.toLowerCase()?.replace(' ', '-'),
+  //       label: truck.VehicleType,
+  //       image: { uri: truck?.img },
+  //       description: truck.WeightRange,
+  //       color: '#EF476F',
+  //     }));
+  // }, [truckTypesData, values.vehicle.approximateWeightKg]);
+
+  // console.log(truckTypes, 'filtered trucktype');
+  const selectedVehicle = useMemo(
+    () =>
+      vehicleTypesData?.data.find(
+        v => v.VehicleType === values.vehicle.vehicleType,
+      ),
+    [vehicleTypesData, values.vehicle.vehicleType],
+  );
+
+  // console.log(
+  //   '____',
+
+  //   selectedVehicle,
+  //   values.vehicle.vehicleType,
+  //   vehicleTypesData,
+  // );
+  // Get selected dhala length label
+
+  // Get selected body type label
+
+  console.log({ selectedBodyType }, values.load.bodyType);
+
   const handleOpenVehicleModal = useCallback(
     () => vehicleModalRef.current?.open(),
     [],
   );
-  const handleOpenWeightModal = useCallback(
-    () => weightModalRef.current?.open(),
-    [],
-  );
+
   const handleOpenPickupModal = useCallback(
     () => pickupModalRef.current?.open(),
     [],
@@ -120,9 +291,83 @@ const FirstStep: React.FC = () => {
     [],
   );
 
+  const handleOpenDhalaLengthModal = useCallback(
+    () => dhalaLengthModalRef.current?.open(),
+    [],
+  );
+
+  const handleOpenBodyTypeModal = useCallback(
+    () => bodyTypeModalRef.current?.open(),
+    [],
+  );
+
+  const bodyTypeOptions = useMemo(() => {
+    const options =
+      bodytypedata?.data
+        ?.filter(item => item.BodyType)
+        .map(item => ({
+          id: item.BodyType,
+          label: item.BodyType,
+          image: item.img, // 🔥 FIXED
+        })) ?? [];
+
+    if (
+      values.load?.bodyType &&
+      !options.some(o => o.id === values.load.bodyType)
+    ) {
+      options.unshift({
+        id: values.load.bodyType,
+        label: values.load.bodyType,
+      });
+    }
+
+    return options;
+  }, [bodytypedata, values.load?.bodyType]);
+
+  const selectedBodyType = useMemo(() => {
+    if (!values.load?.bodyType) return null;
+    return bodyTypeOptions.find(item => item.id === values.load.bodyType);
+  }, [bodyTypeOptions, values.load?.bodyType]);
+
+  const dhalaLengthOptions = useMemo(() => {
+    const options =
+      dhalalength?.data
+        ?.filter(item => item.DhalaLength)
+        .map(item => ({
+          id: item.DhalaLength,
+          label: item.DhalaLength,
+        })) ?? [];
+
+    // keep selected value if already chosen
+    if (
+      values.load?.dhalaLength &&
+      !options.some(o => o.id === values.load.dhalaLength)
+    ) {
+      options.unshift({
+        id: values.load.dhalaLength,
+        label: values.load.dhalaLength,
+      });
+    }
+
+    return options;
+  }, [dhalalength, values.load?.dhalaLength]);
+
+  const selectedDhalaLength = useMemo(() => {
+    if (!values.load?.dhalaLength) return null;
+    return dhalaLengthOptions.find(item => item.id === values.load.dhalaLength);
+  }, [dhalaLengthOptions, values.load?.dhalaLength]);
+
+  console.log(
+    '-------',
+    { bodyTypeOptions },
+    { vehicleOptions },
+    { dhalaLengthOptions },
+  );
   // Determine border colors based on errors + touched
   const pickupBorderColor =
-    touched.pickup?.origin && errors.pickup?.origin ? '#ef4444' : '#d1d5db';
+    touched.pickup?.origin?.address && errors.pickup?.origin?.address
+      ? '#ef4444'
+      : '#d1d5db';
   const deliveryBorderColor =
     touched.delivery?.destination && errors.delivery?.destination
       ? '#ef4444'
@@ -133,11 +378,17 @@ const FirstStep: React.FC = () => {
       : values.vehicle.vehicleType
       ? '#EF476F'
       : '#d1d5db';
-  const weightBorderColor =
-    touched.vehicle?.weightRange && errors.vehicle?.weightRange
+  const dhalaLengthBorderColor =
+    touched.load?.dhalaLength && errors.load?.dhalaLength
       ? '#ef4444'
-      : values.vehicle.weightRange
-      ? '#3B82F6'
+      : values.load?.dhalaLength
+      ? '#4F46E5'
+      : '#d1d5db';
+  const bodyTypeBorderColor =
+    touched.load?.bodyType && errors.load?.bodyType
+      ? '#ef4444'
+      : values.load?.bodyType
+      ? '#10B981'
       : '#d1d5db';
 
   return (
@@ -161,7 +412,7 @@ const FirstStep: React.FC = () => {
           <View style={tw`flex-row items-center mb-2`}>
             <View style={tw`w-2 h-4 bg-blue-500 mr-2 rounded-full`} />
             <Text style={tw`text-base font-bold text-gray-800`}>
-              Pickup Deails
+              Pickup Address
             </Text>
           </View>
 
@@ -230,6 +481,9 @@ const FirstStep: React.FC = () => {
                         values.pickup.state,
                         values.pickup.district,
                         values.pickup.taluka,
+                        values.pickup?.alternateNo &&
+                          `Alternate Contact: ${values.pickup?.alternateNo}`,
+                        //s `Alternate Contact: 7506122183`,
                       ]
                         .filter(Boolean)
                         .join(', ')}
@@ -266,7 +520,7 @@ const FirstStep: React.FC = () => {
           <View style={tw`flex-row items-center mb-2`}>
             <View style={tw`w-2 h-4 bg-red-500 mr-2 rounded-full`} />
             <Text style={tw`text-base font-bold text-gray-800`}>
-              Delivery Details
+              Delivery Address
             </Text>
           </View>
 
@@ -286,7 +540,7 @@ const FirstStep: React.FC = () => {
                     {values.delivery.contactNumber || 'Consignee'}
                   </Text>
 
-                  <Text style={tw`text-sm text-gray-800 font-Medium`}>
+                  <Text style={tw`text-sm text-gray-800 font-medium`}>
                     {values.delivery.plotOrBuilding},{' '}
                     {values.delivery.streetArea}
                   </Text>
@@ -323,82 +577,56 @@ const FirstStep: React.FC = () => {
             </Text>
           )}
         </View>
+
+        {/* Approximate Weight Input */}
         <View
           style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
         >
-          <View style={tw`flex-row items-center mb-2`}>
+          <View style={tw`flex-row items-center mb-3`}>
             <View style={tw`w-2 h-4 bg-purple-500 mr-2 rounded-full`} />
             <Text style={tw`text-base font-bold text-gray-800`}>
-              Weight Range
+              Approximate Weight (kg)
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={[
-              tw`p-3 border-2  rounded-lg`,
-              {
-                borderColor: weightBorderColor,
-                backgroundColor: values.vehicle.weightRange
-                  ? '#3B82F620'
-                  : '#f9fafb',
-              },
-            ]}
-            onPress={handleOpenWeightModal}
-            disabled={!values.vehicle.vehicleType}
-            activeOpacity={0.7}
-          >
-            {values.vehicle.weightRange ? (
-              <View style={tw`flex-row items-center gap-3`}>
-                <Image
-                  source={
-                    selectedWeightType?.img
-                      ? { uri: selectedWeightType?.img }
-                      : undefined
-                  }
-                  style={tw`w-12 h-12`}
-                  resizeMode="contain"
-                />
-                <View style={tw`flex-1`}>
-                  <Text style={tw`text-sm font-bold text-gray-800`}>
-                    {selectedWeightType?.WeightRange}
+          <View style={tw`flex-row items-center`}>
+            <View style={tw`flex-1`}>
+              <TextInput
+                style={[
+                  tw`border border-gray-300 rounded-lg p-3 text-gray-800 text-base`,
+                  touched.vehicle?.approximateWeightKg &&
+                    errors.vehicle?.approximateWeightKg &&
+                    tw`border-red-500`,
+                ]}
+                value={values.vehicle.approximateWeightKg ?? ''}
+                onChangeText={text => {
+                  setFieldValue('vehicle.approximateWeightKg', text);
+                  // Clear vehicle type when weight changes
+                  setFieldValue('vehicle.vehicleType', '');
+                  setFieldValue('load.bodyType', '');
+                  setFieldValue('load.dhalaLength', '');
+                }}
+                placeholder="Enter approximate weight in kilograms"
+                keyboardType="numeric"
+                placeholderTextColor="#9CA3AF"
+              />
+              {errors.vehicle?.approximateWeightKg &&
+                touched.vehicle?.approximateWeightKg && (
+                  <Text style={styles.errorText}>
+                    {errors.vehicle.approximateWeightKg}
                   </Text>
-                </View>
-                <Icon
-                  name="keyboard-arrow-down"
-                  size={20}
-                  color={tw.color('gray-500')}
-                />
-              </View>
-            ) : (
-              <View style={tw`flex-row items-center gap-3`}>
-                <View style={tw`bg-gray-200 p-2 rounded-full`}>
-                  <Icon name="fitness-center" size={16} color="#6B7280" />
-                </View>
-                <Text style={tw`text-gray-500 text-sm flex-1`}>
-                  {values.vehicle.vehicleType
-                    ? 'Select Weight Range'
-                    : 'Select vehicle type first'}
-                </Text>
-                <Icon
-                  name="keyboard-arrow-down"
-                  size={20}
-                  color={
-                    values.vehicle.vehicleType
-                      ? tw.color('gray-500')
-                      : tw.color('gray-300')
-                  }
-                />
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {errors.vehicle?.weightRange && touched.vehicle?.weightRange && (
-            <Text style={styles.errorText}>
-              {errors.vehicle.weightRange as string}
-            </Text>
-          )}
+                )}
+            </View>
+            <View style={tw`ml-3 bg-gray-100 px-3 py-3 rounded-lg`}>
+              <Text style={tw`text-gray-600 font-medium`}>kg</Text>
+            </View>
+          </View>
+          {/* <Text style={tw`text-sm text-gray-500 mt-2`}>
+            Enter the approximate weight to see available vehicle segments
+          </Text> */}
         </View>
-        {/* Vehicle Type */}
+
+        {/* Vehicle Segment */}
         <View
           style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
         >
@@ -421,13 +649,14 @@ const FirstStep: React.FC = () => {
             ]}
             onPress={handleOpenVehicleModal}
             activeOpacity={0.7}
+            disabled={!values.vehicle.approximateWeightKg}
           >
             {values.vehicle.vehicleType ? (
               <View style={tw`flex-row items-center gap-2`}>
                 <Image
                   source={
-                    selectedTruckType?.img
-                      ? { uri: selectedTruckType?.img }
+                    selectedVehicle?.img
+                      ? { uri: selectedVehicle?.img }
                       : undefined
                   }
                   style={tw`w-12 h-12`}
@@ -435,10 +664,10 @@ const FirstStep: React.FC = () => {
                 />
                 <View style={tw`flex-1`}>
                   <Text style={tw`text-sm font-bold text-gray-800`}>
-                    {selectedTruckType?.VehicleType}
+                    {selectedVehicle?.VehicleType}
                   </Text>
                   <Text style={tw`text-xs text-gray-600 mt-1`}>
-                    {selectedTruckType?.WeightRange}
+                    {selectedVehicle?.WeightRange}
                   </Text>
                 </View>
                 <Icon
@@ -453,12 +682,18 @@ const FirstStep: React.FC = () => {
                   <Icon name="directions-car" size={16} color="#6B7280" />
                 </View>
                 <Text style={tw`text-gray-500 text-sm flex-1`}>
-                  Select vehicle type
+                  {values.vehicle.approximateWeightKg
+                    ? 'Select vehicle type'
+                    : 'Enter weight first'}
                 </Text>
                 <Icon
                   name="keyboard-arrow-down"
                   size={20}
-                  color={tw.color('gray-500')}
+                  color={
+                    values.vehicle.approximateWeightKg
+                      ? tw.color('gray-500')
+                      : tw.color('gray-300')
+                  }
                 />
               </View>
             )}
@@ -470,75 +705,151 @@ const FirstStep: React.FC = () => {
             </Text>
           )}
         </View>
-
-        {/* Weight Range Selection */}
-
-        {showVoluminousCheckbox && (
+        {/* Body Type Selection (Dropdown with Images) */}
+        {values.vehicle.vehicleType && (
           <View
             style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
           >
-            <View style={tw`flex-row items-center justify-between`}>
-              <Text style={tw`text-sm font-medium text-gray-800`}>
-                Is Voluminous?
+            <View style={tw`flex-row items-center mb-2`}>
+              <View style={tw`w-2 h-4 bg-teal-500 mr-2 rounded-full`} />
+              <Text style={tw`text-base font-bold text-gray-800`}>
+                Body Type
               </Text>
-
-              <Checkbox
-                status={values?.vehicle?.isVoluminous ? 'checked' : 'unchecked'}
-                onPress={() =>
-                  setFieldValue(
-                    'values.vehicle.isVoluminous',
-                    !values.vehicle.isVoluminous,
-                  )
-                }
-              />
             </View>
+
+            <TouchableOpacity
+              style={[
+                tw`p-3 border-2 rounded-lg`,
+                {
+                  borderColor: bodyTypeBorderColor,
+                  backgroundColor: values.load?.bodyType
+                    ? '#10B98110'
+                    : '#f9fafb',
+                },
+              ]}
+              onPress={handleOpenBodyTypeModal}
+              activeOpacity={0.7}
+            >
+              {values.load?.bodyType ? (
+                <View style={tw`flex-row items-center justify-between`}>
+                  <View style={tw`flex-row items-center gap-2`}>
+                    {selectedBodyType?.image && (
+                      <Image
+                        source={{ uri: selectedBodyType.image }}
+                        style={tw`w-10 h-10`}
+                        resizeMode="contain"
+                      />
+                    )}
+                    <View>
+                      <Text style={tw`text-sm font-medium text-gray-800`}>
+                        {selectedBodyType?.label}
+                      </Text>
+                      {selectedBodyType?.description && (
+                        <Text style={tw`text-xs text-gray-600`}>
+                          {selectedBodyType.description}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <Icon
+                    name="keyboard-arrow-down"
+                    size={20}
+                    color={tw.color('gray-500')}
+                  />
+                </View>
+              ) : (
+                <View style={tw`flex-row items-center justify-between`}>
+                  <View style={tw`flex-row items-center gap-2`}>
+                    <View style={tw`bg-gray-200 p-2 rounded-full`}>
+                      <Icon name="local-shipping" size={16} color="#6B7280" />
+                    </View>
+                    <Text style={tw`text-gray-500 text-sm`}>
+                      Select body type
+                    </Text>
+                  </View>
+                  <Icon
+                    name="keyboard-arrow-down"
+                    size={20}
+                    color={tw.color('gray-500')}
+                  />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {errors.load?.bodyType && touched.load?.bodyType && (
+              <Text style={styles.errorText}>
+                {errors.load.bodyType as string}
+              </Text>
+            )}
           </View>
         )}
-
-        {/* Exact Weight Input */}
-        <View
-          style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs`}
-        >
-          <View style={tw`flex-row items-center mb-3`}>
-            <View style={tw`w-2 h-4 bg-indigo-500 mr-2 rounded-full`} />
-            <Text style={tw`text-base font-bold text-gray-800`}>
-              Approximate Weight (kg)
-            </Text>
-          </View>
-
-          <View style={tw`flex-row items-center`}>
-            <View style={tw`flex-1`}>
-              <TextInput
-                style={[
-                  tw`border border-gray-300 rounded-lg p-3 text-gray-800 text-base`,
-                  touched.vehicle?.approximateWeightKg &&
-                    errors.vehicle?.approximateWeightKg &&
-                    tw`border-red-500`,
-                ]}
-                value={values.vehicle.approximateWeightKg}
-                onChangeText={text =>
-                  setFieldValue('vehicle.approximateWeightKg', text)
-                }
-                placeholder={
-                  weightLimits
-                    ? `Enter weight between ${weightLimits.min}-${weightLimits.max} kg`
-                    : 'Enter exact weight in kilograms'
-                }
-                keyboardType="numeric"
-                placeholderTextColor="#9CA3AF"
-              />
-              {errors.vehicle?.approximateWeightKg &&
-                touched.vehicle?.approximateWeightKg && (
-                  <Text style={styles.errorText}>
-                    {errors.vehicle.approximateWeightKg}
-                  </Text>
-                )}
+        {/* Dhala Length Selection (Dropdown) */}
+        {values.vehicle.vehicleType && (
+          <View
+            style={tw`bg-white p-3 rounded-xl border border-gray-100 shadow-xs mb-3`}
+          >
+            <View style={tw`flex-row items-center mb-2`}>
+              <View style={tw`w-2 h-4 bg-indigo-500 mr-2 rounded-full`} />
+              <Text style={tw`text-base font-bold text-gray-800`}>
+                Dhala Length
+              </Text>
             </View>
-            <View style={tw`ml-3 bg-gray-100 px-3 py-3 rounded-lg`}>
-              <Text style={tw`text-gray-600 font-medium`}>kg</Text>
-            </View>
+
+            <TouchableOpacity
+              style={[
+                tw`p-3 border-2 rounded-lg`,
+                {
+                  borderColor: dhalaLengthBorderColor,
+                  backgroundColor: values.load?.dhalaLength
+                    ? '#4F46E510'
+                    : '#f9fafb',
+                },
+              ]}
+              onPress={handleOpenDhalaLengthModal}
+              activeOpacity={0.7}
+            >
+              {values.load?.dhalaLength ? (
+                <View style={tw`flex-row items-center justify-between`}>
+                  <View style={tw`flex-row items-center gap-2`}>
+                    <View style={tw`bg-indigo-100 p-2 rounded-full`}>
+                      <Icon name="straighten" size={16} color="#4F46E5" />
+                    </View>
+                    <Text style={tw`text-sm font-medium text-gray-800`}>
+                      {selectedDhalaLength?.label}
+                    </Text>
+                  </View>
+                  <Icon
+                    name="keyboard-arrow-down"
+                    size={20}
+                    color={tw.color('gray-500')}
+                  />
+                </View>
+              ) : (
+                <View style={tw`flex-row items-center justify-between`}>
+                  <View style={tw`flex-row items-center gap-2`}>
+                    <View style={tw`bg-gray-200 p-2 rounded-full`}>
+                      <Icon name="straighten" size={16} color="#6B7280" />
+                    </View>
+                    <Text style={tw`text-gray-500 text-sm`}>
+                      Select dhala length
+                    </Text>
+                  </View>
+                  <Icon
+                    name="keyboard-arrow-down"
+                    size={20}
+                    color={tw.color('gray-500')}
+                  />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {errors.load?.dhalaLength && touched.load?.dhalaLength && (
+              <Text style={styles.errorText}>
+                {errors.load.dhalaLength as string}
+              </Text>
+            )}
           </View>
-        </View>
+        )}
       </ScrollView>
 
       {/* Modals */}
@@ -547,23 +858,33 @@ const FirstStep: React.FC = () => {
       <SelectionModal
         ref={vehicleModalRef}
         title="Select Vehicle Type"
-        options={truckTypes}
+        options={vehicleOptions}
         selectedValue={values.vehicle.vehicleType}
-        onSelect={(vehicleType: any) => {
-          setFieldValue('vehicle.vehicleType', vehicleType);
-          setFieldValue('vehicle.weightRange', '');
-          setFieldValue('isVoluminous', false);
+        onSelect={(id: any) => {
+          setFieldValue('vehicle.vehicleType', id);
+
+          // ✅ clear only what depends on vehicleType
+          setFieldValue('load.bodyType', '');
+          setFieldValue('load.dhalaLength', '');
         }}
         numColumns={2}
       />
       <SelectionModal
-        key="weight"
-        ref={weightModalRef}
-        title="Select Weight Range"
-        options={weightTypes}
-        selectedValue={values.vehicle.weightRange}
-        onSelect={(weight: any) => setFieldValue('vehicle.weightRange', weight)}
-        numColumns={2}
+        ref={dhalaLengthModalRef}
+        title="Select Dhala Length"
+        options={dhalaLengthOptions}
+        selectedValue={values.load?.dhalaLength}
+        onSelect={value => setFieldValue('load.dhalaLength', value)}
+      />
+      <SelectionModal
+        ref={bodyTypeModalRef}
+        title="Select Body Type"
+        options={bodyTypeOptions}
+        selectedValue={values.load?.bodyType}
+        onSelect={value => {
+          setFieldValue('load.bodyType', value);
+          setFieldValue('load.dhalaLength', ''); // clear only child
+        }}
       />
     </KeyboardAvoidingView>
   );

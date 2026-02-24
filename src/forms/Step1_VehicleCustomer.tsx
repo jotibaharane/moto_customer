@@ -1,4 +1,3 @@
-// Step1_VehicleCustomer.tsx
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
@@ -35,6 +34,7 @@ const LocationCard: React.FC<{
   onEdit: () => void;
   type: 'pickup' | 'drop';
 }> = ({ title, values, onEdit, type }) => {
+  console.log({ values });
   const prefix = type;
 
   return (
@@ -68,24 +68,24 @@ const LocationCard: React.FC<{
         </View>
 
         {/* Phone - label and value in same row */}
-        <View style={styles.fieldRow}>
+        {/* <View style={styles.fieldRow}>
           <Text variant="labelSmall" style={styles.fieldLabel}>
             PHONE
           </Text>
           <Text variant="bodyMedium" style={styles.fieldValue}>
             {values[`${prefix}Phone`] || '—'}
           </Text>
-        </View>
+        </View> */}
 
         {/* GST - label and value in same row */}
-        {/* <View style={styles.fieldRow}>
+        <View style={styles.fieldRow}>
           <Text variant="labelSmall" style={styles.fieldLabel}>
             GST NO
           </Text>
           <Text variant="bodyMedium" style={styles.fieldValue}>
             {values[`${prefix}Gst`] || 'Not specified'}
           </Text>
-        </View> */}
+        </View>
 
         {/* Address Line 1 - label and value in same row */}
         <View style={styles.fieldRow}>
@@ -98,16 +98,15 @@ const LocationCard: React.FC<{
         </View>
 
         {/* Address Line 2 - only show if exists */}
-        {values[`${prefix}Address2`] && (
-          <View style={styles.fieldRow}>
-            <Text variant="labelSmall" style={styles.fieldLabel}>
-              ADDRESS 2
-            </Text>
-            <Text variant="bodyMedium" style={styles.fieldValue}>
-              {values[`${prefix}Address2`]}
-            </Text>
-          </View>
-        )}
+
+        <View style={styles.fieldRow}>
+          <Text variant="labelSmall" style={styles.fieldLabel}>
+            ADDRESS 2
+          </Text>
+          <Text variant="bodyMedium" style={styles.fieldValue}>
+            {values[`${prefix}Address2`]}
+          </Text>
+        </View>
 
         {/* Google Address - only show if exists */}
         {/* {values[`${prefix}Google`] && (
@@ -254,7 +253,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
               />
 
               {/* Google Address */}
-              <TextInput
+              {/* <TextInput
                 label="Google Address"
                 value={values[`${prefix}Google`] || ''}
                 onChangeText={t => setFieldValue(`${prefix}Google`, t)}
@@ -262,7 +261,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                 multiline
                 numberOfLines={3}
                 style={styles.input}
-              />
+              /> */}
 
               {/* City */}
               <TextInput

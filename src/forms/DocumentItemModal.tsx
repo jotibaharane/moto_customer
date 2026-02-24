@@ -85,6 +85,7 @@ export type DocumentItem =
   | ChallanItem
   | BillOfEntryItem
   | StockTransferItem;
+
 export type DocumentType =
   | 'invoice'
   | 'challan'
@@ -559,7 +560,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
       case 'challan':
         return 'Challan Details';
       case 'bill-of-entry':
-        return 'Bill of Entry Details';
+        return 'Bill of Entry Details / AirwayBill';
       case 'Stock-transfer':
         return 'Stock Transfer Details';
     }
@@ -593,10 +594,10 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
       case 'Stock-transfer':
         if (tempItems.length === 0)
           return ['Transfer No', 'Qty/Weight', 'Value', 'Action'];
-        // const firstItem = tempItems[0] as StockTransferItem;
+        const firstStock = tempItems[0] as StockTransferItem;
         return [
           'Transfer No',
-          firstItem.unit === 'pcs' ? 'Quantity' : 'Weight',
+          firstStock?.unit === 'pcs' ? 'Quantity' : 'Weight',
           'Value',
           'Action',
         ];
@@ -851,7 +852,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             <View style={styles.formRow}>
               <View style={styles.fullWidthColumn}>
                 <TextInput
-                  label="Material Type"
+                  label="Material / Product Name"
                   value={invoiceItem?.materialType || ''}
                   onChangeText={t => handleItemChange('materialType', t)}
                   mode="outlined"
@@ -1007,7 +1008,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             <View style={styles.formRow}>
               <View style={[styles.formColumn, styles.formColumnGap]}>
                 <TextInput
-                  label="Material Type"
+                  label="Material /Product Name"
                   value={challanItem?.materialType || ''}
                   onChangeText={t => handleItemChange('materialType', t)}
                   mode="outlined"
@@ -1282,7 +1283,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             <View style={styles.formRow}>
               <View style={styles.fullWidthColumn}>
                 <TextInput
-                  label="Material Details"
+                  label="Material / Product Name"
                   value={boeItem?.materialType || ''}
                   onChangeText={t => handleItemChange('materialType', t)}
                   mode="outlined"
@@ -1463,7 +1464,7 @@ const DocumentItemModal: React.FC<DocumentItemModalProps> = ({
             <View style={styles.formRow}>
               <View style={styles.fullWidthColumn}>
                 <TextInput
-                  label="Material Type"
+                  label="Material / Product Name"
                   value={StockItem?.materialType || ''}
                   onChangeText={t => handleItemChange('materialType', t)}
                   mode="outlined"

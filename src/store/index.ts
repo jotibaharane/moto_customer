@@ -18,10 +18,12 @@ import {
 import authReducer from './slices/authSlice';
 import loadPostFormReducer from './slices/loadPostFormSlice';
 import mapReducer from './slices/mapSlice';
+import vehicleSheetReducer from './slices/VehicleSheet';
 const rootReducer = combineReducers({
   auth: authReducer,
   map: mapReducer,
   loadPostForm: loadPostFormReducer,
+  vehicleSheet: vehicleSheetReducer,
   [baseApi.reducerPath]: baseApi.reducer,
 });
 

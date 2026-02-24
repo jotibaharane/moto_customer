@@ -387,6 +387,59 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
 
         <Card style={styles.card}>
           <Card.Content>
+            {/* <Text style={tw`text-gray-700 mb-2`}>Delivery Location</Text> */}
+
+            {/* <View style={tw`flex-row justify-between mt-4`}>
+              <ActionButton
+                icon={
+                  <Entypo
+                    name="map"
+                    size={18}
+                    color={
+                      activeDestinationButton === 'map'
+                        ? '#fff'
+                        : tw.color('purple-600')
+                    }
+                  />
+                }
+                text="Map"
+                onPress={() => {
+                  setFieldName('delivery');
+                  setActiveDestinationButton('map');
+                  setShowMap(true);
+                }}
+                color={
+                  activeDestinationButton === 'map'
+                    ? tw.color('purple-600') || ''
+                    : 'transparent'
+                }
+                style={tw`border border-purple-600 `}
+              />
+            </View> */}
+            <TextInput
+              mode="outlined"
+              label="Contact Mobile Number *"
+              style={styles.input}
+              placeholder="Enter mobile number"
+              value={values.delivery.contactNumber}
+              onChangeText={text => {
+                setFieldValue('delivery.contactNumber', text);
+                if (fieldErrors.contactNumber) {
+                  setFieldErrors(prev => ({
+                    ...prev,
+                    contactNumber: '',
+                  }));
+                }
+              }}
+              keyboardType="numeric"
+              maxLength={10}
+              error={!!fieldErrors.contactNumber}
+            />
+            {fieldErrors.contactNumber && (
+              <HelperText type="error" visible={true}>
+                {fieldErrors.contactNumber}
+              </HelperText>
+            )}
             <TextInput
               mode="outlined"
               label="Consignee / Company Name *"
@@ -436,28 +489,82 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
                 {fieldErrors.contactPerson}
               </HelperText>
             )}
+
+            <SelectList
+              data={destinationPlaces?.suggestions}
+              displayKey="value"
+              value={values.delivery.destination?.address}
+              save="object"
+              setSelected={handleDestinationSelect}
+              placeholder="Google Address"
+              search={true}
+              onSearchChange={destinationPlaces.handleInputChange}
+              searchValue={destinationPlaces.inputValue}
+              onClear={() => {
+                setFieldValue('delivery.destination', {
+                  address: '',
+                  components: {
+                    dist: '',
+                    pincode: '',
+                    place: '',
+                    state: '',
+                    tal: '',
+                  },
+                  coordinates: {
+                    lat: 0,
+                    lng: 0,
+                  },
+                });
+              }}
+              inputStyles={tw`border-gray-200`}
+            />
             <TextInput
               mode="outlined"
-              label="Contact Mobile Number *"
+              label="Plot No/ Unit No/ Building / Flat / Company"
               style={styles.input}
-              placeholder="Enter mobile number"
-              value={values.delivery.contactNumber}
+              placeholder="Enter plot/unit number"
+              value={values.delivery.plotOrBuilding}
+              error={!!fieldErrors.plotOrBuilding}
               onChangeText={text => {
-                setFieldValue('delivery.contactNumber', text);
-                if (fieldErrors.contactNumber) {
+                setFieldValue('delivery.plotOrBuilding', text);
+
+                // ✅ clear error when user starts typing
+                if (fieldErrors.plotOrBuilding) {
                   setFieldErrors(prev => ({
                     ...prev,
-                    contactNumber: '',
+                    plotOrBuilding: '',
                   }));
                 }
               }}
-              keyboardType="numeric"
-              maxLength={10}
-              error={!!fieldErrors.contactNumber}
             />
-            {fieldErrors.contactNumber && (
+            {fieldErrors.plotOrBuilding && (
               <HelperText type="error" visible={true}>
-                {fieldErrors.contactNumber}
+                {fieldErrors.plotOrBuilding}
+              </HelperText>
+            )}
+
+            <TextInput
+              mode="outlined"
+              label="Area/Street/Sector/Village"
+              style={styles.input}
+              placeholder="Enter area details"
+              value={values.delivery.streetArea}
+              error={!!fieldErrors.streetArea}
+              onChangeText={text => {
+                setFieldValue('delivery.streetArea', text);
+
+                // ✅ clear error when user starts typing
+                if (fieldErrors.streetArea) {
+                  setFieldErrors(prev => ({
+                    ...prev,
+                    streetArea: '',
+                  }));
+                }
+              }}
+            />
+            {fieldErrors.streetArea && (
+              <HelperText type="error" visible={true}>
+                {fieldErrors.streetArea}
               </HelperText>
             )}
 
@@ -551,114 +658,6 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
                   </HelperText>
                 )}
               </View>
-            </View>
-
-            <TextInput
-              mode="outlined"
-              label="Plot No/ Unit No/ Building / Flat / Company"
-              style={styles.input}
-              placeholder="Enter plot/unit number"
-              value={values.delivery.plotOrBuilding}
-              error={!!fieldErrors.plotOrBuilding}
-              onChangeText={text => {
-                setFieldValue('delivery.plotOrBuilding', text);
-
-                // ✅ clear error when user starts typing
-                if (fieldErrors.plotOrBuilding) {
-                  setFieldErrors(prev => ({
-                    ...prev,
-                    plotOrBuilding: '',
-                  }));
-                }
-              }}
-            />
-            {fieldErrors.plotOrBuilding && (
-              <HelperText type="error" visible={true}>
-                {fieldErrors.plotOrBuilding}
-              </HelperText>
-            )}
-
-            <TextInput
-              mode="outlined"
-              label="Area/Street/Sector/Village"
-              style={styles.input}
-              placeholder="Enter area details"
-              value={values.delivery.streetArea}
-              error={!!fieldErrors.streetArea}
-              onChangeText={text => {
-                setFieldValue('delivery.streetArea', text);
-
-                // ✅ clear error when user starts typing
-                if (fieldErrors.streetArea) {
-                  setFieldErrors(prev => ({
-                    ...prev,
-                    streetArea: '',
-                  }));
-                }
-              }}
-            />
-            {fieldErrors.streetArea && (
-              <HelperText type="error" visible={true}>
-                {fieldErrors.streetArea}
-              </HelperText>
-            )}
-
-            <Text style={tw`text-gray-700 mb-2`}>Delivery Location</Text>
-            <SelectList
-              data={destinationPlaces?.suggestions}
-              displayKey="value"
-              value={values.delivery.destination?.address}
-              save="object"
-              setSelected={handleDestinationSelect}
-              placeholder="Google Address"
-              search={true}
-              onSearchChange={destinationPlaces.handleInputChange}
-              searchValue={destinationPlaces.inputValue}
-              onClear={() => {
-                setFieldValue('delivery.destination', {
-                  address: '',
-                  components: {
-                    dist: '',
-                    pincode: '',
-                    place: '',
-                    state: '',
-                    tal: '',
-                  },
-                  coordinates: {
-                    lat: 0,
-                    lng: 0,
-                  },
-                });
-              }}
-              inputStyles={tw`border-gray-200`}
-            />
-
-            <View style={tw`flex-row justify-between mt-4`}>
-              <ActionButton
-                icon={
-                  <Entypo
-                    name="map"
-                    size={18}
-                    color={
-                      activeDestinationButton === 'map'
-                        ? '#fff'
-                        : tw.color('purple-600')
-                    }
-                  />
-                }
-                text="Map"
-                onPress={() => {
-                  setFieldName('delivery');
-                  setActiveDestinationButton('map');
-                  setShowMap(true);
-                }}
-                color={
-                  activeDestinationButton === 'map'
-                    ? tw.color('purple-600') || ''
-                    : 'transparent'
-                }
-                style={tw`border border-purple-600 `}
-              />
             </View>
           </Card.Content>
         </Card>

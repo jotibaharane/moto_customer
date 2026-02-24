@@ -15,6 +15,8 @@ import {
   GetLoadPostLoaded,
   GetLoadPostReached,
   GetLoadPostRequest,
+  GetvehicleTypesRequest,
+  GetvehicleTypesResponse,
   InsertCustomerResponse,
   LoadPostApiLoadedResponse,
   LoadPostApiReachedResponse,
@@ -260,6 +262,36 @@ export const motoApi = baseApi.injectEndpoints({
         body,
       }),
     }),
+    GetVehicleTypes: builder.query<
+      GetvehicleTypesResponse,
+      { weightRange: string; vehicleType: string; BodyType: string }
+    >({
+      query: body => ({
+        url: '/get_Vehicle_Details_weightRange',
+        method: 'POST',
+        body,
+      }),
+    }),
+    GetBodytypes: builder.query<
+      GetvehicleTypesResponse,
+      { weightRange: string; vehicleType: string; BodyType: string }
+    >({
+      query: body => ({
+        url: '/get_Vehicle_Details_weightRange',
+        method: 'POST',
+        body,
+      }),
+    }),
+    getdhalalength: builder.query<
+      GetvehicleTypesResponse,
+      { weightRange: string; vehicleType: string; BodyType: string }
+    >({
+      query: body => ({
+        url: '/get_Vehicle_Details_weightRange',
+        method: 'POST',
+        body,
+      }),
+    }),
     CargoType_BodyType_History: builder.query<any, { CustomerID: string }>({
       query: ({ CustomerID }) => ({
         url: '/CargoType_BodyType_History',
@@ -267,6 +299,7 @@ export const motoApi = baseApi.injectEndpoints({
         body: { CustomerID },
       }),
     }),
+
     Loadpostaddress: builder.mutation<any, { LoadPostID: string }>({
       query: ({ LoadPostID }) => ({
         url: '/customer_post_address',
@@ -289,6 +322,20 @@ export const motoApi = baseApi.injectEndpoints({
         body: { CustomerID },
       }),
     }),
+    getCustomerAddress: builder.query<
+      any,
+      { CustomerID: string; CompanyType: string }
+    >({
+      query: ({ CustomerID, CompanyType }) => ({
+        url: '/get_Customer',
+        method: 'POST',
+        body: {
+          CustomerID,
+          CompanyType,
+        },
+      }),
+    }),
+
     getAproximateWeight: builder.query<
       WeightResponse,
       ApproximateWeightRequest
@@ -337,4 +384,8 @@ export const {
   useGetCustomerLoadedQuery,
   useGetCustomerLoadingQuery,
   useGetCustomerReachedQuery,
+  useGetCustomerAddressQuery,
+  useGetVehicleTypesQuery,
+  useGetBodytypesQuery,
+  useGetdhalalengthQuery,
 } = motoApi;

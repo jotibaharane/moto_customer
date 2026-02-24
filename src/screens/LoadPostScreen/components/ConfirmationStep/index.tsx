@@ -8,8 +8,6 @@ import { calculateDistance } from '@utils/distanceUtils';
 import { useFormikContext } from 'formik';
 import React, { useEffect, useState } from 'react';
 import { Animated, Image, StyleSheet, Text, View } from 'react-native';
-import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import tw from 'twrnc';
 
@@ -93,9 +91,9 @@ const ConfirmationStep: React.FC = () => {
   });
 
   return (
-    <Animated.ScrollView style={[tw`flex-1 bg-gray-50 p-1`]}>
+    <Animated.ScrollView style={[tw`flex-1 bg-gray-50 p-4`]}>
       {/* Main Shipment Card */}
-      <View style={[tw`bg-white mb-4  `, styles.card]}>
+      <View style={[tw`bg-white mb-4`, styles.card]}>
         {/* Location Section */}
         <View style={tw`p-6`}>
           {/* From Section */}
@@ -192,214 +190,164 @@ const ConfirmationStep: React.FC = () => {
             </View>
           </View>
         </View>
+      </View>
 
-        {/* Vehicle & Cargo Details with Images */}
-        <View style={tw`bg-gray-50 px-6 py-4 border-t border-gray-200`}>
-          {/* Vehicle Section with Image */}
-          <View style={tw`flex-row items-start mb-4`}>
-            <View style={tw`mr-4`}>
-              <View
-                style={tw`bg-white p-3 rounded-lg shadow-sm border border-gray-200`}
-              >
-                <Image
-                  source={
-                    selectedBodyType?.img ? { uri: selectedBodyType.img } : {}
-                  }
-                  style={tw`w-16 h-16`}
-                  resizeMode="contain"
-                />
-              </View>
-            </View>
+      {/* Vehicle Details Card */}
+      <View style={[tw`bg-white mb-4`, styles.card]}>
+        <View style={tw`p-6`}>
+          <Text style={tw`text-gray-800 font-bold text-lg mb-4`}>
+            Vehicle Details
+          </Text>
 
-            <View style={tw`flex-1`}>
-              <Text style={tw`text-gray-800 font-bold text-base mb-3`}>
-                Vehicle Details
+          <View style={tw`space-y-4`}>
+            {/* Approximate Weight */}
+            <View
+              style={tw`flex-row justify-between items-center py-2 border-b border-gray-100`}
+            >
+              <Text style={tw`text-gray-600 font-medium`}>
+                Approximate Weight
               </Text>
-
-              <View style={tw`flex-row justify-between mb-3`}>
-                <View style={tw`flex-1`}>
-                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
-                    VEHICLE TYPE
-                  </Text>
-                  <View style={tw`flex-row items-center`}>
-                    <FontAwesome5
-                      name="truck"
-                      size={14}
-                      color="#6b7280"
-                      style={tw`mr-2`}
-                    />
-                    <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.vehicle.vehicleType}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={tw`flex-1`}>
-                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
-                    WEIGHT RANGE
-                  </Text>
-                  <View style={tw`flex-row items-center`}>
-                    <FontAwesome5
-                      name="weight-hanging"
-                      size={14}
-                      color="#6b7280"
-                      style={tw`mr-2`}
-                    />
-                    <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.vehicle.weightRange}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={tw`flex-row justify-between`}>
-                <View style={tw`flex-1`}>
-                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
-                    BODY TYPE
-                  </Text>
-                  <View style={tw`flex-row items-center`}>
-                    <MaterialIcons
-                      name="local-shipping"
-                      size={14}
-                      color="#6b7280"
-                      style={tw`mr-2`}
-                    />
-                    <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.load.bodyType}
-                    </Text>
-                  </View>
-                </View>
-                <View style={tw`flex-1`}>
-                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
-                    APPROX. WEIGHT
-                  </Text>
-                  <View style={tw`flex-row items-center`}>
-                    <MaterialIcons
-                      name="scale"
-                      size={14}
-                      color="#6b7280"
-                      style={tw`mr-2`}
-                    />
-                    <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.vehicle.approximateWeightKg} kg
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Cargo Section with Images */}
-          <View style={tw`flex-row items-start`}>
-            <View style={tw`mr-4`}>
-              <View
-                style={tw`bg-white p-3 rounded-lg shadow-sm border border-gray-200`}
-              >
-                <Image
-                  source={
-                    selectedCargoContent?.img
-                      ? { uri: selectedCargoContent.img }
-                      : {}
-                  }
-                  style={tw`w-16 h-16`}
-                  resizeMode="contain"
+              <View style={tw`flex-row items-center`}>
+                <MaterialIcons
+                  name="scale"
+                  size={16}
+                  color="#4b5563"
+                  style={tw`mr-2`}
                 />
+                <Text style={tw`text-gray-800 font-semibold`}>
+                  {values.vehicle.approximateWeightKg} kg
+                </Text>
               </View>
-              {selectedPackageType?.img && (
-                <View
-                  style={tw`bg-white p-3 rounded-lg shadow-sm border border-gray-200 mt-2`}
-                >
-                  <Image
-                    source={{ uri: selectedPackageType.img }}
-                    style={tw`w-16 h-16`}
-                    resizeMode="contain"
-                  />
-                </View>
-              )}
             </View>
 
-            <View style={tw`flex-1`}>
-              <Text style={tw`text-gray-800 font-bold text-base mb-3`}>
-                Load Details
-              </Text>
+            {/* Dhala Length */}
 
-              <View style={tw`mb-3`}>
-                <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
-                  CARGO TYPE
+            <View
+              style={tw`flex-row justify-between items-center py-2 border-b border-gray-100`}
+            >
+              <Text style={tw`text-gray-600 font-medium`}>Dhala Length</Text>
+              <View style={tw`flex-row items-center`}>
+                <MaterialIcons
+                  name="straighten"
+                  size={16}
+                  color="#4b5563"
+                  style={tw`mr-2`}
+                />
+                <Text style={tw`text-gray-800 font-semibold`}>
+                  {values.load.dhalaLength} meters
                 </Text>
-                <View style={tw`flex-row items-center`}>
-                  <MaterialIcons
-                    name="category"
-                    size={14}
-                    color="#6b7280"
-                    style={tw`mr-2`}
-                  />
-                  <Text style={tw`text-gray-800 font-semibold`}>
-                    {values.load.cargoType}
-                  </Text>
-                </View>
               </View>
+            </View>
 
-              <View style={tw`mb-3`}>
-                <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
-                  CARGO CONTENT
+            {/* Body Type */}
+            <View style={tw`flex-row justify-between items-center py-2`}>
+              <Text style={tw`text-gray-600 font-medium`}>Body Type</Text>
+              <View style={tw`flex-row items-center`}>
+                <MaterialIcons
+                  name="local-shipping"
+                  size={16}
+                  color="#4b5563"
+                  style={tw`mr-2`}
+                />
+                <Text style={tw`text-gray-800 font-semibold`}>
+                  {values.load.bodyType}
                 </Text>
-                <View style={tw`flex-row items-center`}>
-                  <MaterialIcons
-                    name="inventory"
-                    size={14}
-                    color="#6b7280"
-                    style={tw`mr-2`}
-                  />
-                  <Text style={tw`text-gray-800 font-semibold`}>
-                    {values.load.cargoContent}
-                  </Text>
-                </View>
               </View>
-
-              {values.load.packageType && (
-                <View style={tw`mb-3`}>
-                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
-                    PACKAGING TYPE
-                  </Text>
-                  <View style={tw`flex-row items-center`}>
-                    <MaterialIcons
-                      name="package"
-                      size={14}
-                      color="#6b7280"
-                      style={tw`mr-2`}
-                    />
-                    <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.load.packageType}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {values.load.dhalaLength && (
-                <View>
-                  <Text style={tw`text-gray-500 text-xs font-medium mb-1`}>
-                    DHALA LENGTH
-                  </Text>
-                  <View style={tw`flex-row items-center`}>
-                    <MaterialIcons
-                      name="straighten"
-                      size={14}
-                      color="#6b7280"
-                      style={tw`mr-2`}
-                    />
-                    <Text style={tw`text-gray-800 font-semibold`}>
-                      {values.load.dhalaLength} meters
-                    </Text>
-                  </View>
-                </View>
-              )}
             </View>
           </View>
         </View>
+      </View>
 
-        {/* Additional Info Footer */}
-        <View style={tw`bg-white px-6 py-4 border-t border-gray-200`}>
+      {/* Load Details Card */}
+      <View style={[tw`bg-white mb-4`, styles.card]}>
+        <View style={tw`p-6`}>
+          <Text style={tw`text-gray-800 font-bold text-lg mb-4`}>
+            Load Details
+          </Text>
+
+          <View style={tw`space-y-4`}>
+            {/* Material Cargo Type */}
+            <View
+              style={tw`flex-row justify-between items-center py-2 border-b border-gray-100`}
+            >
+              <Text style={tw`text-gray-600 font-medium`}>
+                Material Cargo Type
+              </Text>
+              <View style={tw`flex-row items-center`}>
+                <MaterialIcons
+                  name="category"
+                  size={16}
+                  color="#4b5563"
+                  style={tw`mr-2`}
+                />
+                <Text style={tw`text-gray-800 font-semibold`}>
+                  {values.load.cargoType}
+                </Text>
+              </View>
+            </View>
+
+            {/* Material Name */}
+            <View
+              style={tw`flex-row justify-between items-center py-2 border-b border-gray-100`}
+            >
+              <Text style={tw`text-gray-600 font-medium`}>Material Name</Text>
+              <View style={tw`flex-row items-center`}>
+                <MaterialIcons
+                  name="inventory"
+                  size={16}
+                  color="#4b5563"
+                  style={tw`mr-2`}
+                />
+                <Text style={tw`text-gray-800 font-semibold`}>
+                  {values.load.materialName}
+                </Text>
+              </View>
+            </View>
+
+            {/* Package Type */}
+
+            <View
+              style={tw`flex-row justify-between items-center py-2 border-b border-gray-100`}
+            >
+              <Text style={tw`text-gray-600 font-medium`}>Package Type</Text>
+              <View style={tw`flex-row items-center`}>
+                <MaterialIcons
+                  name="package"
+                  size={16}
+                  color="#4b5563"
+                  style={tw`mr-2`}
+                />
+                <Text style={tw`text-gray-800 font-semibold`}>
+                  {values.load.packageType}
+                </Text>
+              </View>
+            </View>
+
+            {/* Approximate Weight per kg */}
+
+            <View style={tw`flex-row justify-between items-center py-2`}>
+              <Text style={tw`text-gray-600 font-medium`}>
+                Approximate Weight per kg
+              </Text>
+              <View style={tw`flex-row items-center`}>
+                <MaterialIcons
+                  name="scale"
+                  size={16}
+                  color="#4b5563"
+                  style={tw`mr-2`}
+                />
+                <Text style={tw`text-gray-800 font-semibold`}>
+                  {values.load.weight} kg
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Additional Info Card */}
+      <View style={[tw`bg-white mb-4`, styles.card]}>
+        <View style={tw`p-6`}>
           <View style={tw`flex-row justify-between items-center`}>
             <View>
               <Text style={tw`text-gray-500 text-xs font-medium`}>
@@ -408,9 +356,9 @@ const ConfirmationStep: React.FC = () => {
               <Text style={tw`text-gray-800 font-semibold text-sm`}>
                 {values.load.expectedVehicleAvailability || 'Flexible'}
               </Text>
-              <Text style={tw`text-gray-600 text-xs`}>
+              {/* <Text style={tw`text-gray-600 text-xs`}>
                 {values.schedule.date} at {values.schedule.time}
-              </Text>
+              </Text> */}
             </View>
             <View style={tw`items-end`}>
               <Text style={tw`text-gray-500 text-xs font-medium`}>
@@ -423,8 +371,6 @@ const ConfirmationStep: React.FC = () => {
           </View>
         </View>
       </View>
-
-      {/* Additional Notes Card */}
     </Animated.ScrollView>
   );
 };
@@ -440,6 +386,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    borderRadius: 8,
   },
 });
 

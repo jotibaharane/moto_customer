@@ -1,23 +1,34 @@
 import tw from '@utils/tw';
-import React from 'react';
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Keyboard,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { IconButton } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 type SelectItem = {
   [key: string]: any;
   disabled?: boolean;
+  type?: 'location' | 'default'; // Add type for location items
+  isCurrentLocation?: boolean;
 };
+
+type DropdownType = 'modal' | 'bottom-sheet' | 'dropdown';
 
 interface SelectListProps {
   setSelected: (selected: any) => void;
@@ -28,7 +39,6 @@ interface SelectListProps {
   iconLeftStyle?: any;
   boxStyles?: any;
   inputStyles?: any;
-  dropdownStyles?: any;
   dropdownItemStyles?: any;
   dropdownTextStyles?: any;
   maxHeight?: number;
@@ -38,24 +48,30 @@ interface SelectListProps {
   defaultOption?: SelectItem;
   defaultValue?: any;
   defaultKey?: any;
-  searchicon?: React.ReactNode;
-  arrowicon?: React.ReactNode;
-  closeicon?: React.ReactNode;
-  search?: boolean;
   searchPlaceholder?: string;
   notFoundText?: string;
   disabledItemStyles?: any;
   disabledTextStyles?: any;
   onSelect?: (selectedItem: any) => void;
   save?: 'key' | 'value' | 'object' | string;
-  dropdownShown?: boolean;
   fontFamily?: string;
   onSearchChange?: (text: string) => void;
   searchValue?: string;
   isLoading?: boolean;
   onClear?: () => void;
   disabled?: boolean;
+  showSearchInModal?: boolean;
+  dropdownType?: DropdownType;
+  onCurrentLocationPress?: () => void;
+  showCurrentLocationOption?: boolean;
+  currentLocationText?: string;
+  currentLocationIcon?: React.ReactNode;
+  registeredLocationText?: string;
+  registeredLocationIcon?: React.ReactNode;
 }
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MODAL_HEIGHT = SCREEN_HEIGHT * 0.6;
 
 const SelectList: React.FC<SelectListProps> = ({
   setSelected,
@@ -66,20 +82,14 @@ const SelectList: React.FC<SelectListProps> = ({
   iconLeftStyle,
   boxStyles,
   inputStyles,
-  dropdownStyles,
   dropdownItemStyles,
   dropdownTextStyles,
-  maxHeight = 200,
   data,
   displayKey = 'value',
   matchKey,
   defaultOption,
   defaultValue,
   defaultKey,
-  searchicon = false,
-  arrowicon = false,
-  closeicon = false,
-  search = true,
   searchPlaceholder = 'Search',
   notFoundText = 'No data found',
   disabledItemStyles,
@@ -87,49 +97,64 @@ const SelectList: React.FC<SelectListProps> = ({
   onSelect = () => {},
   onClear = () => {},
   save = 'key',
-  dropdownShown = false,
   fontFamily,
   onSearchChange,
   searchValue,
   isLoading = false,
   disabled = false,
+  showSearchInModal = true,
+  dropdownType = 'modal',
+  onCurrentLocationPress,
+  showCurrentLocationOption = false,
+  currentLocationText = 'Use Current Location',
+  currentLocationIcon = (
+    <MaterialCommunityIcons name="crosshairs-gps" size={20} color="#1976D2" />
+  ),
+  registeredLocationText = 'Registered Location',
+  registeredLocationIcon = (
+    <Icon name="location-on" size={20} color="#4CAF50" />
+  ),
 }) => {
-  const [_firstRender, _setFirstRender] = React.useState<boolean>(true);
-  const [dropdown, setDropdown] = React.useState<boolean>(dropdownShown);
-  const [selectedItem, setSelectedItem] = React.useState<SelectItem | null>(
-    null,
+  const [modalVisible, setModalVisible] = useState(false);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<SelectItem | null>(null);
+  const [internalSearchValue, setInternalSearchValue] = useState<string>('');
+  const [isFocused, setIsFocused] = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
+  const dropdownRef = useRef<View>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
+
+  const actualSearchValue = useMemo(
+    () => (searchValue !== undefined ? searchValue : internalSearchValue),
+    [searchValue, internalSearchValue],
   );
-  const [height, setHeight] = React.useState<number>(maxHeight);
-  const [internalSearchValue, setInternalSearchValue] =
-    React.useState<string>('');
-  const animatedvalue = React.useRef(new Animated.Value(0)).current;
-  const [filtereddata, setFilteredData] = React.useState<SelectItem[]>(data);
-  const [isFocused, setIsFocused] = React.useState(false);
 
-  const actualSearchValue =
-    searchValue !== undefined ? searchValue : internalSearchValue;
-  const setSearchValue =
-    searchValue !== undefined
-      ? onSearchChange || (() => {})
-      : setInternalSearchValue;
+  const setSearchValue = useMemo(
+    () =>
+      searchValue !== undefined
+        ? onSearchChange || (() => {})
+        : setInternalSearchValue,
+    [searchValue, onSearchChange],
+  );
 
-  const actualMatchKey =
-    matchKey ||
-    (save === 'key'
-      ? 'key'
-      : save === 'value'
-      ? 'value'
-      : typeof save === 'string'
-      ? save
-      : 'key');
+  const actualMatchKey = useMemo(() => {
+    if (matchKey) return matchKey;
+    if (save === 'key') return 'key';
+    if (save === 'value') return 'value';
+    return typeof save === 'string' ? save : 'key';
+  }, [matchKey, save]);
 
-  const normalizeString = (str: any) => {
+  const normalizeString = useCallback((str: any): string => {
     if (str === null || str === undefined) return '';
     return String(str).trim().toLowerCase();
-  };
+  }, []);
 
-  const findItem = React.useCallback(
-    (val: any) => {
+  const findItem = useCallback(
+    (val: any): SelectItem | undefined => {
       if (val === undefined || val === null) return undefined;
 
       if (save === 'object' && typeof val === 'object') {
@@ -143,368 +168,385 @@ const SelectList: React.FC<SelectListProps> = ({
         return normalizeString(itemValue) === normalizeString(val);
       });
     },
-    [data, save, actualMatchKey],
+    [data, save, actualMatchKey, normalizeString],
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (value === undefined) return;
     const matchedItem = findItem(value);
     if (matchedItem) {
       setSelectedItem(matchedItem);
-    } else {
-      setSelectedItem(
-        value && typeof value === 'object' ? value : { [displayKey]: value },
-      );
+    } else if (value && typeof value === 'object') {
+      setSelectedItem(value);
     }
-  }, [value, findItem, displayKey]);
+  }, [value, findItem]);
 
-  React.useEffect(() => {
-    setHeight(maxHeight);
-  }, [maxHeight]);
+  useEffect(() => {
+    if (!data.length) return;
 
-  React.useEffect(() => {
-    setFilteredData(data);
-  }, [data]);
+    let defaultItem: SelectItem | undefined;
 
-  React.useEffect(() => {
-    if (_firstRender && data.length > 0) {
-      let defaultItem: SelectItem | undefined;
+    if (defaultOption) {
+      defaultItem = defaultOption;
+    } else if (defaultKey !== undefined) {
+      defaultItem = findItem(defaultKey);
+    } else if (defaultValue !== undefined) {
+      defaultItem = findItem(defaultValue);
+    }
 
-      if (defaultOption) {
-        defaultItem = defaultOption;
-      } else if (defaultKey !== undefined) {
-        defaultItem = findItem(defaultKey);
-      } else if (defaultValue !== undefined) {
-        defaultItem = findItem(defaultValue);
+    if (defaultItem && value === undefined) {
+      setSelectedItem(defaultItem);
+      if (save === 'object') {
+        setSelected(defaultItem);
+      } else {
+        const selectedValue =
+          typeof save === 'string'
+            ? defaultItem[save]
+            : defaultItem[actualMatchKey];
+        setSelected(selectedValue);
       }
-
-      if (defaultItem && value === undefined) {
-        setSelectedItem(defaultItem);
-        if (save === 'object') {
-          setSelected(defaultItem);
-        } else {
-          const selectedValue =
-            typeof save === 'string'
-              ? defaultItem[save]
-              : defaultItem[actualMatchKey];
-          setSelected(selectedValue);
-        }
-      }
-
-      _setFirstRender(false);
     }
   }, [
-    _firstRender,
     data,
     defaultOption,
     defaultKey,
     defaultValue,
     save,
-    findItem,
     actualMatchKey,
     value,
+    findItem,
   ]);
 
-  const slidedown = () => {
-    if (disabled) return;
-    setDropdown(true);
-    setIsFocused(true);
-    Animated.timing(animatedvalue, {
-      toValue: height,
-      duration: 500,
-      useNativeDriver: false,
-    }).start();
-  };
+  const getDisplayValue = useCallback(
+    (item: SelectItem | null): string => {
+      if (!item) return placeholder;
+      if (typeof item !== 'object') return String(item);
 
-  const slideup = () => {
-    setIsFocused(false);
-    Animated.timing(animatedvalue, {
-      toValue: 0,
-      duration: 500,
-      useNativeDriver: false,
-    }).start(() => setDropdown(false));
-  };
+      const displayValue = displayKey
+        .split('.')
+        .reduce((obj, key) => obj?.[key], item);
+      return displayValue ? String(displayValue) : placeholder;
+    },
+    [displayKey, placeholder],
+  );
 
-  const getDisplayValue = (item: SelectItem | null): string => {
-    if (!item) return placeholder || 'Select an option';
-    if (typeof item !== 'object') return String(item);
+  const handleItemPress = useCallback(
+    (item: SelectItem) => {
+      if (item.disabled) return;
 
-    const displayValue = displayKey
-      .split('.')
-      .reduce((obj, key) => obj?.[key], item);
-    return displayValue
-      ? String(displayValue)
-      : placeholder || 'Select an option';
-  };
+      setSelectedItem(item);
 
-  const handleItemPress = (item: SelectItem) => {
-    if (item.disabled) return;
+      if (save === 'object') {
+        setSelected(item);
+      } else {
+        const selectedValue =
+          typeof save === 'string' ? item[save] : item[actualMatchKey];
+        setSelected(selectedValue);
+      }
 
-    setSelectedItem(item);
+      onSelect(item);
 
-    if (save === 'object') {
-      setSelected(item);
-    } else {
-      const selectedValue =
-        typeof save === 'string' ? item[save] : item[actualMatchKey];
-      setSelected(selectedValue);
+      if (dropdownType === 'modal') {
+        setModalVisible(false);
+      } else {
+        setDropdownVisible(false);
+      }
+      setSearchValue('');
+    },
+    [save, actualMatchKey, onSelect, setSelected, setSearchValue, dropdownType],
+  );
+
+  const handleCurrentLocationPress = useCallback(() => {
+    if (onCurrentLocationPress) {
+      onCurrentLocationPress();
+      if (dropdownType === 'modal') {
+        setModalVisible(false);
+      } else {
+        setDropdownVisible(false);
+      }
     }
+  }, [onCurrentLocationPress, dropdownType]);
 
-    onSelect(item);
-    slideup();
-    setTimeout(() => setFilteredData(data), 800);
-  };
+  const filteredData = useMemo(() => {
+    if (!actualSearchValue.trim()) return data;
 
-  const handleSearchChange = (val: string) => {
-    setSearchValue(val);
-    const result = data.filter(item => {
-      const searchStr = normalizeString(val);
+    return data.filter(item => {
+      const searchStr = normalizeString(actualSearchValue);
       const displayValue = normalizeString(getDisplayValue(item));
       return displayValue.includes(searchStr);
     });
-    setFilteredData(result);
-  };
+  }, [data, actualSearchValue, normalizeString, getDisplayValue]);
 
-  const handleClearSearch = () => {
+  const handleSearchChange = useCallback(
+    (val: string) => {
+      setSearchValue(val);
+    },
+    [setSearchValue],
+  );
+
+  const handleClearSearch = useCallback(() => {
     setSearchValue('');
-    setFilteredData(data);
-    slideup();
-  };
+  }, [setSearchValue]);
+
+  const handleOpenDropdown = useCallback(() => {
+    if (disabled) return;
+    setIsFocused(true);
+
+    if (dropdownType === 'modal') {
+      setModalVisible(true);
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    } else {
+      // Measure position for dropdown
+      dropdownRef.current?.measureInWindow((x, y, width, height) => {
+        setDropdownPosition({
+          top: y + height,
+          left: x,
+          width,
+        });
+        setDropdownVisible(true);
+      });
+    }
+  }, [disabled, dropdownType]);
+
+  const handleCloseDropdown = useCallback(() => {
+    if (dropdownType === 'modal') {
+      setModalVisible(false);
+    } else {
+      setDropdownVisible(false);
+    }
+    setIsFocused(false);
+    setSearchValue('');
+  }, [dropdownType, setSearchValue]);
+
+  const handleContainerPress = useCallback(() => {
+    setDropdownVisible(false);
+  }, []);
 
   const hasValue = selectedItem !== null && selectedItem !== undefined;
 
-  return (
-    <View>
-      {dropdown && search ? (
-        <View style={[styles.wrapper, boxStyles, { backgroundColor: '#fff' }]}>
-          <View style={styles.searchContainer}>
-            {!searchicon ? (
-              <Icon
-                name="search"
-                size={20}
-                style={styles.searchIcon}
-                color="#666"
-              />
-            ) : (
-              searchicon
-            )}
-
-            <TextInput
-              placeholder={searchPlaceholder}
-              placeholderTextColor="#999"
-              onChangeText={handleSearchChange}
-              value={actualSearchValue}
-              style={[
-                styles.searchInput,
-                { fontFamily, color: '#000' },
-                inputStyles,
-              ]}
-              selectionColor="#1976D2"
-            />
-
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#666" />
-            ) : (
-              <TouchableOpacity onPress={handleClearSearch}>
-                {!closeicon ? (
-                  <Icon
-                    name="close"
-                    size={17}
-                    style={styles.closeIcon}
-                    color="#666"
-                  />
-                ) : (
-                  closeicon
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      ) : (
-        <View style={tw`relative`}>
-          {label && (
-            <Text
-              style={[
-                styles.label,
-                {
-                  top: isFocused || hasValue ? -8 : 18,
-                  fontSize: isFocused || hasValue ? 12 : 16,
-                  color: isFocused ? '#1976D2' : '#666',
-                  left: iconLeft ? 10 : 20,
-                },
-                inputStyles,
-                tw`text-primary font-semibold`,
-                disabled && { color: '#c4c5c6' },
-              ]}
-            >
-              {label}
-            </Text>
+  const renderDropdownContent = () => (
+    <>
+      {/* Search Input */}
+      {showSearchInModal && dropdownType !== 'dropdown' && (
+        <View style={styles.searchContainer}>
+          <Icon name="search" size={20} color="#666" />
+          <TextInput
+            ref={searchInputRef}
+            placeholder={searchPlaceholder}
+            value={actualSearchValue}
+            onChangeText={handleSearchChange}
+            style={styles.searchInput}
+            placeholderTextColor="#999"
+            clearButtonMode="while-editing"
+          />
+          {actualSearchValue.length > 0 && (
+            <TouchableOpacity onPress={handleClearSearch}>
+              <Icon name="close" size={20} color="#666" />
+            </TouchableOpacity>
           )}
+        </View>
+      )}
+
+      {/* Current Location Option */}
+      {showCurrentLocationOption && onCurrentLocationPress && (
+        <TouchableOpacity
+          style={[styles.currentLocationOption, dropdownItemStyles]}
+          onPress={handleCurrentLocationPress}
+        >
+          {currentLocationIcon}
+          <Text style={[styles.currentLocationText, dropdownTextStyles]}>
+            {currentLocationText}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Options List */}
+      <ScrollView
+        style={[
+          styles.optionsContainer,
+          dropdownType === 'dropdown' && styles.dropdownOptionsContainer,
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {filteredData.length > 0 ? (
+          filteredData.map((item, index) => {
+            const isDisabled = item.disabled ?? false;
+            const isSelected = selectedItem === item;
+            const isLocationItem = item.type === 'location';
+
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.optionItem,
+                  dropdownItemStyles,
+                  isSelected && styles.selectedOption,
+                  isDisabled && [styles.disabledOption, disabledItemStyles],
+                  isLocationItem && styles.locationOption,
+                ]}
+                onPress={() => !isDisabled && handleItemPress(item)}
+                disabled={isDisabled}
+              >
+                {isLocationItem && item.isCurrentLocation && (
+                  <View style={styles.locationIconContainer}>
+                    {currentLocationIcon}
+                  </View>
+                )}
+                {isLocationItem && !item.isCurrentLocation && (
+                  <View style={styles.locationIconContainer}>
+                    {registeredLocationIcon}
+                  </View>
+                )}
+                <Text
+                  style={[
+                    styles.optionText,
+                    dropdownTextStyles,
+                    isDisabled && [styles.disabledText, disabledTextStyles],
+                    isLocationItem && styles.locationText,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {getDisplayValue(item)}
+                  {isLocationItem && item.isCurrentLocation && ' (Current)'}
+                  {isLocationItem && !item.isCurrentLocation && ' (Registered)'}
+                </Text>
+                {isSelected && <Icon name="check" size={20} color="#1976D2" />}
+              </TouchableOpacity>
+            );
+          })
+        ) : (
+          <View style={styles.notFoundContainer}>
+            <Text style={styles.notFoundText}>{notFoundText}</Text>
+          </View>
+        )}
+      </ScrollView>
+    </>
+  );
+
+  const renderModal = () => (
+    <Modal
+      visible={modalVisible}
+      animationType="slide"
+      transparent
+      onRequestClose={handleCloseDropdown}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={handleCloseDropdown}
+      >
+        <View
+          style={styles.modalContent}
+          onStartShouldSetResponder={() => true}
+        >
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Option</Text>
+            <IconButton icon="close" size={24} onPress={handleCloseDropdown} />
+          </View>
+          {renderDropdownContent()}
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
+  const renderDropdown = () => (
+    <>
+      {dropdownVisible && (
+        <>
           <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={handleCloseDropdown}
+          />
+          <View
             style={[
-              styles.wrapper,
-              boxStyles,
-              { backgroundColor: disabled ? '#f5f5f5' : '#fff' }, // Add background color
-              label && { paddingTop: 18, paddingBottom: 8 },
-              disabled && {
-                backgroundColor: '#f5f5f5',
-                borderColor: '#e0e0e0',
+              styles.dropdownContainer,
+              {
+                top: dropdownPosition.top,
+                left: dropdownPosition.left,
+                width: dropdownPosition.width,
+                maxHeight: MODAL_HEIGHT * 0.8,
               },
             ]}
-            onPress={() => {
-              if (disabled) return;
-              if (!dropdown) {
-                Keyboard.dismiss();
-                slidedown();
-              } else {
-                slideup();
-              }
-            }}
-            activeOpacity={disabled ? 1 : 0.7}
-            disabled={disabled}
           >
-            {iconLeft && (
-              <View style={[styles.iconLeftContainer, iconLeftStyle]}>
-                {iconLeft}
-              </View>
-            )}
-            <Text
-              numberOfLines={2}
-              style={[
-                { fontFamily, color: disabled ? '#c4c5c6' : '#000' }, // Set text color
-                inputStyles,
-                iconLeft && { marginLeft: 10, flex: 1 },
-                disabled && { color: '#c4c5c6' },
-              ]}
-            >
-              {getDisplayValue(selectedItem)}
-            </Text>
-
-            {!arrowicon && !onClear ? (
-              <Icon
-                name={dropdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                size={20}
-                style={[styles.arrowIcon, disabled && { color: '#c4c5c6' }]}
-                color={disabled ? '#c4c5c6' : '#666'}
-              />
-            ) : (
-              arrowicon
-            )}
-          </TouchableOpacity>
-          {value !== '' && !disabled && (
-            <IconButton
-              icon="close"
-              style={tw`absolute right-0 top-0`}
-              onPress={onClear}
-            />
-          )}
-        </View>
+            {renderDropdownContent()}
+          </View>
+        </>
       )}
+    </>
+  );
 
-      {dropdown && (
-        <Animated.View
-          style={[
-            styles.dropdown,
-            {
-              maxHeight: animatedvalue,
-              position: 'absolute',
-              bottom: '100%',
-              marginBottom: 8,
-              zIndex: 9999,
-              backgroundColor: '#fff', // White background for dropdown
-              elevation: 5,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 4,
-            },
-            dropdownStyles,
-          ]}
-        >
-          <ScrollView
-            contentContainerStyle={[
-              styles.scrollContent,
-              { backgroundColor: '#fff' },
+  return (
+    <>
+      <View style={tw`relative`} ref={dropdownRef}>
+        {label && (
+          <Text
+            style={[
+              styles.label,
+              {
+                top: isFocused || hasValue ? -8 : 18,
+                fontSize: isFocused || hasValue ? 12 : 16,
+                color: isFocused ? '#1976D2' : '#666',
+                left: iconLeft ? 10 : 20,
+              },
+              inputStyles,
+              tw`text-primary font-semibold`,
+              disabled && { color: '#c4c5c6' },
             ]}
-            nestedScrollEnabled={true}
-            showsVerticalScrollIndicator={true}
-            indicatorStyle="black"
           >
-            {filtereddata.length >= 1 ? (
-              filtereddata.map((item, index) => {
-                const disabled = item.disabled ?? false;
-                const displayValue = getDisplayValue(item);
-                const isSelected =
-                  selectedItem &&
-                  findItem(
-                    save === 'object'
-                      ? selectedItem
-                      : typeof save === 'string'
-                      ? selectedItem[save]
-                      : selectedItem[actualMatchKey],
-                  ) === item;
+            {label}
+          </Text>
+        )}
+        <TouchableOpacity
+          style={[
+            styles.wrapper,
+            boxStyles,
+            { backgroundColor: disabled ? '#f5f5f5' : '#fff' },
+            label && { paddingTop: 18, paddingBottom: 8 },
+            disabled && {
+              backgroundColor: '#f5f5f5',
+              borderColor: '#e0e0e0',
+            },
+          ]}
+          onPress={handleOpenDropdown}
+          activeOpacity={disabled ? 1 : 0.7}
+          disabled={disabled}
+        >
+          {iconLeft && (
+            <View style={[styles.iconLeftContainer, iconLeftStyle]}>
+              {iconLeft}
+            </View>
+          )}
+          <Text
+            numberOfLines={2}
+            style={[
+              styles.inputText,
+              { fontFamily, color: disabled ? '#c4c5c6' : '#000' },
+              inputStyles,
+              iconLeft && { marginLeft: 10, flex: 1 },
+            ]}
+          >
+            {getDisplayValue(selectedItem)}
+          </Text>
+          <Icon
+            name={dropdownVisible ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+            size={20}
+            style={[styles.arrowIcon, disabled && { color: '#c4c5c6' }]}
+            color={disabled ? '#c4c5c6' : '#666'}
+          />
+        </TouchableOpacity>
+        {hasValue && !disabled && (
+          <IconButton
+            icon="close"
+            style={tw`absolute right-0 top-0`}
+            onPress={onClear}
+          />
+        )}
+      </View>
 
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.option,
-                      dropdownItemStyles,
-                      { backgroundColor: '#fff' }, // White background for each option
-                      isSelected && { backgroundColor: '#f0f7ff' }, // Light blue for selected
-                      disabled && [
-                        styles.disabledoption,
-                        disabledItemStyles,
-                        { backgroundColor: '#f9f9f9' },
-                      ],
-                    ]}
-                    key={index}
-                    onPress={() => !disabled && handleItemPress(item)}
-                    disabled={disabled}
-                  >
-                    <Text
-                      style={[
-                        { fontFamily, color: '#000' }, // Black text
-                        dropdownTextStyles,
-                        disabled && [
-                          styles.disabledText,
-                          disabledTextStyles,
-                          { color: '#999' },
-                        ],
-                      ]}
-                      numberOfLines={2}
-                    >
-                      {displayValue}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })
-            ) : (
-              <View>
-                <TouchableOpacity
-                  style={[
-                    styles.option,
-                    dropdownItemStyles,
-                    { backgroundColor: '#fff' },
-                  ]}
-                  onPress={() => {
-                    const newItem = { [displayKey]: actualSearchValue };
-                    setSelectedItem(newItem);
-                    setSelected(actualSearchValue);
-                    slideup();
-                  }}
-                >
-                  <Text
-                    style={[{ fontFamily, color: '#000' }, dropdownTextStyles]}
-                  >
-                    {notFoundText} min 3 word - Use "{actualSearchValue}"
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </ScrollView>
-        </Animated.View>
-      )}
-    </View>
+      {dropdownType === 'modal' ? renderModal() : renderDropdown()}
+    </>
   );
 };
 
@@ -512,86 +554,159 @@ const styles = StyleSheet.create({
   wrapper: {
     borderWidth: 1,
     borderRadius: 10,
-    borderColor: '#ddd', // Lighter border color
+    borderColor: '#ddd',
     paddingHorizontal: 20,
     paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    position: 'relative',
-    backgroundColor: '#fff', // White background
+    backgroundColor: '#fff',
   },
-  dropdown: {
-    borderWidth: 1,
-    borderRadius: 10,
-    borderColor: '#ddd',
-    marginTop: 10,
+  label: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    paddingHorizontal: 4,
+    zIndex: 1,
+  },
+  inputText: {
+    flex: 1,
+    fontSize: 16,
+  },
+  arrowIcon: {
+    marginLeft: 8,
+  },
+  iconLeftContainer: {
+    marginRight: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: MODAL_HEIGHT,
     overflow: 'hidden',
-    backgroundColor: '#fff', // White background for dropdown
   },
-  option: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    overflow: 'hidden',
-    backgroundColor: '#fff', // White background for options
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0', // Separator between options
-  },
-  disabledoption: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+  modalHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9', // Light gray for disabled
-    opacity: 0.9,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    backgroundColor: '#fff', // White background for search container
-  },
-  searchIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 10,
-    color: '#666',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   searchInput: {
-    padding: 0,
-    height: 20,
     flex: 1,
-    color: '#000', // Black text for search input
+    marginLeft: 12,
     fontSize: 16,
+    color: '#000',
+    paddingVertical: 0,
   },
-  closeIcon: {
-    width: 17,
-    height: 17,
-    color: '#666',
+  optionsContainer: {
+    flex: 1,
   },
-  arrowIcon: {
-    width: 20,
-    height: 20,
-    color: '#666',
+  dropdownOptionsContainer: {
+    maxHeight: 300,
   },
-  scrollContent: {
-    paddingVertical: 0, // No vertical padding
-    overflow: 'hidden',
-    backgroundColor: '#fff', // White background for scroll content
+  optionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  selectedOption: {
+    backgroundColor: '#f0f7ff',
+  },
+  disabledOption: {
+    backgroundColor: '#f9f9f9',
+    opacity: 0.6,
+  },
+  optionText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#000',
   },
   disabledText: {
-    color: '#999', // Gray for disabled text
+    color: '#999',
   },
-  label: {
+  notFoundContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  notFoundText: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+  },
+  dropdownOverlay: {
     position: 'absolute',
-    backgroundColor: '#fff', // White background for label
-    paddingHorizontal: 4,
-    zIndex: 1,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
   },
-  iconLeftContainer: {
-    marginRight: 10,
+  dropdownContainer: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  currentLocationOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
+  },
+  currentLocationText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#1976D2',
+    fontWeight: '500',
+  },
+  locationOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationIconContainer: {
+    marginRight: 12,
+  },
+  locationText: {
+    color: '#333',
+    fontWeight: '500',
   },
 });
 

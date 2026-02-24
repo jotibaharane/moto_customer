@@ -5,7 +5,7 @@ import tw from 'twrnc';
 const CustomRadioButton = ({ options, selectedOption, onSelect }: any) => {
   return (
     <View style={tw`flex-row items-center gap-6`}>
-      {options.map((option: any) => (
+      {options?.map((option: any) => (
         <TouchableOpacity
           key={option.value}
           style={tw`flex-row items-center`}

@@ -90,13 +90,12 @@ const LoadPostForm: React.FC = () => {
       const payload: ShipmentData = {
         ...values,
         customerId: CustomerID,
-        schedule: {
-          date: values.schedule.date || '',
-          time: values.schedule.time || '',
-        },
       };
+      console.log({ payload });
 
       const response = await postCustomerRequirement(payload).unwrap();
+
+      console.log({ response });
 
       if (response?.status === '00') {
         emitCreateCustomerLoad({

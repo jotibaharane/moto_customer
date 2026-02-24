@@ -94,6 +94,8 @@ const CompanyTypeSelector = ({
   </View>
 );
 
+// Commented out AddressTypeSelector component
+/*
 const AddressTypeSelector = ({
   value,
   onChange,
@@ -139,6 +141,7 @@ const AddressTypeSelector = ({
     </View>
   );
 };
+*/
 
 /* ---------------------------------------------------------------
  * MAIN COMPONENT
@@ -168,11 +171,12 @@ const RegistrationScreen: React.FC = () => {
   const [errors, setErrors] = useState<Partial<RegisterRequest>>({});
   const [availableDistricts, setAvailableDistricts] = useState<any[]>([]);
   const originPlaces = useGooglePlacesSelect();
-  const [addressTypeUI, setAddressTypeUI] = useState({
-    Factory: 'N',
-    Warehouse: 'N',
-    Office: 'N',
-  });
+  // Commented out addressTypeUI state as it's no longer needed
+  // const [addressTypeUI, setAddressTypeUI] = useState({
+  //   Factory: 'N',
+  //   Warehouse: 'N',
+  //   Office: 'N',
+  // });
 
   /* -------------------------------------------------------------
    * EFFECT: Clear company name when switching to Individual
@@ -196,6 +200,7 @@ const RegistrationScreen: React.FC = () => {
       }));
     }
   }, [mobilenumber]);
+
   const showSnack = (message: string) => {
     setSnack({ visible: true, message });
   };
@@ -296,6 +301,7 @@ const RegistrationScreen: React.FC = () => {
     },
     [originPlaces, dispatch],
   );
+
   /* -------------------------------------------------------------
    * VALIDATION
    * ------------------------------------------------------------- */
@@ -333,7 +339,7 @@ const RegistrationScreen: React.FC = () => {
       newErrors.Destination = 'District is required';
     }
 
-    // ✅ CORRECT Address Type validation
+    // ✅ CORRECT Address Type validation - Commented out
     // if (
     //   formData.Factory === 'N' &&
     //   formData.Warehouse === 'N' &&
@@ -422,7 +428,6 @@ const RegistrationScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           {/* Personal Information */}
-          {/* <Card style={screenStyles.card}> */}
           <Card.Content>
             {/* Company Type */}
             <CompanyTypeSelector
@@ -446,7 +451,7 @@ const RegistrationScreen: React.FC = () => {
               {errors.CompanyType}
             </HelperText>
 
-            <Text style={screenStyles.sectionTitle}>Personal Information</Text>
+            {/* <Text style={screenStyles.sectionTitle}>Personal Information</Text> */}
 
             {/* Full Name */}
             <TextInput
@@ -512,9 +517,9 @@ const RegistrationScreen: React.FC = () => {
               {errors.EmailID}
             </HelperText>
           </Card.Content>
-          {/* </Card> */}
 
-          {/* Business Type (Only for Organization) */}
+          {/* Business Type (Only for Organization) - Commented out */}
+          {/*
           {formData.CompanyType === 'Organization' && (
             <AddressTypeSelector
               value={{
@@ -531,10 +536,11 @@ const RegistrationScreen: React.FC = () => {
               error={errors.Factory}
             />
           )}
+          */}
 
           {/* ADDRESS SECTION */}
-
           <Card.Content>
+            <AddressSearch onSelect={handleOriginSelect} />
             {/* Address Line 1 */}
             <TextInput
               mode="outlined"
@@ -567,6 +573,7 @@ const RegistrationScreen: React.FC = () => {
             <HelperText type="error" visible={!!errors.Address2}>
               {errors.Address2}
             </HelperText>
+
             {/* Pincode + City */}
             <View style={screenStyles.row}>
               <View style={screenStyles.halfInput}>
@@ -598,13 +605,13 @@ const RegistrationScreen: React.FC = () => {
 
             {/* State */}
             <SelectList
-              label="State *"
+              // label="State *"
               data={stateData?.data || []}
               displayKey="state"
               save="state"
               value={formData.State}
               setSelected={(val: any) => handleChange('State', val)}
-              placeholder="Select State"
+              // placeholder="Select State"
               onClear={() => handleChange('State', '')}
             />
             <HelperText type="error" visible={!!errors.State}>
@@ -626,8 +633,6 @@ const RegistrationScreen: React.FC = () => {
             <HelperText type="error" visible={!!errors.Destination}>
               {errors.Destination}
             </HelperText>
-
-            <AddressSearch onSelect={handleOriginSelect} />
           </Card.Content>
 
           {/* SUBMIT BUTTON */}
@@ -667,8 +672,8 @@ const localStyles = StyleSheet.create({
   },
   companyTypeRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 8,
+    // gap: 10,
+    // marginBottom: 8,
   },
   companyTypeButton: {
     flex: 1,
@@ -690,7 +695,7 @@ const localStyles = StyleSheet.create({
   businessTypeItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4, // SPACE BETWEEN ICON & TEXT
+    // gap: 4, // SPACE BETWEEN ICON & TEXT
   },
 
   businessTypeText: {

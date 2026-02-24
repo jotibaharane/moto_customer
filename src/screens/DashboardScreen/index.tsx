@@ -531,7 +531,7 @@ const Dashboard: React.FC = () => {
   const ARRIVAL_DISTANCE = 100; // meters
   const arrivalTriggered = useRef(false);
   const { originAddress } = useSelector((state: RootState) => state.map);
-  const [showLoadingModal, setShowLoadingModal] = useState<boolean>(true);
+  const [showLoadingModal, setShowLoadingModal] = useState<boolean>(false);
 
   // Default driver location (Mumbai)
   const [driverLocation, setDriverLocation] = useState({

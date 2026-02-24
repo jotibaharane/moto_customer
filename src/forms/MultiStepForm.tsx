@@ -1,7 +1,6 @@
-// MultiStepFormTabs.tsx
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Formik } from 'formik';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -23,7 +22,6 @@ import { RootState } from '@store/index';
 import { useSelector } from 'react-redux';
 import Step1_VehicleCustomer from './Step1_VehicleCustomer';
 import Step2_CargoInvoice from './Step2_CargoInvoice';
-import Step3_FreightDetails from './Step3_FreightDetails';
 // import ChargesFreightInput from './ChargesFreightInput';
 // Import types
 import {
@@ -31,24 +29,44 @@ import {
   FormikValues,
   LoadPostApiPayload,
   LoadPostData,
+  VdltValues,
 } from '../forms/api.types';
 
 // ========== DUMMY DATA ==========
-const DUMMY_DATA: LoadPostData[] = [
+const DUMMY_DATA = [
   {
     LoadPostID: 'LP721277',
-    full_name: 'RAIS AHMED SHAH',
-    MobileNo: '8779239065',
+
+    // Vehicle & Driver
     Vehcile_No: 'MH12DE1433',
-    Origin: '825H+JJ Bhiwandi, Maharashtra, India',
-    Origin_City: 'Bhiwandi',
-    Origin_State: 'Maharashtra',
-    Origin_Pincode: '421302',
-    Destination:
-      'J6V9+2MW, Ratan Lal Market, Kaseru Walan, Ajmeri Gate, New Delhi, Delhi, 110055, India',
-    Destination_City: 'New Delhi',
-    Destination_State: 'Delhi',
-    Destination_Pincode: '110055',
+    MobileNo: '8779239065',
+
+    // ================= PICKUP / CONSIGNOR =================
+    pickupName: 'RAIS AHMED SHAH',
+    pickupPhone: '8779239065',
+    pickupGst: '27AAACR5055M1ZP',
+    pickupAddress1: 'Ratan Compound',
+    pickupAddress2: 'Near Anjur Phata',
+    pickupCity: 'Bhiwandi',
+    pickupDistrict: 'Thane',
+    pickupState: 'Maharashtra',
+    pickupPincode: '421302',
+    pickupGoogle: '825H+JJ Bhiwandi, Maharashtra, India',
+
+    // ================= DROP / CONSIGNEE =================
+    dropName: 'Amit Kumar',
+    dropPhone: '9876543210',
+    dropGst: '07AABCS1429M1ZQ',
+    dropAddress1: 'Ratan Lal Market',
+    dropAddress2: 'Ajmeri Gate',
+    dropCity: 'New Delhi',
+    dropDistrict: 'Central Delhi',
+    dropState: 'Delhi',
+    dropPincode: '110055',
+    dropGoogle:
+      'J6V9+2MW, Ratan Lal Market, Ajmeri Gate, New Delhi, Delhi, 110055, India',
+
+    // ================= CARGO =================
     BodyType: 'Multiaxel Trailer',
     CargoContent: 'Agro',
     CargoPackageType: 'Corrugated Boxes',
@@ -56,261 +74,545 @@ const DUMMY_DATA: LoadPostData[] = [
     Weight: '12500-18000kg',
     Approximate_weight: '200',
   },
-  // ... other dummy data
 ];
 
 // ========== HELPER FUNCTIONS ==========
 const transformToDropdownItems = (data: LoadPostData[]): DropdownItem[] => {
+  console.log({ data });
   return data.map(item => ({
     loadPostId: item.LoadPostID,
-    pickupCity: item.Origin_City,
-    dropCity: item.Destination_City,
-    pickupName: item.full_name,
+    Vehicleno: item?.VehicleType,
+    pickupCity: item?.PickupCity,
+    dropCity: item?.DeliveryCity,
+
+    pickupName: item?.PickupContactPerson,
     full: item,
   }));
 };
 
 const mapApiDataToFormik = (item: LoadPostData): Partial<FormikValues> => ({
   // Pickup Details
-  pickupName: item.full_name || '',
-  pickupPhone: item.MobileNo || '',
-  pickupAddress1: item.Origin || '',
-  pickupAddress2: '',
-  pickupGoogle: item.Origin || '',
-  pickupCity: item.Origin_City || '',
-  pickupState: item.Origin_State || '',
-  pickupPincode: item.Origin_Pincode || '',
-  pickupGst: '27AAACR5055M1ZP',
-  pickupDistrict: 'Thane',
-  pickupTaluka: '',
-  pickupLat: 0,
-  pickupLng: 0,
+  pickupName: item?.PickupContactPerson || '',
+  pickupPhone: item?.PickupContactNumber || '',
+  pickupAddress1: item?.PickupPlotBuilding || '',
+  pickupAddress2: item?.PickupStreetArea || '',
+  // pickupGoogle: item.Origin || '',
+  pickupCity: item?.PickupCity || '',
+  pickupState: item?.PickupState || '',
+  pickupPincode: item?.PickupPincode || '',
+  //pickupGst: '27AAACR5055M1ZP',
+  // pickupDistrict: 'Thane',
+  pickupTaluka: item?.PickupTaluka || '',
+  pickupLat: item?.PickupLat || 0,
+  pickupLng: item?.PickupLng || 0,
 
   // Drop Details
-  dropName: item.full_name || '',
-  dropPhone: item.MobileNo || '',
-  dropAddress1: item.Destination || '',
-  dropAddress2: '',
-  dropGoogle: item.Destination || '',
-  dropCity: item.Destination_City || '',
-  dropState: item.Destination_State || '',
-  dropPincode: item.Destination_Pincode || '',
-  dropGst: '07AABCS1429M1ZQ',
-  dropDistrict: 'Central Delhi',
-  dropTaluka: '',
-  dropLat: 0,
-  dropLng: 0,
+  dropName: item?.DeliveryContactPerson || '',
+  dropPhone: item?.DeliveryContactNumber || '',
+  dropAddress1: item?.DeliveryPlotBuilding || '',
+  dropAddress2: item?.DeliveryStreetArea || '',
+  dropGoogle: item?.DeliveryGoogleMapLocation || '',
+  dropCity: item?.DeliveryCity || '',
+  dropState: item?.DeliveryState || '',
+  dropPincode: item?.DeliveryPincode || '',
+  dropGst: item?.DeliveryGST || '',
+  dropDistrict: item?.DeliveryDistrict || '',
+  dropTaluka: item?.DeliveryTaluka || '',
+  dropLat: item?.DeliveryLat || 0,
+  dropLng: item?.DeliveryLng || 0,
+
+  // Documents: item.isDocumentsAvailable || [],
 
   // Vehicle & Cargo Details
-  bodyType: item.BodyType || '',
-  cargoContent: item.CargoContent || '',
-  packageType: item.CargoPackageType || '',
-  dhalaLength: '',
-  Approximate_weight: item.Approximate_weight || '',
-  netWeight: item.Weight || '',
-  grossWeight: item.Weight || '',
-  VehicleType: item.VehicleType || '',
+  // bodyType: item.BodyType || '',
+  // cargoContent: item.CargoContent || '',
+  // packageType: item.CargoPackageType || '',
+  // dhalaLength: '',
+  // Approximate_weight: item.Approximate_weight || '',
+  // netWeight: item.Weight || '',
+  // grossWeight: item.Weight || '',
+  // VehicleType: item.VehicleType || '',
+  // Declaration: item.StockTransfers   || '',
 
   // Driver Details
-  driverName: item.full_name || '',
-  driverNumber: item.MobileNo || '',
-  vehicleNo: item.Vehcile_No || '',
+  // driverName: item. || '',
+  // driverNumber: item.MobileNo || '',
+  // vehicleNo: item.Vehcile_No || '',
 });
 
 // ========== API PAYLOAD TRANSFORMATION ==========
+// const transformToApiPayload = (
+//   values: FormikValues,
+//   selectedLoadPostId: string,
+// ): VdltValues => {
+//   // Get CustomerID from Redux store or use default
+
+//   return {
+//     LoadPostID: selectedLoadPostId || 'LP999888',
+//     CustomerID: '123654',
+
+//     consigner: {
+//       consigner_name: values.pickupName || '',
+//       //  consigner_gst: values.Address[0]?.ConsignerDetails?.GST || '',
+//       consigner_address: `${values.pickupAddress1 || ''} ${
+//         values.pickupAddress2 || ''
+//       }`.trim(),
+//       consigner_pincode: values.pickupPincode || '',
+//       consigner_origin: values.pickupCity || '',
+//       consigner_state: values.pickupState || '',
+//       consigner_gst: values.dropGst || '',
+
+//       // pickup: {
+//       //   pickup_plot_unit: values.pickupAddress1 || '',
+//       //   pickup_area_street: values.pickupAddress2 || '',
+//       //   pickup_pincode: values.pickupPincode || '',
+//       //   pickup_state: values.pickupState || '',
+//       //   pickup_district: values.pickupDistrict || '',
+//       //   pickup_taluka: values.pickupTaluka || '',
+//       //   pickup_map_location: values.pickupGoogle || '',
+//       //   pickup_Lat: values.pickupLat || 0,
+//       //   pickup_Lng: values.pickupLng || 0,
+//       // },
+//     },
+
+//     consignee: {
+//       consignee_name: values.customerName || '',
+//       // consignee_gst: values.dropGst || '',
+//       consignee_address: `${values.dropAddress1 || ''} ${
+//         values.dropAddress2 || ''
+//       }`.trim(),
+//       consignee_pincode: values.dropPincode || '',
+//       consignee_destination: values.dropCity || '',
+//       consignee_state: values.dropState || '',
+//       consignee_gst: values.dropGst || '',
+
+//       // drop: {
+//       //   drop_plot_unit: values.dropAddress1 || '',
+//       //   drop_area_street: values.dropAddress2 || '',
+//       //   drop_pincode: values.dropPincode || '',
+//       //   drop_state: values.dropState || '',
+//       //   drop_district: values.dropDistrict || '',
+//       //   drop_taluka: values.dropTaluka || '',
+//       //   drop_map_location: values.dropGoogle || '',
+//       //   drop_Lat: values.dropLat || 0,
+//       //   drop_Lng: values.dropLng || 0,
+//       // },
+//     },
+
+//     domestic_type: values?.documentype,
+//     dom_declaration: values?.declaration,
+//     declaration: values?.isDeclared,
+//     declaration_img: values?.declarationImages,
+
+//     // cargo: {
+//     //   cargo_content: values.cargoContent || '',
+//     //   package_type: values.packageType || '',
+//     //   package_name: values.packageNote || '',
+//     // },
+
+//     // PO: {
+//     //   po_number: values.poNo || '',
+//     //   po_date: values.poDate || '',
+//     // },
+
+//     // weight: {
+//     //   No_of_package: values.freightDetails?.noOfPackages || '0',
+//     //   net_weight: values.freightDetails?.netQuantity || values.netWeight || '0',
+//     //   approx_weight: values.Approximate_weight || '0',
+//     //   gross_weight:
+//     //     values.freightDetails?.grossWeight || values.grossWeight || '0',
+//     // },
+
+//     // charges: {
+//     //   freightAmount: values.freightDetails?.freightAmount || '0',
+//     //   loadingcharge: values.freightDetails?.loading || '0',
+//     //   unloadingcharge: values.freightDetails?.unloading || '0',
+//     //   LRcharge: values.freightDetails?.lrCharges || '0',
+//     //   othercharge: values.freightDetails?.otherCharges || '0',
+//     //   otherchargelabel: values.freightDetails?.otherChargesLabel || '',
+//     //   Advance: values.freightDetails?.advance || '0',
+//     //   // },
+
+//     invoiceDetails: (values.invoices && values.invoices[0]?.InvoiceNo
+//       ? [values.invoices[0]]
+//       : []
+//     ).map(inv => ({
+//       invoice_number: inv.InvoiceNo || '',
+//       invoice_date: inv.InvoiceDate || '',
+//       Unit: inv.Unit || '',
+//       quantity: inv.GrossQuantity || '',
+//       value_amount: inv.ValueAmount || '',
+//       invoice_img: inv.ImageUpload || '',
+//       Materialtype: inv.MaterialName || '',
+//       PackageType: inv.PachageType || '',
+//     })),
+
+//     challanDetails: (values.challans && values.challans[0]?.ChallanNo
+//       ? [values.challans[0]]
+//       : []
+//     ).map(ch => ({
+//       challan_number: ch.ChallanNo || '',
+//       challan_date: ch.ChallanDate || '',
+//       Unit: ch.Unit || '',
+//       quantity: ch.GrossWeight || '',
+//       net_weight: ch.NetWeight || '',
+//       value_amount: ch.ValueAmount || '',
+//       challan_img: ch.ImageUpload || '',
+//       doc_no: ch.DocumentNo || '',
+//       po_number: ch.PoNo || '',
+//       po_date: ch.Podate || '',
+//       material_Type: ch.MaterialName || '',
+//       package_type: ch.PackageType || '',
+//       remarks: ch.MaterialName || '',
+//     })),
+//     BillDetails: (values.billOfEntries && values.billOfEntries[0]?.BillOfEntryNo
+//       ? [values.billOfEntries[0]]
+//       : []
+//     ).map(be => ({
+//       Bill_Entry_number: be.BillOfEntryNo || '',
+//       Bill_Entry_date: be.BillOfEntryDate || '',
+//       Shipper_name: be.ShipperName || '',
+//       Country: be.Country || '',
+//       buyer_name: be.BuyerName || '',
+//       destination: be.Destination || '',
+//       Currency: be.Currency || '',
+//       Package_type: be.PackageType || '',
+//       material_name: be.MaterialName || '',
+//       Value: be.ValueAmount || '',
+//       image_upload: be.ImageUpload || '',
+//       Material_type: be.MaterialName || '',
+//     })),
+//     stockDetails: (values.StockTransfers &&
+//     values.StockTransfers[0]?.StockTransferNo
+//       ? [values.StockTransfers[0]]
+//       : []
+//     ).map(st => ({
+//       stock_number: st.StockTransferNo || '',
+//       stock_date: st.StockTransferDate || '',
+//       Unit: st.Unit || '',
+//       net_weight: st.NetQuantity || '',
+//       gross_weight: st.GrossQuantity || '',
+//       value_amount: st.TranferValue || '',
+
+//       from_location: st.FromLocation || '',
+//       to_location: st.ToLocation || '',
+//       material: st.MaterialName || '',
+//       quantity: st.NetQuantity || '',
+//       remarks: st.MaterialName,
+//     })),
+//   };
+// };
+// ========== API PAYLOAD TRANSFORMATION ==========
+// const transformToApiPayload = (
+//   values: FormikValues,
+//   selectedLoadPostId: string,
+// ): VdltValues => {
+//   // Helper function to extract items from groups
+//   const extractItemsFromGroups = (groups: any[] | undefined) => {
+//     if (!groups || groups.length === 0) return [];
+
+//     // Flatten all items from all groups
+//     const allItems = groups.flatMap(group => group.items || []);
+//     return allItems;
+//   };
+
+//   // Get CustomerID from Redux store or use default
+//   return {
+//     LoadPostID: selectedLoadPostId || 'LP999888',
+//     CustomerID: '123654',
+
+//     consigner: {
+//       consigner_name: values.pickupName || '',
+//       consigner_address: `${values.pickupAddress1 || ''} ${
+//         values.pickupAddress2 || ''
+//       }`.trim(),
+//       consigner_pincode: values.pickupPincode || '',
+//       consigner_origin: values.pickupCity || '',
+//       consigner_state: values.pickupState || '',
+//       consigner_gst: values.pickupGst || '',
+//     },
+
+//     consignee: {
+//       consignee_name: values.dropName || '',
+//       consignee_address: `${values.dropAddress1 || ''} ${
+//         values.dropAddress2 || ''
+//       }`.trim(),
+//       consignee_pincode: values.dropPincode || '',
+//       consignee_destination: values.dropCity || '',
+//       consignee_state: values.dropState || '',
+//       consignee_gst: values.dropGst || '',
+//     },
+
+//     domestic_type: values?.shipmentDocumentType,
+//     dom_declaration: values?.declaration,
+//     declaration: values?.isDeclared,
+//     declaration_img: values?.declarationImages || [],
+
+//     // Transform invoice items
+//     invoiceDetails: extractItemsFromGroups(values.invoices).map(item => ({
+//       invoice_number: item.invoiceNo || '',
+//       invoice_date: item.invoiceDate || '',
+//       Unit: item.unit || '',
+//       quantity: item.quantity || item.netWeight || '',
+//       value_amount: item.value || '',
+//       invoice_img: item.image || '',
+//       Materialtype: item.materialType || '',
+//       PackageType: item.packageType || '',
+//     })),
+
+//     // Transform challan items
+//     challanDetails: extractItemsFromGroups(values.challans).map(item => ({
+//       challan_number: item.challanNo || '',
+//       challan_date: item.challanDate || '',
+//       Unit: item.unit || '',
+//       quantity: item.quantity || item.netWeight || '',
+//       net_weight: item.netWeight || '',
+//       value_amount: item.value || '',
+//       challan_img: item.image || '',
+//       doc_no: item.documentno || '',
+//       po_number: item.poNo || '',
+//       po_date: item.poDate || '',
+//       material_Type: item.materialType || '',
+//       package_type: item.packageType || '',
+//       remarks: item.materialType || '',
+//     })),
+
+//     // Transform bill of entry items
+//     BillDetails: extractItemsFromGroups(values.billOfEntries).map(item => ({
+//       Bill_Entry_number: item.billOfEntryNo || '',
+//       Bill_Entry_date: item.billOfEntryDate || '',
+//       Shipper_name: item.shipperName || '',
+//       Country: item.country || '',
+//       buyer_name: item.buyerName || '',
+//       destination: item.destination || '',
+//       Currency: item.currency || '',
+//       Package_type: item.packageType || '',
+//       material_name: item.materialType || '',
+//       Value: item.value || '',
+//       image_upload: item.image || '',
+//       Material_type: item.materialType || '',
+//     })),
+
+//     // Transform stock transfer items
+//     stockDetails: extractItemsFromGroups(values.StockTransfers).map(item => ({
+//       stock_number: item.StockTransferNo || '',
+//       stock_date: item.StockTransferDate || '',
+//       Unit: item.unit || '',
+//       net_weight: item.netWeight || '',
+//       gross_weight: item.grossWeight || '',
+//       value_amount: item.value || '',
+//       from_location: item.fromLocation || '',
+//       to_location: item.toLocation || '',
+//       material: item.materialType || '',
+//       quantity: item.quantity || item.netWeight || '',
+//       remarks: item.materialType || '',
+//     })),
+//   };
+// };
+
 const transformToApiPayload = (
   values: FormikValues,
   selectedLoadPostId: string,
-): LoadPostApiPayload => {
-  // Get CustomerID from Redux store or use default
-  const customerID =
-    useSelector((state: RootState) => state.auth.customerId) || 'CM123456';
+) => {
+  const extractItemsFromGroups = (groups: any[] | undefined) => {
+    if (!groups || groups.length === 0) return [];
+    return groups.flatMap(group => group.items || []);
+  };
 
   return {
-    LoadPostID: selectedLoadPostId || 'LP999888',
-    CustomerID: customerID,
+    LoadPostID: selectedLoadPostId || 'LP002',
+    CustomerID: 'CUST001',
 
     consigner: {
       consigner_name: values.pickupName || '',
       consigner_gst: values.pickupGst || '',
-      consigner_address:
-        `${values.pickupAddress1} ${values.pickupAddress2}`.trim(),
+      consigner_address: `${values.pickupAddress1 || ''} ${
+        values.pickupAddress2 || ''
+      }`.trim(),
       consigner_pincode: values.pickupPincode || '',
       consigner_origin: values.pickupCity || '',
       consigner_state: values.pickupState || '',
-
-      pickup: {
-        pickup_plot_unit: values.pickupAddress1 || '',
-        pickup_area_street: values.pickupAddress2 || '',
-        pickup_pincode: values.pickupPincode || '',
-        pickup_state: values.pickupState || '',
-        pickup_district: values.pickupDistrict || '',
-        pickup_taluka: values.pickupTaluka || '',
-        pickup_map_location: values.pickupGoogle || '',
-        pickup_Lat: values.pickupLat || 0,
-        pickup_Lng: values.pickupLng || 0,
-      },
     },
 
     consignee: {
       consignee_name: values.dropName || '',
       consignee_gst: values.dropGst || '',
-      consignee_address: `${values.dropAddress1} ${values.dropAddress2}`.trim(),
+      consignee_address: `${values.dropAddress1 || ''} ${
+        values.dropAddress2 || ''
+      }`.trim(),
       consignee_pincode: values.dropPincode || '',
       consignee_destination: values.dropCity || '',
       consignee_state: values.dropState || '',
-
-      drop: {
-        drop_plot_unit: values.dropAddress1 || '',
-        drop_area_street: values.dropAddress2 || '',
-        drop_pincode: values.dropPincode || '',
-        drop_state: values.dropState || '',
-        drop_district: values.dropDistrict || '',
-        drop_taluka: values.dropTaluka || '',
-        drop_map_location: values.dropGoogle || '',
-        drop_Lat: values.dropLat || 0,
-        drop_Lng: values.dropLng || 0,
-      },
     },
 
-    cargo: {
-      cargo_content: values.cargoContent || '',
-      package_type: values.packageType || '',
-      package_name: values.packageNote || '',
-    },
+    domestic_type: 'Domestic',
 
-    PO: {
-      po_number: values.poNo || '',
-      po_date: values.poDate || '',
-    },
+    // Payload-2 declaration format
+    dom_declaration: (values.declarationTextList || []).map(
+      (text: string, index: number) => ({
+        [`declaration${index + 1}`]: text,
+      }),
+    ),
 
-    weight: {
-      No_of_package: values.freightDetails?.noOfPackages || '0',
-      net_weight: values.freightDetails?.netQuantity || values.netWeight || '0',
-      approx_weight: values.Approximate_weight || '0',
-      gross_weight:
-        values.freightDetails?.grossWeight || values.grossWeight || '0',
-    },
+    isdeclaration: values.isDeclared ? 'Y' : 'N',
+    declaration_img: values.declarationImages?.[0] || '',
 
-    // charges: {
-    //   freightAmount: values.freightDetails?.freightAmount || '0',
-    //   loadingcharge: values.freightDetails?.loading || '0',
-    //   unloadingcharge: values.freightDetails?.unloading || '0',
-    //   LRcharge: values.freightDetails?.lrCharges || '0',
-    //   othercharge: values.freightDetails?.otherCharges || '0',
-    //   otherchargelabel: values.freightDetails?.otherChargesLabel || '',
-    //   Advance: values.freightDetails?.advance || '0',
-    // },
-
-    lr_no: values.lr_no || '',
-    lr_date: values.lr_date || '',
-
-    invoiceDetails: (values.invoices || []).map(inv => ({
-      invoice_number: inv.invoiceNo || '',
-      invoice_date: inv.invoiceDate || '',
-      Unit: inv.unit || '',
-      quantity: inv.quantity || '',
-      value_amount: inv.value || '',
-      invoice_img: inv.image || '',
-      remarks: '',
+    invoiceDetails: extractItemsFromGroups(values.invoices).map(item => ({
+      invoice_number: item.invoiceNo || '',
+      invoice_date: item.invoiceDate || '',
+      Unit: item.unit || '',
+      quantity: item.quantity || '',
+      net_weight: item.netWeight || '',
+      gross_weight: item.grossWeight || '',
+      package_type: item.packageType || '',
+      material_Type: item.materialType || '',
+      po_number: item.poNo || '',
+      po_date: item.poDate || '',
+      value_amount: item.value || '',
+      invoice_img: item.image || '',
+      remarks: item.remarks || '',
     })),
 
-    challanDetails: (values.challans || []).map(ch => ({
-      challan_number: ch.challanNo || '',
-      challan_date: ch.challanDate || '',
-      Unit: ch.unit || '',
-      quantity: ch.quantity || '',
-      value_amount: ch.value || '',
-      challan_img: ch.image || '',
-      remarks: '',
+    challanDetails: extractItemsFromGroups(values.challans).map(item => ({
+      challan_number: item.challanNo || '',
+      challan_date: item.challanDate || '',
+      Unit: item.unit || '',
+      quantity: item.quantity || '',
+      net_weight: item.netWeight || '',
+      package_type: item.packageType || '',
+      material_Type: item.materialType || '',
+      doc_no: item.documentno || '',
+      po_number: item.poNo || '',
+      po_date: item.poDate || '',
+      value_amount: item.value || '',
+      challan_img: item.image || '',
+      remarks: item.remarks || '',
+    })),
+
+    stockDetails: extractItemsFromGroups(values.StockTransfers).map(item => ({
+      stock_number: item.StockTransferNo || '',
+      stock_date: item.StockTransferDate || '',
+      Unit: item.unit || '',
+      net_weight: item.netWeight || '',
+      gross_weight: item.grossWeight || '',
+      quantity: item.quantity || '',
+      value_amount: item.value || '',
+      from_location: item.fromLocation || '',
+      to_location: item.toLocation || '',
+      material: item.materialType || '',
+      stock_img: item.image || '',
+      remarks: item.remarks || '',
+    })),
+
+    BillDetails: extractItemsFromGroups(values.billOfEntries).map(item => ({
+      Bill_Entry_number: item.billOfEntryNo || '',
+      Bill_Entry_date: item.billOfEntryDate || '',
+      Shipper_name: item.shipperName || '',
+      Country: item.country || '',
+      buyer_name: item.buyerName || '',
+      destination: item.destination || '',
+      Currency: item.currency || '',
+      Value: item.value || '',
+      Material_type: item.materialType || '',
+      Package_type: item.packageType || '',
+      Bill_img: item.image || '',
+      remarks: item.remarks || '',
     })),
   };
 };
 
 // ========== INITIAL VALUES ==========
-const initialValues: FormikValues = {
-  vehicleNo: '',
-  driverName: '',
-  driverNumber: '',
-  loadPosDate: '',
-  customerName: '',
+// const initialValues = {
+//   // Step 1
+//   pickupName: '',
+//   pickupGst: '',
+//   pickupAddress1: '',
+//   pickupAddress2: '',
+//   pickupPhone: '',
+//   pickupAltPhone: '',
+//   pickupPincode: '',
+//   pickupCity: '',
+//   pickupState: '',
+//   pickupLat: '',
+//   pickupLng: '',
+//   pickupGoogle: '',
 
-  // Pickup Details
+//   dropName: '',
+//   dropGst: '',
+//   dropPhone: '',
+//   dropAddress1: '',
+//   dropAddress2: '',
+//   dropPincode: '',
+//   dropCity: '',
+//   dropState: '',
+//   dropLat: '',
+//   dropLng: '',
+//   dropGoogle: '',
+
+//   // Step 2
+//   invoices: [],
+//   challans: [],
+//   billOfEntries: [],
+//   StockTransfers: [],
+//   isDeclared: false,
+
+//   // Step 3
+//   declaration: {
+//     checkbox1: '',
+//     checkbox2: '',
+//     checkbox3: '',
+//     checkbox4: '',
+//     checkbox5: '',
+//   },
+//   declarationImages: [],
+// };
+const initialValues = {
+  // STEP 1 – Pickup
   pickupName: '',
-  pickupPhone: '',
   pickupGst: '',
   pickupAddress1: '',
   pickupAddress2: '',
+  pickupPhone: '',
+  pickupAltPhone: '',
   pickupPincode: '',
   pickupCity: '',
   pickupState: '',
-  pickupDistrict: '',
-  pickupTaluka: '',
+  pickupLat: '',
+  pickupLng: '',
   pickupGoogle: '',
-  pickupLat: 0,
-  pickupLng: 0,
 
-  // Drop Details
+  // STEP 1 – Drop
   dropName: '',
-  dropPhone: '',
   dropGst: '',
+  dropPhone: '',
   dropAddress1: '',
   dropAddress2: '',
   dropPincode: '',
   dropCity: '',
   dropState: '',
-  dropDistrict: '',
-  dropTaluka: '',
+  dropLat: '',
+  dropLng: '',
   dropGoogle: '',
-  dropLat: 0,
-  dropLng: 0,
 
-  // Vehicle & Cargo
-  VehicleType: '',
-  bodyType: '',
-  cargoContent: '',
-  packageType: '',
-  packageNote: '',
-  dhalaLength: '',
-  Approximate_weight: '',
-
-  // PO
-  poNo: '',
-  poDate: '',
-
-  // Arrays
+  // STEP 2 – Documents
   invoices: [],
   challans: [],
-  cargo: [],
-  packaging: [],
-  // freightDetailsArray: [],
+  billOfEntries: [],
+  StockTransfers: [],
 
-  // Weight
-  netWeight: '',
-  grossWeight: '',
+  // STEP 3 – Declaration (Payload-2 style)
+  isDeclared: false, // will convert to "Y" / "N"
 
-  // Freight Details
-  // freightDetails: {
-  //   noOfPackages: '0',
-  //   netQuantity: '0',
-  //   grossWeight: '0',
-  //   freightAmount: '0',
-  //   loading: '0',
-  //   unloading: '0',
-  //   // lrCharges: '0',
-  //   // otherCharges: '0',
-  //   // otherChargesLabel: '',
-  //   // advance: '0',
-  //   // balance: '0',
-  // },
+  // Array of declaration texts
+  declarationTextList: [
+    '', // declaration1
+    '', // declaration2
+    '', // declaration3
+    '', // declaration4
+  ],
 
-  // Additional
-  labReportApplied: false,
-  labReportAvailable: false,
-  insurance: false,
-  transitRisk: '',
-  lr_no: '',
-  lr_date: '',
+  // Single or multiple images (first one will be used)
+  declarationImages: [],
 };
 
 // ========== VALIDATION SCHEMA ==========
@@ -337,13 +639,16 @@ export default function MultiStepFormTabs() {
   const [stepCompletion, setStepCompletion] = useState({
     step1: false,
     step2: false,
-    step3: false,
   });
-
+  const customerID =
+    useSelector((state: RootState) => state.auth.customerDetails?.CustomerID) ||
+    'CM123456';
   // API Integration
   const { data: loadPostData, isLoading } = useGetcustomerloadpostdetailsQuery({
-    CustomerID: 'CM770175',
+    CustomerID: 'CM548612',
   });
+
+  console.log({ loadPostData });
   const [insertVehicleloadpostdatasheet, { isLoading: isInserting }] =
     useInsertVehicleloadpostdatasheetMutation();
 
@@ -351,8 +656,10 @@ export default function MultiStepFormTabs() {
     useUpdateloadpostMutation();
 
   // Transform data for dropdown
-  const dropdownItems = React.useMemo(() => {
-    const dataSource = loadPostData?.length ? loadPostData : DUMMY_DATA;
+  const dropdownItems = useMemo(() => {
+    const dataSource =
+      loadPostData?.data?.length > 0 ? loadPostData.data : DUMMY_DATA;
+
     return transformToDropdownItems(dataSource);
   }, [loadPostData]);
 
@@ -360,11 +667,14 @@ export default function MultiStepFormTabs() {
     setSelectedLoadPost(loadPostId);
   };
 
-  // Step completion checks
+  // const hasAnyDocument = useSelector(
+  //   (state: RootState) => state.vehicleSheet.isDocumentsAvailable,
+  // );
+
   const checkStep1Completion = (values: FormikValues) => {
     return (
       values.pickupName?.trim() !== '' &&
-      values.pickupGst?.trim() !== '' &&
+      // values.pickupGst?.trim() !== '' &&
       values.pickupAddress1?.trim() !== '' &&
       values.pickupPincode?.trim() !== '' &&
       values.dropName?.trim() !== '' &&
@@ -377,19 +687,20 @@ export default function MultiStepFormTabs() {
   const checkStep2Completion = (values: FormikValues) => {
     return (
       (values.invoices && values.invoices.length > 0) ||
-      (values.challans && values.challans.length > 0)
+      (values.challans && values.challans.length > 0) ||
+      (values.billOfEntries && values.billOfEntries.length > 0) ||
+      (values.StockTransfers && values.StockTransfers.length > 0)
     );
   };
 
-  const checkStep3Completion = (values: FormikValues) => {
-    return values.freightDetails && values.freightDetails.freightAmount !== '';
-  };
+  // const checkStep3Completion = (values: FormikValues) => {
+  //   return values.freightDetails && values.freightDetails.freightAmount !== '';
+  // };
 
   const checkStepCompletion = (values: FormikValues) => {
     setStepCompletion({
       step1: checkStep1Completion(values),
       step2: checkStep2Completion(values),
-      step3: checkStep3Completion(values),
     });
   };
 
@@ -397,21 +708,23 @@ export default function MultiStepFormTabs() {
   const handleSubmit = async (values: FormikValues) => {
     try {
       // Validate required fields
-      if (!selectedLoadPost) {
-        Alert.alert('Error', 'Please select a load post from dropdown');
-        return;
-      }
+      // if (!selectedLoadPost) {
+      //   Alert.alert('Error', 'Please select a load post from dropdown');
+      //   return;
+      // }
 
-      if (!checkStep1Completion(values)) {
-        Alert.alert('Error', 'Please complete Step 1: Name & Address Details');
-        return;
-      }
+      // if (!checkStep1Completion(values)) {
+      //   Alert.alert('Error', 'Please complete Step 1: Name & Address Details');
+      //   return;
+      // }
 
       // Transform to API payload
       const payload = transformToApiPayload(values, selectedLoadPost);
-
+      //  const payload = values;
+      console.log({ payload });
       // Call API
       const response = await insertVehicleloadpostdatasheet(payload).unwrap();
+      console.log({ response });
 
       Alert.alert('Success', 'Load data updated successfully!');
     } catch (error: any) {
@@ -449,7 +762,7 @@ export default function MultiStepFormTabs() {
       {/* Formik Form */}
       <Formik
         initialValues={initialValues}
-        validationSchema={validationSchema}
+        // validationSchema={validationSchema}
         validateOnBlur={false}
         validateOnChange={false}
         onSubmit={handleSubmit}
@@ -458,14 +771,19 @@ export default function MultiStepFormTabs() {
         {formik => {
           // Update formik values when load post is selected
           useEffect(() => {
-            if (selectedLoadPost && dropdownItems.length > 0) {
-              const selectedItem = dropdownItems.find(
-                item => item.loadPostId === selectedLoadPost,
-              )?.full;
-              if (selectedItem) {
-                const mappedData = mapApiDataToFormik(selectedItem);
-                formik.setValues(prev => ({ ...prev, ...mappedData }));
-              }
+            if (!selectedLoadPost || dropdownItems.length === 0) return;
+
+            const selectedItem = dropdownItems.find(
+              item => item.loadPostId === selectedLoadPost,
+            )?.full;
+
+            if (!selectedItem) return;
+
+            const mappedData = mapApiDataToFormik(selectedItem);
+            console.log({ mappedData });
+
+            if (Object.keys(mappedData).length > 0) {
+              formik.setValues(prev => ({ ...prev, ...mappedData }));
             }
           }, [selectedLoadPost, dropdownItems]);
 
@@ -525,7 +843,7 @@ export default function MultiStepFormTabs() {
                             },
                           ]}
                         >
-                          Name & Address
+                          <Text>Name & Address</Text>
                         </Text>
                         {stepCompletion.step1 && !focused && (
                           <View style={styles.completedIndicator}>
@@ -558,7 +876,7 @@ export default function MultiStepFormTabs() {
                         labelStyle={styles.buttonLabel}
                         disabled={!stepCompletion.step1}
                       >
-                        Next: Invoice/Documents Detail
+                        <Text> Next: Invoice/Documents Detail</Text>
                       </Button>
                     </ScrollView>
                   )}
@@ -570,26 +888,9 @@ export default function MultiStepFormTabs() {
                   options={{
                     tabBarLabel: ({ focused, color }) => (
                       <View style={styles.tabLabelContainer}>
-                        <Text
-                          style={[
-                            styles.tabLabelText,
-                            {
-                              color: stepCompletion.step2
-                                ? focused
-                                  ? '#3366FF'
-                                  : '#10B981'
-                                : color,
-                              fontWeight: stepCompletion.step2 ? '700' : '600',
-                            },
-                          ]}
-                        >
+                        <Text style={[styles.tabLabelText, { color }]}>
                           Documents
                         </Text>
-                        {stepCompletion.step2 && !focused && (
-                          <View style={styles.completedIndicator}>
-                            <Text style={styles.completedCheck}>✓</Text>
-                          </View>
-                        )}
                       </View>
                     ),
                   }}
@@ -605,6 +906,7 @@ export default function MultiStepFormTabs() {
                         setFieldValue={formik.setFieldValue}
                       />
 
+                      {/* 🔽 FOOTER BUTTONS */}
                       <View style={styles.navButtons}>
                         <Button
                           mode="outlined"
@@ -612,19 +914,18 @@ export default function MultiStepFormTabs() {
                             navigation.navigate('Name & Address Details')
                           }
                           style={styles.backButton}
-                          labelStyle={styles.buttonLabel}
                         >
                           Back
                         </Button>
+
                         <Button
                           mode="contained"
-                          onPress={() => formik.handleSubmit()}
+                          onPress={formik.handleSubmit}
                           style={styles.submitButton}
-                          labelStyle={styles.buttonLabel}
                           loading={isSubmitting}
-                          disabled={isSubmitting || !stepCompletion.step3}
+                          disabled={isSubmitting}
                         >
-                          {isSubmitting ? 'Submitting...' : 'Submit Load'}
+                          Submit Load
                         </Button>
                       </View>
                     </ScrollView>
