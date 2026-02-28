@@ -390,10 +390,9 @@ const RegistrationScreen: React.FC = () => {
             MPIN_Flag: 'N',
           }),
         );
-
         navigation.replace(
           formData.CompanyType === 'Individual'
-            ? routeName.INDIVIDUAL
+            ? routeName.SET_MPIN
             : routeName.ADD_EMPLOYEE,
         );
       } else {

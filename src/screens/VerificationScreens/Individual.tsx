@@ -27,7 +27,7 @@ const formatAadhaar = (value: string): string => {
 export default function Individual() {
   const navigation = useNavigation<any>();
 
-  const [verifiedAadhaar, setVerifiedAadhaar] = useState(false);
+  const [verifiedAadhaar, setVerifiedAadhaar] = useState(true);
   const [verifiedPan, setVerifiedPan] = useState(false);
   const [verifiedGst, setVerifiedGst] = useState(false);
 

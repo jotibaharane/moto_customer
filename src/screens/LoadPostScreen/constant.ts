@@ -12,6 +12,7 @@ export const emptyShipmentData: ShipmentData = {
     contactName: '',
     companyName: '',
     contactNumber: '',
+    shipperName: '',
     plotOrBuilding: '',
     streetArea: '',
     pincode: '',

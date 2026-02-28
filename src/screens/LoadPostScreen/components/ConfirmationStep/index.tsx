@@ -196,7 +196,7 @@ const ConfirmationStep: React.FC = () => {
       <View style={[tw`bg-white mb-4`, styles.card]}>
         <View style={tw`p-6`}>
           <Text style={tw`text-gray-800 font-bold text-lg mb-4`}>
-            Vehicle Details
+            Vehicle Requirements-Specification
           </Text>
 
           <View style={tw`space-y-4`}>
@@ -262,7 +262,7 @@ const ConfirmationStep: React.FC = () => {
       <View style={[tw`bg-white mb-4`, styles.card]}>
         <View style={tw`p-6`}>
           <Text style={tw`text-gray-800 font-bold text-lg mb-4`}>
-            Load Details
+            Material/Cargo Details
           </Text>
 
           <View style={tw`space-y-4`}>

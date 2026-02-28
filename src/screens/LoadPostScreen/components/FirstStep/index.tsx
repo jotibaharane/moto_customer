@@ -473,7 +473,7 @@ const FirstStep: React.FC = () => {
                     values.pickup.taluka) && (
                     <Text
                       style={tw`text-sm text-gray-800 mt-1 font-medium`}
-                      numberOfLines={2}
+                      numberOfLines={3}
                     >
                       {[
                         values.pickup.pincode &&
@@ -481,12 +481,15 @@ const FirstStep: React.FC = () => {
                         values.pickup.state,
                         values.pickup.district,
                         values.pickup.taluka,
-                        values.pickup?.alternateNo &&
-                          `Alternate Contact: ${values.pickup?.alternateNo}`,
                         //s `Alternate Contact: 7506122183`,
                       ]
                         .filter(Boolean)
                         .join(', ')}
+                    </Text>
+                  )}
+                  {values.pickup?.alternateNo && (
+                    <Text style={tw`text-sm text-gray-800 mt-1 font-medium`}>
+                      Alternate Contact: {values.pickup.alternateNo}
                     </Text>
                   )}
                 </View>

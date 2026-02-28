@@ -435,6 +435,7 @@ export interface PickupData {
   companyName: string;
   contactNumber: string;
   plotOrBuilding: string;
+  shipperName: string;
   streetArea: string;
   pincode: string;
   state: string;

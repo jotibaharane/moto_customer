@@ -16,14 +16,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
-import {
-  RadioButton,
-  TextInput,
-  HelperText,
-  Button,
-  Chip,
-  Card,
-} from 'react-native-paper';
+import { TextInput, HelperText, Button, Card } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { ShipmentData } from '@api/api.type';
@@ -62,6 +55,7 @@ interface LocalPickupData {
   streetArea: string;
   state: string;
   district: string;
+  shipperName: string;
   taluka: string;
   pincode: string;
   companyName: string;
@@ -91,7 +85,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const { selectedLocation, handleInputChange, suggestions } =
     useGooglePlacesSelect();
   const { values, setFieldValue } = useFormikContext<ShipmentData>();
-
+  const isOther = values?.pickup?.pickupType === 'Other';
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showAddressTypeModal, setShowAddressTypeModal] = useState(false);
@@ -116,6 +110,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     contactName: '',
     contactNumber: '',
     plotOrBuilding: '',
+    shipperName: '',
     streetArea: '',
     state: '',
     district: '',
@@ -140,6 +135,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         contactNumber: values.pickup.contactNumber || '',
         plotOrBuilding: values.pickup.plotOrBuilding || '',
         streetArea: values.pickup.streetArea || '',
+        shipperName: values.pickup.shipperName || '', // <-- include shipperName
         state: values.pickup.state || '',
         district: values.pickup.district || '',
         taluka: values.pickup.taluka || '',
@@ -162,6 +158,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         plotOrBuilding: '',
         streetArea: '',
         state: '',
+        shipperName: '',
         district: '',
         taluka: '',
         pincode: '',
@@ -173,13 +170,11 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     }
 
     setFieldErrors({});
-  }, [isModalOpen, values.pickup]); // ✅ add values.pickup as dependency
+  }, [isModalOpen, values.pickup]);
 
   const handleCurrentLocation = useCallback(() => {
     if (currentlocation) {
       const components = currentlocation?.components || {};
-
-      //  console.log('Current Location Components:', currentlocation);
 
       // Update local values with current location data
       const updatedValues = {
@@ -220,6 +215,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     }
   }, [currentlocation, CustomerDetail, localValues]);
   console.log({ CustomerDetail });
+
   const handleState = useCallback(
     async (value: string) => {
       try {
@@ -234,66 +230,11 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
     [getDistricts],
   );
 
-  // const handlePinchange = useCallback(
-  //   async (value: string) => {
-  //     // Clean the input - only numbers, max 6 digits
-  //     const cleanValue = value.replace(/[^0-9]/g, '').slice(0, 6);
-  //     setLocalValues(prev => ({ ...prev, pincode: cleanValue }));
-
-  //     if (fieldErrors.pincode) {
-  //       setFieldErrors(prev => ({ ...prev, pincode: '' }));
-  //     }
-
-  //     // Call API when we have exactly 6 digits
-  //     if (cleanValue.length === 6) {
-  //       try {
-  //         const response = await PincodeData({ pincode: cleanValue }).unwrap();
-  //         const mapped = response?.data;
-  //         if (mapped) {
-  //           const newState = mapped?.State || '';
-  //           const newDistrict = mapped?.District || '';
-
-  //           setLocalValues(prev => ({
-  //             ...prev,
-  //             state: newState,
-  //             district: newDistrict,
-  //           }));
-
-  //           // Fetch districts for the new state
-  //           if (newState) {
-  //             const districtResponse = await getDistricts({
-  //               state: newState,
-  //             }).unwrap();
-  //             setAvailableDistricts(
-  //               districtResponse?.data ? districtResponse?.data : [],
-  //             );
-  //           }
-
-  //           Toast.show({
-  //             type: 'success',
-  //             text1: 'Pincode Verified',
-  //             text2: 'State and district have been auto-filled',
-  //           });
-  //         }
-  //       } catch (error) {
-  //         console.error('Error fetching pincode data:', error);
-  //         Toast.show({
-  //           type: 'error',
-  //           text1: 'Invalid Pincode',
-  //           text2: 'Please enter a valid pincode',
-  //         });
-  //       }
-  //     }
-  //   },
-  //   [PincodeData, getDistricts, fieldErrors.pincode],
-  // );
-
   // Handle Registered button press
   const handleRegisteredPress = useCallback(() => {
     if (customerAddressData?.data?.length > 0) {
       const registeredAddress = customerAddressData.data[0];
 
-      // Set all values but they won't be displayed in the form
       const updatedValues = {
         origin: {
           address: registeredAddress.Address,
@@ -320,11 +261,11 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         pincode: registeredAddress.Pincode || '',
         addressType: null,
         alternateNo: '',
+        shipperName: '', // <-- clear shipperName for registered
       };
 
       setLocalValues(updatedValues);
 
-      // If state is available from registered address, fetch districts for that state
       if (registeredAddress.State) {
         handleState(registeredAddress.State);
       }
@@ -332,7 +273,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       Toast.show({
         type: 'success',
         text1: 'Registered Address Loaded',
-        text2: 'Registered address has been set (not displayed in form)',
+        text2: 'Registered address has been set',
       });
     } else {
       Alert.alert(
@@ -372,6 +313,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       setFieldValue('pickup.pincode', valuesToConfirm.pincode);
       setFieldValue('pickup.companyName', valuesToConfirm.companyName);
       setFieldValue('pickup.addressType', valuesToConfirm.addressType);
+      setFieldValue('pickup.shipperName', valuesToConfirm.shipperName); // <-- include shipperName
 
       setFieldErrors({});
       setIsConfirmStep(false);
@@ -382,37 +324,8 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
 
   const handleConfirm = useCallback(() => {
     const errors: any = {};
-    // console.log(localValues);
 
-    // Validate required fields
-    // if (!localValues.origin?.address) {
-    //   errors.origin = 'Please select a pickup location';
-    // }
-    // if (!localValues.contactName?.trim()) {
-    //   errors.contactName = 'Please enter contact person name';
-    // }
-    // if (!localValues.contactNumber?.trim()) {
-    //   errors.contactNumber = 'Please enter contact number';
-    // } else if (localValues.contactNumber.length !== 10) {
-    //   errors.contactNumber = 'Please enter a valid 10-digit number';
-    // }
-    // if (!localValues.plotOrBuilding?.trim()) {
-    //   errors.plotOrBuilding = 'Please enter plot/unit/building details';
-    // }
-    // if (!localValues.streetArea?.trim()) {
-    //   errors.streetArea = 'Please enter area/street details';
-    // }
-    // if (!localValues.pincode?.trim()) {
-    //   errors.pincode = 'Please enter pincode';
-    // } else if (localValues.pincode.length !== 6) {
-    //   errors.pincode = 'Please enter a valid 6-digit pincode';
-    // }
-    // if (!localValues.state?.trim()) {
-    //   errors.state = 'Please select state';
-    // }
-    // if (!localValues.addressType) {
-    //   errors.addressType = 'Please select address type';
-    // }
+    // (Validation code is commented out in original; if needed, uncomment and adjust)
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -441,10 +354,8 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
       try {
         const location = await originPlaces.getPlaceDetails(selected.key);
         if (location) {
-          // Extract address components from the location
           const components = location.components || {};
 
-          // Update local values with Google Places data
           setLocalValues(prev => ({
             ...prev,
             origin: location,
@@ -452,14 +363,12 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
             district: components.dist || '',
             taluka: components.tal || '',
             pincode: components.pincode || '',
-            // Auto-fill plot/building and street/area from the address if needed
             plotOrBuilding: components.place || prev.plotOrBuilding,
             streetArea: location.address || prev.streetArea,
           }));
 
           setFieldErrors(prev => ({ ...prev, origin: '' }));
 
-          // If state is available from Google address, fetch districts for that state
           if (components.state) {
             handleState(components.state);
           }
@@ -497,6 +406,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         district: item.district || '',
         taluka: item.taluka || '',
         pincode: item.pincode || '',
+        shipperName: '', // <-- clear shipperName for history selection
       }));
 
       setShowHistoryModal(false);
@@ -625,7 +535,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
           <Card style={styles.header}>
             <Card.Content style={styles.headerContent}>
               <View style={tw`flex-row justify-between items-center`}>
-                <Text style={styles.title}>Pickup Location</Text>
+                <Text style={styles.title}>Pickup Address</Text>
                 <TouchableOpacity
                   onPress={handleModalClose}
                   style={styles.closeButton}
@@ -641,11 +551,25 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
               <SegmentedButtons
                 value={values.pickup.pickupType || ''}
                 onValueChange={value => {
+                  // 🔥 FIX: Set pickup.pickupType so that isOther works correctly
+                  setFieldValue('pickup.pickupType', value);
+                  // Also set locationType if needed elsewhere
                   setFieldValue('locationType', value);
+                  if (value === 'Other') {
+                    setLocalValues(prev => ({
+                      ...prev,
+                      origin: {
+                        address: '',
+                        coordinates: null,
+                        components: {},
+                      },
+                    }));
+                  }
 
                   if (value === 'registered') handleRegisteredPress();
                   if (value === 'current') handleCurrentLocation();
                   if (value === 'history') handleHistoryPress();
+                  // For 'Other', no automatic data loading is needed
                 }}
                 buttons={[
                   {
@@ -659,6 +583,11 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                     icon: 'office-building',
                   },
                   {
+                    value: 'Other',
+                    label: 'Other',
+                    icon: 'user',
+                  },
+                  {
                     value: 'history',
                     label: 'History',
                     icon: 'history',
@@ -670,47 +599,50 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
             <Card.Content>
               <TextInput
                 mode="outlined"
-                label=" Registered  / Currentlocation"
+                label="Pickup Address"
                 style={styles.input}
-                placeholder="Enter plot/unit number"
+                placeholder="Enter pickup address"
                 value={localValues?.origin?.address || ''}
-                numberOfLines={4}
-              />
+                multiline
+                editable={isOther}
+                onChangeText={text => {
+                  if (!isOther) return;
 
-              {/* Google Address Search */}
-              {/* <Text style={tw`text-gray-700 mb-2 text-base font-medium`}>
-                Pickup Location *
-              </Text> */}
-              <SelectList
-                data={originPlaces?.suggestions}
-                displayKey="value"
-                value={
-                  originPlaces.inputValue || localValues?.origin?.address || ''
-                }
-                save="object"
-                setSelected={handleOriginSelect}
-                placeholder="Search pickup location..."
-                search={true}
-                dropdownType="modal"
-                onSearchChange={originPlaces.handleInputChange}
-                searchValue={originPlaces.inputValue}
-                inputStyles={[
-                  tw`border-gray-200`,
-                  fieldErrors.origin && {
-                    borderColor: 'red',
-                    borderWidth: 1,
-                  },
-                ]}
+                  setLocalValues(prev => ({
+                    ...prev,
+                    origin: {
+                      ...(prev.origin || {}),
+                      address: text,
+                      coordinates: prev.origin?.coordinates || null,
+                      components: prev.origin?.components || {},
+                    },
+                  }));
+                }}
               />
+              {!isOther && (
+                <SelectList
+                  data={originPlaces?.suggestions}
+                  displayKey="value"
+                  value={
+                    originPlaces.inputValue ||
+                    localValues?.origin?.address ||
+                    ''
+                  }
+                  save="object"
+                  setSelected={handleOriginSelect}
+                  placeholder="Search pickup location..."
+                  search={true}
+                  dropdownType="modal"
+                  onSearchChange={originPlaces.handleInputChange}
+                  searchValue={originPlaces.inputValue}
+                />
+              )}
               {fieldErrors.origin && (
                 <HelperText type="error" visible={true}>
                   {fieldErrors.origin}
                 </HelperText>
               )}
 
-              {/* Registered and History Chips */}
-
-              {/* Plot/Building */}
               <TextInput
                 mode="outlined"
                 label="Plot / Unit / Building *"
@@ -737,7 +669,6 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                 </HelperText>
               )}
 
-              {/* Street/Area */}
               <TextInput
                 mode="outlined"
                 label="Street / Area / Sector / Village *"
@@ -758,7 +689,22 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                 </HelperText>
               )}
 
-              {/* Alternate No */}
+              {/* 🔥 Shipper Name input appears only when pickupType is 'Other' */}
+              {isOther && (
+                <TextInput
+                  mode="outlined"
+                  label="Shipper Name"
+                  style={styles.input}
+                  placeholder="Enter shipper name"
+                  value={localValues?.shipperName}
+                  onChangeText={text => {
+                    setLocalValues(prev => ({ ...prev, shipperName: text }));
+                  }}
+                  keyboardType="default"
+                  maxLength={100}
+                />
+              )}
+
               <TextInput
                 mode="outlined"
                 label="Alternate No"
@@ -772,152 +718,9 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                 maxLength={10}
               />
 
-              {/* Contact Person */}
-              {/* <TextInput
-                mode="outlined"
-                label="Contact Person *"
-                style={styles.input}
-                placeholder="Enter contact person name"
-                value={localValues.contactName}
-                onChangeText={text => {
-                  setLocalValues(prev => ({ ...prev, contactName: text }));
-                  if (fieldErrors.contactName) {
-                    setFieldErrors(prev => ({ ...prev, contactName: '' }));
-                  }
-                }}
-                error={!!fieldErrors.contactName}
-              />
-              {fieldErrors.contactName && (
-                <HelperText type="error" visible={true}>
-                  {fieldErrors.contactName}
-                </HelperText>
-              )} */}
-
-              {/* Contact Number */}
-              {/* <TextInput
-                mode="outlined"
-                label="Contact Number *"
-                style={styles.input}
-                placeholder="Enter contact number"
-                value={localValues.contactNumber}
-                onChangeText={text => {
-                  setLocalValues(prev => ({ ...prev, contactNumber: text }));
-                  if (fieldErrors.contactNumber) {
-                    setFieldErrors(prev => ({ ...prev, contactNumber: '' }));
-                  }
-                }}
-                keyboardType="phone-pad"
-                maxLength={10}
-                error={!!fieldErrors.contactNumber}
-              />
-              {fieldErrors.contactNumber && (
-                <HelperText type="error" visible={true}>
-                  {fieldErrors.contactNumber}
-                </HelperText>
-              )} */}
-
-              {/* Pincode and State */}
-              {/* <View style={tw`flex-row gap-3 mb-4`}>
-                <View style={tw`flex-1`}>
-                  <TextInput
-                    mode="outlined"
-                    label="Pincode *"
-                    style={styles.input}
-                    placeholder="Enter Pincode"
-                    value={localValues.pincode}
-                    onChangeText={handlePinchange}
-                    keyboardType="numeric"
-                    maxLength={6}
-                    error={!!fieldErrors.pincode}
-                  />
-                  {fieldErrors.pincode && (
-                    <HelperText type="error" visible={true}>
-                      {fieldErrors.pincode}
-                    </HelperText>
-                  )}
-                </View>
-
-                <View style={tw`flex-1`}>
-                  <SelectList
-                    data={stateData?.data || []}
-                    displayKey="state"
-                    save="state"
-                    value={localValues.state}
-                    setSelected={value => {
-                      handleState(value);
-                      if (fieldErrors.state) {
-                        setFieldErrors(prev => ({ ...prev, state: '' }));
-                      }
-                    }}
-                    placeholder="Select State"
-                    onClear={() =>
-                      setLocalValues(prev => ({ ...prev, state: '' }))
-                    }
-                    inputStyles={tw`border-gray-200`}
-                    style={
-                      fieldErrors.state && {
-                        borderColor: 'red',
-                        borderWidth: 1,
-                      }
-                    }
-                  />
-                  {fieldErrors.state && (
-                    <HelperText type="error" visible={true}>
-                      {fieldErrors.state}
-                    </HelperText>
-                  )}
-                </View>
-              </View> */}
-
-              {/* District and Taluka */}
-              {/* <View style={tw`flex-row gap-3 mb-4`}>
-                <View style={tw`flex-1`}>
-                  <SelectList
-                    data={availableDistricts}
-                    displayKey="region"
-                    save="region"
-                    value={localValues.district}
-                    setSelected={val =>
-                      setLocalValues(prev => ({ ...prev, district: val }))
-                    }
-                    placeholder="Select District"
-                    onClear={() =>
-                      setLocalValues(prev => ({ ...prev, district: '' }))
-                    }
-                    disabled={!localValues.state}
-                    inputStyles={tw`border-gray-200`}
-                  />
-                </View> */}
-
-              {/* <View style={tw`flex-1`}>
-                  <TextInput
-                    mode="outlined"
-                    label="Taluka / Town"
-                    style={styles.input}
-                    placeholder="Enter Taluka"
-                    value={localValues.taluka}
-                    onChangeText={text => {
-                      setLocalValues(prev => ({ ...prev, taluka: text }));
-                    }}
-                  />
-                </View>
-              </View> */}
-
-              {/* Company Name */}
-              {/* <TextInput
-                mode="outlined"
-                label="Company Name"
-                style={styles.input}
-                placeholder="Enter company name"
-                value={localValues.companyName}
-                onChangeText={text =>
-                  setLocalValues(prev => ({ ...prev, companyName: text }))
-                }
-              /> */}
-
               {/* Address Type */}
               <Text style={tw`text-gray-700 mb-2 text-base font-medium`}>
-                Address Type *
+                Save This Address Type As
               </Text>
 
               <SegmentedButtons
@@ -1006,6 +809,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   title: {
+    textAlign: 'center',
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',

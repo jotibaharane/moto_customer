@@ -68,6 +68,7 @@ const OtpLoginScreen = () => {
       const response = await sendOTP({
         mobile_number: phoneNumber,
       });
+      console.log({ response });
 
       if (response?.data?.status === '00') {
         setIsLoading(false);

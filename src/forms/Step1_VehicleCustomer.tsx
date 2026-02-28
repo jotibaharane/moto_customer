@@ -1,3 +1,4 @@
+import { RootState } from '@store/index';
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
@@ -10,6 +11,7 @@ import {
   Portal,
   Button,
 } from 'react-native-paper';
+import { useSelector } from 'react-redux';
 
 // ========== TYPES ==========
 interface Step1_VehicleCustomerProps {
@@ -34,7 +36,14 @@ const LocationCard: React.FC<{
   onEdit: () => void;
   type: 'pickup' | 'drop';
 }> = ({ title, values, onEdit, type }) => {
-  console.log({ values });
+  const CustomerDetail = useSelector(
+    (state: RootState) => state?.auth?.customerDetails,
+  );
+
+  // const IsOrganization = CustomerDetail?.customerType === 'Organization';
+
+  const IsOrganization = true;
+  const isPickupOrganization = type === 'pickup' && IsOrganization;
   const prefix = type;
 
   return (
@@ -56,16 +65,30 @@ const LocationCard: React.FC<{
       <Divider style={styles.divider} />
 
       <View style={styles.cardContent}>
-        {/* Name - label and value in same row */}
-        <View style={styles.fieldRow}>
-          <Text variant="labelSmall" style={styles.fieldLabel}>
-            NAME
-          </Text>
+        {isPickupOrganization && (
+          <View style={styles.fieldRow}>
+            <Text variant="labelSmall" style={styles.fieldLabel}>
+              SHIPPER NAME
+            </Text>
 
-          <Text variant="bodyMedium" style={styles.fieldValue}>
-            {values[`${prefix}Name`] || '—'}
-          </Text>
-        </View>
+            <Text variant="bodyMedium" style={styles.fieldValue}>
+              {values[`${prefix}ShipperName`] || '—'}
+            </Text>
+          </View>
+        )}
+        {/* Name - label and value in same row */}
+
+        {!isPickupOrganization && (
+          <View style={styles.fieldRow}>
+            <Text variant="labelSmall" style={styles.fieldLabel}>
+              NAME
+            </Text>
+
+            <Text variant="bodyMedium" style={styles.fieldValue}>
+              {values[`${prefix}Name`] || '—'}
+            </Text>
+          </View>
+        )}
 
         {/* Phone - label and value in same row */}
         {/* <View style={styles.fieldRow}>
@@ -202,6 +225,13 @@ const LocationModal: React.FC<LocationModalProps> = ({
             <Divider style={styles.modalDivider} />
 
             <ScrollView style={styles.modalContent}>
+              <TextInput
+                label="Shipper Name"
+                value={values[`${prefix}ShipperName`] || ''}
+                onChangeText={t => setFieldValue(`${prefix}ShipperName`, t)}
+                mode="outlined"
+                style={styles.input}
+              />
               {/* GST Number */}
               <TextInput
                 label="GST Number"

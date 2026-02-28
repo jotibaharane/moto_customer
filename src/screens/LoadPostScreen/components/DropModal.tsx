@@ -369,7 +369,7 @@ const DropModal = forwardRef<DropModalRef>((props, ref) => {
                 <Icon name="close" size={22} color="#666" />
               </TouchableOpacity>
 
-              <Text style={styles.title}>Drop Location</Text>
+              <Text style={styles.title}>Delivery Address</Text>
 
               <TouchableOpacity
                 style={styles.historyButton}

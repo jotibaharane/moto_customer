@@ -229,6 +229,7 @@ export interface FormikValues {
   pickupName: string;
   pickupPhone: string;
   pickupGst?: string;
+  shipperName?: string;
   pickupAddress1: string;
   pickupAddress2: string;
   pickupPincode: string;

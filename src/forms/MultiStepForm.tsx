@@ -569,6 +569,7 @@ const transformToApiPayload = (
 const initialValues = {
   // STEP 1 – Pickup
   pickupName: '',
+  shipperName: '',
   pickupGst: '',
   pickupAddress1: '',
   pickupAddress2: '',
