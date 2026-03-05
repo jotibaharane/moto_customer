@@ -85,7 +85,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
   const { selectedLocation, handleInputChange, suggestions } =
     useGooglePlacesSelect();
   const { values, setFieldValue } = useFormikContext<ShipmentData>();
-  const isOther = values?.pickup?.pickupType === 'Other';
+  const isOther = values?.pickup?.pickupType === 'other';
   const bottomModalRef = useRef<BottomModalRef>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showAddressTypeModal, setShowAddressTypeModal] = useState(false);
@@ -141,7 +141,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
         taluka: values.pickup.taluka || '',
         pincode: values.pickup.pincode || '',
         companyName: values.pickup.companyName || '',
-        addressType: values.pickup.addressType || null,
+        addressType: values.pickup.addresstype || null,
         alternateNo: values.pickup.alternateNo || '',
       });
 
@@ -555,7 +555,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                   setFieldValue('pickup.pickupType', value);
                   // Also set locationType if needed elsewhere
                   setFieldValue('locationType', value);
-                  if (value === 'Other') {
+                  if (value === 'other') {
                     setLocalValues(prev => ({
                       ...prev,
                       origin: {
@@ -575,17 +575,17 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                   {
                     value: 'registered',
                     label: 'Registered',
-                    icon: 'office-building',
+                    // icon: 'office-building',
                   },
                   {
                     value: 'current',
                     label: 'Current',
-                    icon: 'office-building',
+                    // icon: 'office-building',
                   },
                   {
-                    value: 'Other',
-                    label: 'Other',
-                    icon: 'user',
+                    value: 'other',
+                    label: 'Other Location',
+                    // icon: 'user',
                   },
                   {
                     value: 'history',
@@ -619,7 +619,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                   }));
                 }}
               />
-              {!isOther && (
+              {/* {!isOther && (
                 <SelectList
                   data={originPlaces?.suggestions}
                   displayKey="value"
@@ -641,7 +641,7 @@ const PickupModal = forwardRef<PickupModalRef>((props, ref) => {
                 <HelperText type="error" visible={true}>
                   {fieldErrors.origin}
                 </HelperText>
-              )}
+              )} */}
 
               <TextInput
                 mode="outlined"

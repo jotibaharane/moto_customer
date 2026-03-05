@@ -19,6 +19,7 @@ export const emptyShipmentData: ShipmentData = {
     state: '',
     district: '',
     alternateNo: '',
+    addresstype: '',
     taluka: '',
     origin: {
       address: '',
@@ -46,7 +47,7 @@ export const emptyShipmentData: ShipmentData = {
   vehicle: {
     vehicleType: '',
     weightRange: '', // This will be auto-filled from truck data
-    approximateWeightKg: '', // User inputs this first
+    approximateWeightKg: '', // User inputs thisfirst
   },
   load: {
     cargoType: 'normal',

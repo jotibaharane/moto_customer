@@ -105,10 +105,11 @@ const FirstStep: React.FC = () => {
     description: type.description,
   }));
 
-  const rawWeightRange = values.vehicle.approximateWeightKg;
+  const rawWeightRange = values.vehicle?.approximateWeightKg;
   const debouncedWeightRange = useDebounce(rawWeightRange, 600);
-  const vehicleType = values.vehicle.vehicleType;
+  const vehicleType = values.vehicle?.vehicleType;
   const BodyType = values.load?.bodyType;
+  const isother = values.pickup?.pickupType === 'other';
 
   const vehicleQueryParams = useMemo(() => {
     if (!debouncedWeightRange) return null;
@@ -276,6 +277,8 @@ const FirstStep: React.FC = () => {
 
   console.log({ selectedBodyType }, values.load.bodyType);
 
+  console.log(values.pickup.pickupType);
+
   const handleOpenVehicleModal = useCallback(
     () => vehicleModalRef.current?.open(),
     [],
@@ -384,6 +387,7 @@ const FirstStep: React.FC = () => {
       : values.load?.dhalaLength
       ? '#4F46E5'
       : '#d1d5db';
+
   const bodyTypeBorderColor =
     touched.load?.bodyType && errors.load?.bodyType
       ? '#ef4444'
@@ -427,19 +431,58 @@ const FirstStep: React.FC = () => {
             {values.pickup.origin?.address ? (
               <View style={tw`flex-row justify-between items-start`}>
                 <View style={tw`flex-1 mr-2`}>
-                  {(values.pickup.contactName ||
-                    values.pickup.contactNumber) && (
-                    <Text
-                      style={tw`text-sm text-gray-800 font-medium`}
-                      numberOfLines={1}
-                    >
-                      {values.pickup.contactName &&
-                        `${values.pickup.contactName}`}
-                      {values.pickup.contactName &&
-                        values.pickup.contactNumber &&
-                        ' • '}
-                      {values.pickup.contactNumber}
-                    </Text>
+                  {/* ✅ If pickupType === "other" */}
+                  {isother ? (
+                    <>
+                      {(values.pickup.shipperName ||
+                        values.pickup.contactNumber) && (
+                        <Text
+                          style={tw`text-sm text-gray-800 font-medium`}
+                          numberOfLines={1}
+                        >
+                          {values.pickup.shipperName}
+                          {values.pickup.shipperName &&
+                            values.pickup.alternateNo &&
+                            ' , '}
+                          {values.pickup.alternateNo}
+                        </Text>
+                      )}
+
+                      {values.pickup.companyName && (
+                        <Text
+                          style={tw`text-sm text-gray-800 font-medium`}
+                          numberOfLines={1}
+                        >
+                          {values.pickup.companyName}
+                        </Text>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* ✅ Existing UI for normal pickup */}
+                      {(values.pickup.contactName ||
+                        values.pickup.contactNumber) && (
+                        <Text
+                          style={tw`text-sm text-gray-800 font-medium`}
+                          numberOfLines={1}
+                        >
+                          {values.pickup.contactName}
+                          {values.pickup.contactName &&
+                            values.pickup.contactNumber &&
+                            ' • '}
+                          {values.pickup.contactNumber}
+                        </Text>
+                      )}
+
+                      {values.pickup.companyName && (
+                        <Text
+                          style={tw`text-sm text-gray-800 font-medium`}
+                          numberOfLines={1}
+                        >
+                          Company: {values.pickup.companyName} |
+                        </Text>
+                      )}
+                    </>
                   )}
                   {values.pickup.companyName && (
                     <Text
@@ -487,11 +530,15 @@ const FirstStep: React.FC = () => {
                         .join(', ')}
                     </Text>
                   )}
-                  {values.pickup?.alternateNo && (
+
+                  {!isother && (
                     <Text style={tw`text-sm text-gray-800 mt-1 font-medium`}>
-                      Alternate Contact: {values.pickup.alternateNo}
+                      Alternate No: {values.pickup.alternateNo}
                     </Text>
                   )}
+                  {/* {values.pickup?.alternateNo && (
+                    
+                  )} */}
                 </View>
                 <Icon name="edit" size={16} color={tw.color('gray-500')} />
               </View>

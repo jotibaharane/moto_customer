@@ -442,6 +442,7 @@ export interface PickupData {
   district: string;
   taluka: string;
   origin: Location;
+  addresstype: string;
 }
 
 // Delivery Interface
